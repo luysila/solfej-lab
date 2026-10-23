@@ -281,7 +281,11 @@ if (run('A')) {
   assert.equal(reset.stored, null);
   assert.equal(reset.chip, false);
 
-  // ── Portede göster: VexFlow yüklenemez → anlaşılır mesaj, uygulama çalışmaya devam eder ──
+  // ── Porte görünümü varsayılan açık; ayrı VexFlow paneli varsayılan gizli ──
+  assert.equal(await page.isChecked('#staffToggle'), true, '"Portede göster" varsayılan açık');
+  assert.equal(await page.isHidden('#staffPanel'), true, 'VexFlow paneli varsayılan gizli');
+  // ── VexFlow paneli açılır ama yüklenemez → anlaşılır mesaj, uygulama çalışmaya devam eder ──
+  await page.evaluate(() => window.solfejLab.setConfig({ UI: { VEXFLOW_PANEL: true } }));
   await page.check('#staffToggle', { force: true });
   await page.waitForFunction(() => /yüklenemedi/.test(document.getElementById('staffMsg').textContent), null, { timeout: 20000 });
   log('porte (CDN kapalı):', await page.textContent('#staffMsg'));
@@ -321,7 +325,7 @@ if (run('A')) {
 // ═══ SENARYO B: Tone.js ve VexFlow taklitleri → piyano yolu + porte çizim kodu ═══
 if (run('B')) {
   log('B) taklit kütüphane senaryosu (Tone.js + VexFlow arayüzü)');
-  const { context, page, consoleMsgs } = await openPage('stub', { ...FAST, QUESTION_COUNTS: { single: 1, double: 1, triple: 2 }, CHORD_RULES: { ALTERED_CHANCE: 1 } });
+  const { context, page, consoleMsgs } = await openPage('stub', { ...FAST, UI: { VEXFLOW_PANEL: true }, QUESTION_COUNTS: { single: 1, double: 1, triple: 2 }, CHORD_RULES: { ALTERED_CHANCE: 1 } });
   await page.waitForFunction(() => window.__dbg.piano.state === 'ready', null, { timeout: 20000 });
   assert.match(await page.textContent('#engineChipText'), /piyano/);
   await page.check('#staffToggle', { force: true });

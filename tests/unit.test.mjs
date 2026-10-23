@@ -145,6 +145,52 @@ test('Yazım: akorlar doğru harf ve yarım ses ile yazılır', () => {
   }
 });
 
+test('Porte konumu: hedef perde nota başının ortasında, ara perdeler orantılı, yazıma göre', () => {
+  const T = M.TYPE_BY_ID;
+  const root = (l, a) => M.ROOTS.find((r) => r.letter === l && r.acc === a);
+  const near = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg}: ${a} ≠ ${b}`);
+  // Bağlamsız: doğal notalar kendi yerinde, siyah tuşlar ortada; Mi–Fa ve Si–Do yarım sesi tam bir basamak
+  near(M.staffPosition(60), 28, 'Do4');
+  near(M.staffPosition(64), 30, 'Mi4 (sol anahtarının alt çizgisi)');
+  near(M.staffPosition(57), 26, 'La3 (fa anahtarının üst çizgisi)');
+  near(M.staffPosition(61), 28.5, 'Do♯4 bağlamsız');
+  near(M.staffPosition(64.5), 30.5, 'Mi4 + 50 sent');
+  // Re majör: Fa♯ Fa'nın yerinde; Fa doğal, Mi ile Fa♯ arasında ortada; Fa♯ + 50 sent, Fa♯ ile Sol arasında ortada
+  const D = M.buildNotes(root(1, 0), 4, T.major);
+  assert.equal(D.map((n) => n.name).join('-'), 'D-F♯-A');
+  const mapD = M.makeStaffMap(D);
+  near(mapD(66), 31, 'Re majörde Fa♯4');
+  near(mapD(65), 30.5, 'Re majörde Fa doğal');
+  near(mapD(66.5), 31.5, 'Fa♯4 + 50 sent');
+  near(mapD(62), 29, 'Re4');
+  near(mapD(69), 33, 'La4');
+  // Mi♭ majör: Mi♭ Mi'nin yerinde, Mi doğal Mi♭ ile Fa arasında
+  const Eb = M.buildNotes(root(2, -1), 4, T.major);
+  near(M.staffPosition(63, Eb), 30, 'Mi♭4');
+  near(M.staffPosition(64, Eb), 30.5, 'Mi♭ majörde Mi doğal');
+  // Si♯ ve Do♭: harf yerinde, oktav sınırını doğru geçer
+  const Gs = M.buildNotes(root(4, 1), 3, T.major);              // Sol♯ Si♯ Re♯
+  assert.equal(Gs.map((n) => n.fullName).join('-'), 'G♯3-B♯3-D♯4');
+  near(M.staffPosition(60, Gs), 27, 'Si♯3 (perdesi Do4)');
+  const Ab = M.buildNotes(root(5, -1), 3, T.minor);             // La♭ Do♭ Mi♭
+  assert.equal(Ab.map((n) => n.fullName).join('-'), 'A♭3-C♭4-E♭4');
+  near(M.staffPosition(59, Ab), 28, 'Do♭4 (perdesi Si3)');
+  assert.ok(Number.isNaN(M.staffPosition(NaN)), 'NaN → NaN');
+  // Tüm sorularda: her nota kendi harfinin yerinde, dönüşüm kesin artan (perde ↑ → konum ↑)
+  for (let seed = 1; seed <= 60; seed++) {
+    for (const q of M.generateSession(M.CONFIG, M.mulberry32(seed))) {
+      const map = M.makeStaffMap(q.notes);
+      for (const n of q.notes) near(map(n.midi), n.octave * 7 + n.letter, `${q.title} · ${n.fullName}`);
+      let prev = -Infinity;
+      for (let m = 30; m <= 90; m += 0.25) {
+        const p = map(m);
+        assert.ok(p > prev, `${q.title}: ${m} konumu artmıyor`);
+        prev = p;
+      }
+    }
+  }
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {
