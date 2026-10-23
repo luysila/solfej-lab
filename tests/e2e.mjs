@@ -469,7 +469,9 @@ if (run('F')) {
   assert.match(flat.coach, /altında|pes/);
   assert.equal(flat.state, 'LISTENING', '−60 sentte doğrulanmamalı');
   assert.equal(flat.zone, 'bad');
-  assert.ok(flat.zones.length > 50 && flat.zones.every((z) => z === 'bad'), 'çizgi kırmızı olmalı');
+  // Sanal şarkıcının osilatörü başta 440 Hz'den hedefe kayarken birkaç kare yeşilden geçebilir → %95 yeterli
+  const badShare = flat.zones.filter((z) => z === 'bad').length / flat.zones.length;
+  assert.ok(flat.zones.length > 50 && badShare >= 0.95, `çizgi kırmızı olmalı (kırmızı oranı ${badShare.toFixed(2)})`);
   assert.equal(flat.gauge, 'Do♯ / Do / Si');
   await (await page.$('#tuner')).screenshot({ path: `${OUT}/e2e-9a-flat-red.png` });
   await page.waitForTimeout(Math.max(0, 6000 - (Date.now() - t0)));
@@ -477,14 +479,90 @@ if (run('F')) {
   await waitFor(page, () => window.__dbg.state === 'COMPLETE', null, 10000);
   const fixed = await page.evaluate(() => {
     const z = window.__dbg.contour.pts.filter((p) => Number.isFinite(p.s)).map((p) => p.z);
-    return { first: z[0], last: z[z.length - 1], greens: z.filter((x) => x === 'perfect').length, coachKey: document.getElementById('coachLine').dataset.key };
+    const firstGreenAfterRed = z.findIndex((x, i) => x === 'perfect' && z.slice(0, i).filter((y) => y === 'bad').length > 50);
+    return { redsBefore: z.slice(0, firstGreenAfterRed).filter((x) => x === 'bad').length, firstGreenAfterRed, last: z[z.length - 1], greens: z.filter((x) => x === 'perfect').length, coachKey: document.getElementById('coachLine').dataset.key };
   });
   assert.equal(fixed.coachKey, 'low', 'yönlendirme anlık değişmez; yeni sese geçene kadar kalır');
   log('düzeltme sonrası:', JSON.stringify(fixed));
-  assert.equal(fixed.first, 'bad');
+  assert.ok(fixed.firstGreenAfterRed > 0 && fixed.redsBefore > 50, 'önce uzun bir kırmızı parça, sonra yeşil');
   assert.equal(fixed.last, 'perfect');
   assert.ok(fixed.greens >= 5, 'yeşil parça olmalı');
   await (await page.$('#tuner')).screenshot({ path: `${OUT}/e2e-9b-corrected-green.png` });
+  assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
+  await context.close();
+}
+
+// ═══ SENARYO G: arayüz adları — ayarlar grubu, sayfada düzenleme, kopyalama, kalıcılık ═══
+if (run('G')) {
+  log('G) arayüz adları: sayfada düzenleme');
+  const { context, page, consoleMsgs } = await openPage('offline', FAST);
+  await page.click('#settingsPanel > summary');
+  const fields = await page.evaluate(() => ({
+    n: document.querySelectorAll('#settingsForm [data-kind="text"]').length,
+    leaves: (function walk(o) { return Object.values(o).reduce((s, v) => s + (v && typeof v === 'object' ? walk(v) : 1), 0); })(window.solfejLab.defaults.TEXTS),
+    start: document.getElementById('set-TEXTS-btnStart')?.value,
+  }));
+  log('ayarlardaki ad alanları:', fields.n, '/', fields.leaves);
+  assert.equal(fields.n, fields.leaves, 'TEXTS\'teki her ad ayarlarda kendiliğinden çıkmalı');
+  assert.equal(fields.start, '▶ Teste Başla');
+
+  await page.check('#editNamesToggle', { force: true });
+  assert.ok(await page.evaluate(() => document.body.classList.contains('edit-names')));
+  assert.ok(await page.isVisible('#editBar'));
+  // Düğmeye tıklamak işlemi başlatmaz, düzenleyici açılır; Enter kaydeder
+  await page.click('#startBtn');
+  await page.waitForSelector('.name-editor');
+  assert.equal(await page.evaluate(() => window.__dbg.state), 'IDLE', 'düzenleme modunda test başlamamalı');
+  await page.fill('.name-editor', 'Başlat');
+  await page.screenshot({ path: `${OUT}/e2e-10-edit-names.png` });
+  await page.press('.name-editor', 'Enter');
+  // Devre dışı düğme de düzenlenebilir; Esc vazgeçer
+  await page.click('#skipBtn');
+  await page.fill('.name-editor', 'Bunu kaydetme');
+  await page.press('.name-editor', 'Escape');
+  // Yeni panel başlığı
+  await page.click('#tuner .panel-head h2');
+  await page.fill('.name-editor', 'Akort aleti');
+  await page.press('.name-editor', 'Enter');
+  // Boş ad reddedilir, sekme işlemi başlamaz
+  await page.click('#tabPractice');
+  await page.fill('.name-editor', '   ');
+  await page.press('.name-editor', 'Enter');
+  const G1 = await page.evaluate(() => ({
+    texts: window.solfejLab.CONFIG.TEXTS, start: document.getElementById('startBtn').textContent,
+    skip: document.getElementById('skipBtn').textContent, tuner: document.querySelector('#tuner .panel-head h2').textContent,
+    status: document.getElementById('statusLine').textContent, notice: document.getElementById('notice').textContent,
+    mode: document.getElementById('tabExam').getAttribute('aria-selected'), state: window.__dbg.state,
+    stored: JSON.parse(localStorage.getItem('solfejlab.config.v1') || '{}'),
+  }));
+  log('düzenleme sonrası:', G1.start, '|', G1.skip, '|', G1.tuner, '|', G1.status.slice(0, 40), '| uyarı:', G1.notice);
+  assert.equal(G1.start, 'Başlat');
+  assert.equal(G1.skip, '⏭ Soruyu Geç', 'Esc vazgeçmeli');
+  assert.equal(G1.tuner, 'Akort aleti');
+  assert.match(G1.status, /^“Başlat” düğmesine basın/, 'durum metnindeki düğme adı da değişmeli');
+  assert.match(G1.notice, /boş olamaz/);
+  assert.equal(G1.texts.tabPractice, 'Serbest çalışma');
+  assert.equal(G1.mode, 'true', 'sekmeye tıklamak modu değiştirmemeli');
+  assert.equal(G1.state, 'IDLE');
+  assert.deepEqual(G1.stored.TEXTS, { btnStart: 'Başlat', panelTuner: 'Akort aleti' });
+  // Adları kopyala → JSON (pano yoksa JSON kutusuna)
+  await page.click('#editCopyBtn');
+  await page.waitForFunction(() => /ad panoya|kutusuna/.test(document.getElementById('notice').textContent));
+  const copied = await page.evaluate(async () => {
+    const n = document.getElementById('notice').textContent;
+    if (/kutusuna/.test(n)) return JSON.parse(document.getElementById('jsonArea').value);
+    try { return JSON.parse(await navigator.clipboard.readText()); } catch { return { note: n }; }
+  });
+  log('kopyalanan:', JSON.stringify(copied));
+  if (copied.TEXTS) assert.deepEqual(copied, { TEXTS: { btnStart: 'Başlat', panelTuner: 'Akort aleti' } });
+  // Bitir → düğmelerin gerçek durumu geri gelir; yeniden yüklemede adlar korunur
+  await page.click('#editDoneBtn');
+  assert.equal(await page.isDisabled('#skipBtn'), true);
+  assert.equal(await page.isHidden('#editBar'), true);
+  await page.reload();
+  await page.waitForFunction(() => window.__dbg);
+  assert.equal(await page.textContent('#startBtn'), 'Başlat');
+  assert.equal(await page.textContent('#tuner .panel-head h2'), 'Akort aleti');
   assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
   await context.close();
 }
