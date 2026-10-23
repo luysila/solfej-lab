@@ -4,9 +4,12 @@ Konservatuvar adayları için web tabanlı işitme eğitimi uygulaması: sesler 
 "na" hecesiyle sırayla söylersiniz; uygulama perdenizi ölçer ve sınav sonunda teşhis çıkarır.
 
 ## Çalıştırma
+Windows'ta ve Linux'ta aynı şekilde çalışır; yalnızca Node.js 18+ gerekir (Python gerekmez).
 1. Terminalde bu klasöre girin.
-2. `python3 -m http.server 8000`
-3. Tarayıcıda http://localhost:8000 adresini açın.
+2. `npm run serve`
+3. Tarayıcıda http://localhost:8000 adresini açın. Durdurmak için terminalde Ctrl+C.
+   Port 8000 doluysa başka port seçin: Linux'ta `PORT=9000 npm run serve`,
+   PowerShell'de `$env:PORT=9000; npm run serve`.
    Mikrofon yalnızca localhost ya da https üzerinden çalışır; dosyayı çift tıklayarak açmayın.
 
 ## Testler

@@ -5,7 +5,7 @@
   "description": "Konservatuvar adayları için web tabanlı işitme eğitimi (solfej) uygulaması",
   "type": "module",
   "scripts": {
-    "serve": "python3 -m http.server 8000",
+    "serve": "node scripts/serve.mjs",
     "test": "node tests/extract-pure.mjs && node --test tests/unit.test.mjs",
     "e2e": "node tests/e2e.mjs"
   },

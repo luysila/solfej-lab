@@ -8,11 +8,13 @@ perdeyi ölçer, sesi tolerans içinde yeterince tutunca bir sonrakinin kilidini
 - Tüm yanıtlar, açıklamalar, arayüz metinleri ve kod yorumları **Türkçe** olmalı.
   İngilizce bir terim kullanmak gerekirse yanına kısa Türkçe karşılığını yaz.
 - Kullanıcı müzisyen (solfej ve armoni bilgisi güçlü); yazılım kavramlarını sade anlat.
-- Geliştirme ortamı: CachyOS (Arch tabanlı Linux). Stüdyoda düşük gecikmeli bir ses kartı var;
-  gerçek mikrofon testini kullanıcı yapar, sonucu sana anlatır.
+- Geliştirme ortamı: kullanıcı iki bilgisayarda çalışır — Windows 11 ve CachyOS (Arch tabanlı Linux).
+  Komutlar ve betikler ikisinde de çalışmalı (yol ayırıcı, kabuk sözdizimi farklarına dikkat; mümkünse Node betiği yaz).
+  Stüdyoda düşük gecikmeli bir ses kartı var; gerçek mikrofon testini kullanıcı yapar, sonucu sana anlatır.
+- Satır sonları `.gitattributes` ile her yerde LF'ye sabitlendi.
 
 ## Çalıştırma
-- `python3 -m http.server 8000` → http://localhost:8000
+- `npm run serve` → http://localhost:8000 (`scripts/serve.mjs`, yalnızca Node; Python gerekmez; `PORT` ile port değişir)
   (mikrofon için https ya da localhost şart; dosyayı file:// ile açmak çalışmaz)
 - Hata ayıklama: `http://localhost:8000/?debug` → `window.__dbg`; aynı soru seti için `?seed=123`
 - Konsol API'si: `solfejLab.setConfig({...})`, `solfejLab.resetConfig()`, `solfejLab.generateSession(42)`

@@ -1,0 +1,11 @@
+# Satır sonları: depoda ve çalışma kopyasında her yerde LF (Windows ve CachyOS aynı dosyayı görür).
+* text=auto eol=lf
+
+# İkili dosyalar: satır sonu dönüşümü yapılmaz.
+*.png binary
+*.jpg binary
+*.ico binary
+*.mp3 binary
+*.ogg binary
+*.wav binary
+*.woff2 binary
