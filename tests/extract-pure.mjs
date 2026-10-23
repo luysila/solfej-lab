@@ -21,7 +21,7 @@ const EXPORTS = [
   'compareToTarget', 'octaveModeFor', 'zoneOf', 'YinDetector', 'MedianFilter', 'SustainTracker',
   'createMachine', 'ALLOWED', 'S', 'Exercise', 'ExamSession', 'recordPitchFrame',
   'computeDiagnostics', 'buildAdvice', 'tendencyOf', 'makeHistoryEntry', 'normalizeHistory', 'pianoSampleMap', 'fmtSigned',
-  'makeStaffMap', 'staffPosition',
+  'makeStaffMap', 'staffPosition', 'semitoneNeighbors',
 ];
 
 const outDir = path.join(HERE, '.generated');

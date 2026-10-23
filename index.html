@@ -220,18 +220,35 @@ input[type="number"]:focus-visible, textarea:focus-visible { outline: 2px solid 
   .cents { grid-column: 1 / -1; order: -1; min-width: 0; }
 }
 
-.gauge-wrap { padding: 0 14px; }
-.gauge { position: relative; height: 60px; border-radius: 14px; border: 1px solid var(--line); }
-.gauge::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .28); }
+/* Dikey gösterge: porte grafiğiyle aynı yükseklikte, sağda. Aşağı pes, yukarı tiz. */
+.tuner { --view-h: 230px; }
+.view-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 10px; align-items: stretch; }
+.vgauge { position: relative; width: 96px; height: var(--view-h); }
+.vg-names span {
+  position: absolute; left: 0; width: 42px; text-align: right; transform: translateY(-50%);
+  font-size: 12px; color: var(--muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.vg-names .vg-above  { top: 10px; }
+.vg-names .vg-target { top: 50%; font-size: 15px; font-weight: 700; color: var(--text); }
+.vg-names .vg-below  { top: calc(100% - 10px); }
+.gauge { position: absolute; left: 48px; width: 18px; top: 10px; bottom: 10px; border-radius: 9px; border: 1px solid var(--line); }
+.gauge::before { content: ""; position: absolute; left: -4px; right: -4px; top: 50%; height: 1px; background: rgba(255, 255, 255, .45); }
 .needle {
-  position: absolute; left: 50%; top: -8px; bottom: -8px; width: 4px; margin-left: -2px;
+  position: absolute; left: -7px; right: -7px; top: 50%; height: 4px; margin-top: -2px;
   border-radius: 3px; background: var(--zc); box-shadow: 0 0 16px var(--zc);
   will-change: transform; transition: background .15s, opacity .2s;
 }
 .tuner[data-zone="none"] .needle { opacity: .35; box-shadow: none; }
-.ticks { position: relative; height: 20px; margin-top: 10px; }
-.tick { position: absolute; top: 0; transform: translateX(-50%); font: 11px var(--mono); color: var(--muted); }
-.gauge-legend { display: flex; justify-content: space-between; padding: 0 14px; font-size: 11px; letter-spacing: .14em; color: var(--muted); }
+.ticks { position: absolute; left: 72px; right: 0; top: 10px; bottom: 10px; }
+.tick { position: absolute; left: 0; transform: translateY(-50%); font: 10px var(--mono); color: var(--muted); white-space: nowrap; }
+@media (max-width: 600px) {
+  .view-row { gap: 6px; }
+  .vgauge { width: 86px; }
+  .vg-names span { width: 38px; font-size: 11px; }
+  .vg-names .vg-target { font-size: 13px; }
+  .gauge { left: 42px; }
+  .ticks { left: 64px; }
+}
 
 .sustain { margin-top: 22px; }
 .sustain-head { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
@@ -250,7 +267,7 @@ input[type="number"]:focus-visible, textarea:focus-visible { outline: 2px solid 
 .k-pitch { background: var(--accent); } .k-held { background: var(--green); height: 3px; }
 .k-guide { background: rgba(138, 164, 255, .55); height: 1px; }
 .key-band { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; background: rgba(52, 211, 153, .22); }
-.contour canvas { display: block; width: 100%; height: 230px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
+.contour canvas { display: block; width: 100%; height: var(--view-h, 230px); border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
 
 .meter-row { display: grid; grid-template-columns: minmax(110px, 1fr) 1.8fr auto; gap: 14px; align-items: center; margin-top: 22px; font-size: 12.5px; color: var(--muted); }
 .meter { position: relative; height: 8px; border-radius: 999px; background: var(--field); border: 1px solid var(--line); overflow: hidden; }
@@ -488,17 +505,6 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
       </div>
     </div>
 
-    <div class="gauge-wrap">
-      <div class="gauge" id="gauge"><div class="needle" id="needle"></div></div>
-      <div class="ticks" id="ticks"></div>
-    </div>
-    <div class="gauge-legend"><span>◀ PES</span><span>TİZ ▶</span></div>
-
-    <div class="sustain">
-      <div class="sustain-head"><span>Süreklilik (sustain)</span><span class="mono" id="sustainText">0,00 / 0,25 s</span></div>
-      <div class="bar"><div class="fill" id="sustainFill"></div></div>
-    </div>
-
     <div class="contour">
       <div class="contour-head">
         <span class="ch-staff">Porte · son <span id="staffSpan">6</span> sn · okunan perde, nota yazımına göre</span>
@@ -510,7 +516,20 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
           <span class="ch-staff"><i class="key-line k-guide"></i>Hedef</span>
         </span>
       </div>
-      <canvas id="contour" role="img" aria-label="Okunan perde, nota portesi üzerinde"></canvas>
+      <div class="view-row">
+        <canvas id="contour" role="img" aria-label="Okunan perde, nota portesi üzerinde"></canvas>
+        <!-- Dikey akort aleti: aşağı pes, yukarı tiz; uçlar bir yarım ses aşağı/yukarı -->
+        <div class="vgauge" aria-hidden="true">
+          <div class="vg-names"><span class="vg-above" id="vgAbove">tiz</span><span class="vg-target" id="vgTarget"></span><span class="vg-below" id="vgBelow">pes</span></div>
+          <div class="gauge" id="gauge"><div class="needle" id="needle"></div></div>
+          <div class="ticks" id="ticks"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sustain">
+      <div class="sustain-head"><span>Süreklilik (sustain)</span><span class="mono" id="sustainText">0,00 / 0,25 s</span></div>
+      <div class="bar"><div class="fill" id="sustainFill"></div></div>
     </div>
 
     <div class="meter-row">
@@ -721,7 +740,7 @@ const CONFIG = {
   UI: {
     SHOW_STAFF: true,             // "Portede göster" varsayılanı: perde grafiği çift porte üzerinde (false → sent grafiği)
     VEXFLOW_PANEL: false,         // ayrı VexFlow porte paneli (yalnızca "Portede göster" açıkken; kütüphane CDN'den yüklenir)
-    GAUGE_RANGE_CENTS: 50,        // ibre skalasının yarı genişliği
+    GAUGE_RANGE_CENTS: 100,       // dikey göstergenin yarı ölçeği (± sent); 100 → uçlar tam bir yarım ses aşağı/yukarı
     CONTOUR_SECONDS: 6,           // perde grafiğinin zaman penceresi
     CONTOUR_RANGE_CENTS: 100,     // perde grafiğinin dikey aralığı (± sent)
     NEEDLE_SMOOTHING_MS: 55,      // ibre yumuşatma (yalnızca görsel; puanlama ham değerle yapılır)
@@ -1173,6 +1192,25 @@ function makeStaffMap(notes = []) {
 }
 /** Tek seferlik kullanım: staffPosition(66, dMajorNotes) → 31 (Fa'nın yeri) */
 function staffPosition(midi, notes = []) { return makeStaffMap(notes)(midi); }
+
+/**
+ * Bir yarım ses aşağıdaki ve yukarıdaki notanın yazımı (dikey akort aletinin uçları için).
+ * Adaylar: aynı harf (♭ / ♯ eklenerek) ya da komşu harf. Değiştiricisi en az olan seçilir;
+ * eşitlikte aynı harf: Mi → alt Mi♭, üst Fa · Do → alt Si, üst Do♯ · Fa♯ → alt Fa, üst Sol.
+ */
+function semitoneNeighbors(note) {
+  const pick = (dir) => {
+    const pc = (((note.midi + dir) % 12) + 12) % 12;
+    const l2 = (note.letter + dir + 7) % 7;
+    let a2 = (((pc - NATURAL_PC[l2]) % 12) + 12) % 12;
+    if (a2 > 6) a2 -= 12;
+    const cands = [{ letter: note.letter, acc: note.acc + dir }, { letter: l2, acc: a2 }]
+      .filter((c) => Math.abs(c.acc) <= 1);
+    const best = cands.length ? cands.reduce((b, c) => (Math.abs(c.acc) < Math.abs(b.acc) ? c : b)) : { letter: l2, acc: a2 };
+    return { ...best, name: spell(best.letter, best.acc), solfege: solfege(best.letter, best.acc) };
+  };
+  return { below: pick(-1), above: pick(1) };
+}
 
 
 // ───────────────────────────────────────────────────────────────────────
@@ -2069,6 +2107,7 @@ const ui = {
   staffPanel: $('staffPanel'), staff: $('staff'), staffMsg: $('staffMsg'),
   tuner: $('tuner'), targetName: $('targetName'), targetFreq: $('targetFreq'), centsVal: $('centsVal'), zoneLabel: $('zoneLabel'),
   heardFreq: $('heardFreq'), heardNote: $('heardNote'), gauge: $('gauge'), ticks: $('ticks'), needle: $('needle'),
+  vgAbove: $('vgAbove'), vgTarget: $('vgTarget'), vgBelow: $('vgBelow'),
   sustainFill: $('sustainFill'), sustainText: $('sustainText'), contour: $('contour'), contourSpan: $('contourSpan'), contourTol: $('contourTol'),
   staffSpan: $('staffSpan'),
   levelFill: $('levelFill'), levelThr: $('levelThr'), thr: $('thrRange'), thrText: $('thrText'), clarityText: $('clarityText'),
@@ -2376,6 +2415,7 @@ function renderAll() {
   const rev = cur && isNoteRevealed(exercise.index);
   setText(ui.targetName, showTarget ? (rev ? cur.name : `${exercise.index + 1}. ses`) : '—');
   setText(ui.targetFreq, showTarget ? (rev ? `${cur.fullName} · ${nf1.format(cur.freq)} Hz` : `${cur.role} · gizli`) : '— Hz');
+  renderGaugeNames(showTarget && rev ? cur : null);
 
   renderNotes();
   renderExTitle();
@@ -2449,9 +2489,9 @@ function updateHeaderText() {
   setText(ui.contourTol, String(CONFIG.TOLERANCE_CENTS));
 }
 
-// ── İbre / göstergeler ──
-let gaugeHalf = 0;
-let needleX = 0, needleTargetX = 0;
+// ── İbre / göstergeler (dikey: yukarı tiz, aşağı pes) ──
+let gaugeHalf = 0;                       // göstergenin yarı yüksekliği (px)
+let needlePos = 0, needleTarget = 0;     // ibrenin merkezden yukarı uzaklığı (px; + tiz, − pes)
 let curZone = 'none';
 let hintKey = '';
 let lastSustainFrac = -1;
@@ -2459,10 +2499,10 @@ let lastReadoutTs = 0;
 
 function paintGaugeBackground() {
   const R = gaugeRange(), g = CONFIG.TOLERANCE_CENTS, y = CONFIG.WARNING_CENTS;
-  const p = (c) => `${(50 + (clamp(c, -R, R) / R) * 50).toFixed(2)}%`;
+  const p = (c) => `${(50 + (clamp(c, -R, R) / R) * 50).toFixed(2)}%`;   // alttan yüzde (0deg = aşağıdan yukarı)
   const RED = 'rgba(248,113,113,.30)', YEL = 'rgba(251,191,36,.30)', GRN = 'rgba(52,211,153,.36)';
   ui.gauge.style.background =
-    `linear-gradient(90deg, ${RED} 0 ${p(-y)}, ${YEL} ${p(-y)} ${p(-g)}, ${GRN} ${p(-g)} ${p(g)}, ${YEL} ${p(g)} ${p(y)}, ${RED} ${p(y)} 100%)`;
+    `linear-gradient(0deg, ${RED} 0 ${p(-y)}, ${YEL} ${p(-y)} ${p(-g)}, ${GRN} ${p(-g)} ${p(g)}, ${YEL} ${p(g)} ${p(y)}, ${RED} ${p(y)} 100%)`;
 }
 function buildTicks() {
   const R = gaugeRange();
@@ -2470,12 +2510,19 @@ function buildTicks() {
   const values = [...new Set([-R, -CONFIG.WARNING_CENTS, -CONFIG.TOLERANCE_CENTS, 0, CONFIG.TOLERANCE_CENTS, CONFIG.WARNING_CENTS, R])];
   for (const c of values) {
     const tick = el('span', 'tick', `${c > 0 ? '+' : c < 0 ? MINUS : ''}${Math.abs(c)}`);
-    tick.style.left = `${50 + (c / R) * 50}%`;
+    tick.style.top = `${50 - (c / R) * 50}%`;
     ui.ticks.append(tick);
   }
 }
+/** Ortada hedefin adı, uçlarda bir yarım ses aşağı/yukarı; hedef açık değilse yalnızca "tiz" / "pes" */
+function renderGaugeNames(note) {
+  const nb = note ? semitoneNeighbors(note) : null;
+  setText(ui.vgAbove, nb ? nb.above.solfege : 'tiz');
+  setText(ui.vgTarget, note ? note.solfege : '');
+  setText(ui.vgBelow, nb ? nb.below.solfege : 'pes');
+}
 function observeGauge() {
-  const measure = () => { gaugeHalf = ui.gauge.clientWidth / 2; };
+  const measure = () => { gaugeHalf = ui.gauge.clientHeight / 2; };
   measure();
   if ('ResizeObserver' in window) new ResizeObserver(measure).observe(ui.gauge);
   else window.addEventListener('resize', measure);
@@ -2486,11 +2533,11 @@ function setZone(zone) {
 /** İbreyi hedefe doğru yumuşakça kaydırır (yalnızca transform → GPU bileşimi) */
 function easeNeedle(dtMs) {
   const k = 1 - Math.exp(-dtMs / CONFIG.UI.NEEDLE_SMOOTHING_MS);
-  const delta = needleTargetX - needleX;
-  const next = Math.abs(delta) < 0.02 ? needleTargetX : needleX + delta * k;
-  if (next !== needleX) {
-    needleX = next;
-    ui.needle.style.transform = `translate3d(${needleX.toFixed(2)}px,0,0)`;
+  const delta = needleTarget - needlePos;
+  const next = Math.abs(delta) < 0.02 ? needleTarget : needlePos + delta * k;
+  if (next !== needlePos) {
+    needlePos = next;
+    ui.needle.style.transform = `translate3d(0,${(-needlePos).toFixed(2)}px,0)`;   // ekranda y aşağı doğru artar
   }
 }
 function paintSustain(frac) {
@@ -2516,7 +2563,7 @@ function clearReadouts() {
   paintSustain(0);
   setZone('none');
   setHint('');
-  needleTargetX = 0;
+  needleTarget = 0;
 }
 
 // Mikrofon seviye göstergesi (hızlı atak, yavaş bırakma)
@@ -3783,7 +3830,7 @@ function frame(ts) {
   const feedback = !session || CONFIG.EXAM.LIVE_FEEDBACK;
   if (feedback) {
     pushContour(ts, valid ? cents : NaN, valid && absCents <= CONFIG.TOLERANCE_CENTS, valid ? target.midi + cents / 100 : NaN);
-    if (valid) needleTargetX = (clamp(cents, -gaugeRange(), gaugeRange()) / gaugeRange()) * gaugeHalf;
+    if (valid) needleTarget = (clamp(cents, -gaugeRange(), gaugeRange()) / gaugeRange()) * gaugeHalf;
     setZone(zone);
     paintSustain(tracker.progress);
   }

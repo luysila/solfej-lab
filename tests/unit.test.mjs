@@ -191,6 +191,31 @@ test('Porte konumu: hedef perde nota başının ortasında, ara perdeler orantı
   }
 });
 
+test('Dikey akort aleti: bir yarım ses aşağı/yukarı notanın adı', () => {
+  const root = (l, a) => M.ROOTS.find((r) => r.letter === l && r.acc === a);
+  const nb = (l, a) => {
+    const n = M.buildNotes(root(l, a), 4, M.TYPE_BY_ID.single)[0];
+    const r = M.semitoneNeighbors(n);
+    return `${r.below.solfege} < ${n.solfege} < ${r.above.solfege}`;
+  };
+  assert.equal(nb(2, 0), 'Mi♭ < Mi < Fa');
+  assert.equal(nb(0, 0), 'Si < Do < Do♯');
+  assert.equal(nb(3, 1), 'Fa < Fa♯ < Sol');
+  assert.equal(nb(6, -1), 'La < Si♭ < Si');
+  assert.equal(nb(3, 0), 'Mi < Fa < Fa♯');
+  assert.equal(nb(5, 0), 'La♭ < La < La♯');
+  // Her kökte: perdeler tam bir yarım ses, değiştirici en fazla bir tane
+  for (const r of M.ROOTS) {
+    const n = M.buildNotes(r, 4, M.TYPE_BY_ID.single)[0];
+    const { below, above } = M.semitoneNeighbors(n);
+    for (const [x, d] of [[below, -1], [above, 1]]) {
+      const pc = [0, 2, 4, 5, 7, 9, 11][x.letter] + x.acc;
+      assert.equal(((pc % 12) + 12) % 12, (((n.midi + d) % 12) + 12) % 12, `${n.name} komşusu ${x.name}`);
+      assert.ok(Math.abs(x.acc) <= 1);
+    }
+  }
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {
