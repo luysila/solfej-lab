@@ -216,6 +216,49 @@ test('Dikey akort aleti: bir yarım ses aşağı/yukarı notanın adı', () => {
   }
 });
 
+test('Yönlendirme: 5 sn özeti → tek sakin cümle, tekrar yok, sınav provasında yön yok', () => {
+  const cfg = M.CONFIG;
+  // 5 sn, 60 kare/sn; gen(i) → kare
+  const run = (gen, ms = 5000) => {
+    const w = new M.CoachWindow(), n = Math.round(ms / 16.7);
+    for (let i = 0; i < n; i++) w.push(16.7, gen(i));
+    return w.summary();
+  };
+  const sing = (c) => () => ({ loud: true, valid: true, cents: c, held: Math.abs(c) <= cfg.TOLERANCE_CENTS });
+  const key = (s, o) => M.coachKeyFor(s, o, cfg);
+
+  const flat = run(sing(-60));
+  assert.ok(Math.abs(flat.mean + 60) < 1e-9 && flat.spread < 1e-6 && flat.inTolRatio === 0, JSON.stringify(flat));
+  assert.equal(key(flat), 'low');
+  assert.equal(key(run(sing(+30))), 'high');
+  assert.equal(key(run(sing(-120))), 'farLow');
+  assert.equal(key(run(sing(+95))), 'farHigh');
+  assert.equal(key(run(sing(4))), 'good');
+  assert.equal(key(run((i) => sing(i % 2 ? 28 : -28)())), 'unsteady');        // ortalama 0, dalgalı
+  assert.equal(key(run(() => ({ loud: false }))), 'quiet');
+  assert.equal(key(run((i) => ({ loud: true, valid: i % 5 === 0, cents: 0, held: true }))), 'unclear');
+  assert.equal(key(run(sing(-1195))), 'octave');                              // oktav aşağı, sabit oktav modu
+  assert.equal(key(run(sing(-1195)), { fold: false }), 'octaveOff');
+  assert.equal(key(run(sing(-60), 800)), null, 'çok kısa aralık → cümle yok');
+
+  // Sınav provası (canlı geri bildirim kapalı): pes/tiz yönü söylenmez, teknik uyarılar kalır
+  for (const c of [-60, 30, -120, 4]) assert.equal(key(run(sing(c)), { live: false }), 'blind');
+  assert.equal(key(run(() => ({ loud: false })), { live: false }), 'quiet');
+
+  // Aynı cümle üst üste gelmez; her durumda 2–3 söyleyiş var, metinler CONFIG.TEXTS.COACH'tan
+  const state = {};
+  const texts = Array.from({ length: 6 }, () => M.coachMessage(flat, state, {}, cfg));
+  assert.ok(texts.every((m) => m.key === 'low' && m.path.startsWith('COACH.low.')));
+  for (let i = 1; i < texts.length; i++) assert.notEqual(texts[i].text, texts[i - 1].text);
+  for (const [k, g] of Object.entries(cfg.TEXTS.COACH)) {
+    if (k !== 'idle') assert.ok(Object.keys(g).length >= 2 && Object.keys(g).length <= 3, `${k}: 2–3 söyleyiş`);
+  }
+  assert.ok(cfg.TEXTS.COACH.low.a.includes('hedefin biraz altında'));
+  // Pes / tiz cümleleri gerçekten yön söylüyor
+  for (const t of Object.values(cfg.TEXTS.COACH.low)) assert.match(t, /alt|pes|yukarı/);
+  for (const t of Object.values(cfg.TEXTS.COACH.high)) assert.match(t, /üst|tiz|aşağı/);
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {

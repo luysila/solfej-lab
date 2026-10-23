@@ -461,8 +461,12 @@ if (run('F')) {
     state: window.__dbg.state, zone: document.getElementById('tuner').dataset.zone,
     zones: window.__dbg.contour.pts.filter((p) => Number.isFinite(p.s)).map((p) => p.z),
     gauge: ['vgAbove', 'vgTarget', 'vgBelow'].map((id) => document.getElementById(id).textContent).join(' / '),
+    coachKey: document.getElementById('coachLine').dataset.key, coach: document.getElementById('coachLine').textContent,
   }));
   log('pes evre:', flat.state, '· bölge', flat.zone, '· gösterge', flat.gauge, '· kare', flat.zones.length);
+  log('yönlendirme:', flat.coachKey, '·', flat.coach);
+  assert.equal(flat.coachKey, 'low', '5 sn sonunda "pes" yönlendirmesi');
+  assert.match(flat.coach, /altında|pes/);
   assert.equal(flat.state, 'LISTENING', '−60 sentte doğrulanmamalı');
   assert.equal(flat.zone, 'bad');
   assert.ok(flat.zones.length > 50 && flat.zones.every((z) => z === 'bad'), 'çizgi kırmızı olmalı');
@@ -473,8 +477,9 @@ if (run('F')) {
   await waitFor(page, () => window.__dbg.state === 'COMPLETE', null, 10000);
   const fixed = await page.evaluate(() => {
     const z = window.__dbg.contour.pts.filter((p) => Number.isFinite(p.s)).map((p) => p.z);
-    return { first: z[0], last: z[z.length - 1], greens: z.filter((x) => x === 'perfect').length };
+    return { first: z[0], last: z[z.length - 1], greens: z.filter((x) => x === 'perfect').length, coachKey: document.getElementById('coachLine').dataset.key };
   });
+  assert.equal(fixed.coachKey, 'low', 'yönlendirme anlık değişmez; yeni sese geçene kadar kalır');
   log('düzeltme sonrası:', JSON.stringify(fixed));
   assert.equal(fixed.first, 'bad');
   assert.equal(fixed.last, 'perfect');

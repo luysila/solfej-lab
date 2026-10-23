@@ -193,7 +193,6 @@ input[type="number"]:focus-visible, textarea:focus-visible { outline: 2px solid 
 .empty-notes { margin: 0; padding: 18px; border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); font-size: 13.5px; }
 
 .status { margin: 16px 0 0; font-size: 14.5px; }
-.hint   { margin: 4px 0 0; min-height: 1.5em; font-size: 13px; color: var(--muted); }
 
 /* ── Porte (VexFlow) ── */
 .staff-paper { background: #f7f5ef; border-radius: 14px; padding: 6px 0; min-height: 140px; display: grid; place-items: center; overflow: hidden; }
@@ -212,7 +211,10 @@ input[type="number"]:focus-visible, textarea:focus-visible { outline: 2px solid 
 .target b { display: block; font-size: 34px; line-height: 1.1; letter-spacing: -.02em; }
 .cents { text-align: center; min-width: 180px; }
 #centsVal { display: block; font-size: 44px; font-weight: 600; line-height: 1; color: var(--zc); transition: color .15s; }
-.zone-label { display: block; margin-top: 6px; min-height: 1.2em; font-size: 12.5px; color: var(--zc); transition: color .15s; }
+.zone-label { display: block; margin-top: 6px; min-height: 1.2em; font-size: 12.5px; color: var(--muted); }
+/* Yönlendirme satırı: sakin, aralıklı (renk değişmez; anlık durum renk ve göstergeden okunur) */
+.coach { margin: 10px 0 0; min-height: 1.5em; padding: 8px 12px; border-radius: 10px; font-size: 14px; color: var(--text-2); background: var(--panel-2); border-left: 3px solid var(--accent); }
+.coach.idle { color: var(--muted); border-left-color: var(--line); }
 .heard { text-align: right; }
 .heard b { display: block; font-size: 22px; font-weight: 600; }
 @media (max-width: 600px) {
@@ -477,7 +479,6 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
     </div>
     <div class="notes" id="notes" role="list"></div>
     <p class="status" id="statusLine" role="status" aria-live="polite"></p>
-    <p class="hint" id="hintLine"></p>
   </section>
 
   <!-- ── Porte (isteğe bağlı) ── -->
@@ -497,7 +498,7 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
       </div>
       <div class="cents">
         <span class="mono" id="centsVal">—</span>
-        <span class="zone-label" id="zoneLabel">Ses bekleniyor</span>
+        <span class="zone-label">hedefe göre</span>
       </div>
       <div class="heard">
         <span class="label">Okunan</span>
@@ -527,6 +528,7 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
           <div class="ticks" id="ticks"></div>
         </div>
       </div>
+      <p class="coach idle" id="coachLine" role="status" aria-live="polite"></p>
     </div>
 
     <div class="sustain">
@@ -748,6 +750,8 @@ const CONFIG = {
     CONTOUR_RANGE_CENTS: 100,     // perde grafiğinin dikey aralığı (± sent)
     NEEDLE_SMOOTHING_MS: 55,      // ibre yumuşatma (yalnızca görsel; puanlama ham değerle yapılır)
     READOUT_INTERVAL_MS: 80,      // sayısal göstergelerin yenileme aralığı
+    COACH_INTERVAL_MS: 5000,      // sözlü yönlendirme aralığı: bu sürenin özetinden tek cümle (anlık uyarı yok)
+    COACH_FAR_CENTS: 70,          // ortalama sapma bunu aşarsa "epey pes/tiz" söyleyişi (yoksa "biraz pes/tiz")
   },
 
   // ══ 8. KAYIT — "Önceki Testlerim" ═══════════════════════════════════
@@ -768,7 +772,40 @@ const CONFIG = {
     TIMEOUT_MS: 15000,
   },
 
-  // ══ 10. HAZIR STANDARTLAR (Ayarlar panelinden seçilir) ══════════════
+  // ══ 10. ARAYÜZ METİNLERİ ════════════════════════════════════════════
+  TEXTS: {
+    // Yönlendirme cümleleri: her durum için 2–3 söyleyiş (sırayla kullanılır, aynı cümle üst üste gelmez)
+    COACH: {
+      idle:      { a: 'Yönlendirme birkaç saniye içinde burada görünür.' },
+      quiet:     { a: 'Sesinizi henüz duyamıyorum; mikrofona biraz yaklaşın.',
+                   b: 'Ses çok zayıf geliyor; biraz daha dolu bir sesle “na” deyin.',
+                   c: 'Henüz ses gelmiyor; hazır olduğunuzda rahatça başlayın.' },
+      unclear:   { a: 'Sesiniz geliyor ama perde net değil; açık ve düz bir “na” deneyin.',
+                   b: 'Perdeyi seçmekte zorlanıyorum; vibratoyu azaltıp sesi sade tutun.' },
+      blind:     { a: 'Sesi rahat ve düz tutun; doğrulanınca kutu yeşile döner.',
+                   b: 'Dinliyorum; acele etmeden, sabit bir “na” ile devam edin.' },
+      octave:    { a: 'Doğru sese yakınsınız ama oktav farklı; ilk sesi söylediğiniz oktavda kalın.',
+                   b: 'Oktav farklı geliyor; sesi ilk sesin oktavına taşıyın.' },
+      octaveOff: { a: 'Oktav farklı geliyor; sesi yazıldığı oktavda söyleyin.',
+                   b: 'Oktav toleransı kapalı; sesi yazılı oktavına taşıyın.' },
+      good:      { a: 'Çok iyi, tam yerindesiniz; aynı rahatlıkla tutmaya devam edin.',
+                   b: 'Perde doğru; sesi sabit tutun, gerisi kendiliğinden gelecek.' },
+      low:       { a: 'Sesiniz hedefin biraz altında kalıyor; nefesinizi destekleyip hafifçe yukarı taşıyın.',
+                   b: 'Biraz pes kalıyorsunuz; sesi zorlamadan, hafifçe yukarı yerleştirin.',
+                   c: 'Hafif pes; desteği koruyup sesi biraz yukarıda düşünün.' },
+      high:      { a: 'Sesiniz hedefin biraz üstünde kalıyor; omuzları gevşetip hafifçe aşağı bırakın.',
+                   b: 'Biraz tiz kalıyorsunuz; bastırmadan, sesi hafifçe aşağı yerleştirin.',
+                   c: 'Hafif tiz; nefesi rahatlatıp sesi biraz aşağıda düşünün.' },
+      farLow:    { a: 'Hedefin epey altındasınız; sesi içinizden duyup yavaşça yukarı yaklaşın.',
+                   b: 'Belirgin biçimde pes kalıyorsunuz; acele etmeden sesi yukarı doğru arayın.' },
+      farHigh:   { a: 'Hedefin epey üstündesiniz; sesi içinizden duyup yavaşça aşağı inin.',
+                   b: 'Belirgin biçimde tiz kalıyorsunuz; acele etmeden sesi aşağı doğru arayın.' },
+      unsteady:  { a: 'Hedefin çevresindesiniz; sesi kaydırmadan düz tutmayı deneyin.',
+                   b: 'Yakınsınız ama ses dalgalanıyor; nefesi sabit tutup sesi yerinde bırakın.' },
+    },
+  },
+
+  // ══ 11. HAZIR STANDARTLAR (Ayarlar panelinden seçilir) ══════════════
   PRESETS: {
     varsayilan: { label: 'Varsayılan · ±20 sent · 0,25 sn', values: {} },
     siki:       { label: 'Sıkı · ±10 sent · 0,5 sn',       values: { TOLERANCE_CENTS: 10, WARNING_CENTS: 25, SUSTAIN_TIME_MS: 500, SUSTAIN_DROPOUT_GRACE_MS: 0 } },
@@ -1332,6 +1369,76 @@ class SustainTracker {
 
 
 // ───────────────────────────────────────────────────────────────────────
+// YÖNLENDİRME (koç) — anlık uyarı yerine her UI.COACH_INTERVAL_MS'de bir, son aralığın özetinden tek sakin cümle
+//  CoachWindow: kareleri biriktirir (ses var mı, perde net mi, ortalama sapma, dalgalanma, tolerans içi oran, oktav farkı)
+//  coachMessage: özetten bir durum anahtarı seçer, CONFIG.TEXTS.COACH'tan o duruma ait bir söyleyiş verir;
+//                aynı cümle üst üste gelmez. Canlı geri bildirim kapalıysa pes/tiz yönü söylenmez.
+// ───────────────────────────────────────────────────────────────────────
+class CoachWindow {
+  constructor() { this.reset(); }
+  reset() { this.ms = 0; this.frames = 0; this.loud = 0; this.valid = 0; this.octave = 0; this.held = 0; this.n = 0; this.sum = 0; this.sumSq = 0; }
+  /** Bir dinleme karesi. cents: katlanmış sapma (geçerliyse); held: tolerans içinde mi */
+  push(dtMs, { loud = false, valid = false, cents = 0, held = false } = {}) {
+    this.ms += dtMs;
+    this.frames++;
+    if (loud) this.loud++;
+    if (!valid) return;
+    this.valid++;
+    if (held) this.held++;
+    if (Math.abs(cents) > 600) { this.octave++; return; }      // oktav farkı: sapma ortalamasına katılmaz
+    this.n++;
+    this.sum += cents;
+    this.sumSq += cents * cents;
+  }
+  summary() {
+    const mean = this.n ? this.sum / this.n : null;
+    return {
+      ms: this.ms,
+      loudRatio: this.frames ? this.loud / this.frames : 0,         // ses var mı
+      clearRatio: this.loud ? this.valid / this.loud : 0,           // perde net mi (sesli karelerin geçerli olanı)
+      octaveRatio: this.valid ? this.octave / this.valid : 0,       // oktav farkı
+      inTolRatio: this.valid ? this.held / this.valid : 0,          // tolerans içinde kalma oranı
+      mean,                                                          // ortalama sapma (sent; − pes, + tiz)
+      spread: this.n ? Math.sqrt(Math.max(0, this.sumSq / this.n - mean * mean)) : null,   // dalgalanma (std. sapma)
+    };
+  }
+}
+
+/** Özetten durum anahtarı: quiet · unclear · blind · octave · octaveOff · good · farLow · farHigh · low · high · unsteady */
+function coachKeyFor(s, { live = true, fold = true } = {}, cfg = CONFIG) {
+  if (!s || s.ms < Math.min(1500, cfg.UI.COACH_INTERVAL_MS / 2)) return null;
+  if (s.loudRatio < 0.3) return 'quiet';
+  if (s.clearRatio < 0.4) return 'unclear';
+  if (!live) return 'blind';                                   // sınav provası: yön söylenmez
+  if (s.octaveRatio >= 0.4) return fold ? 'octave' : 'octaveOff';
+  if (s.mean == null) return 'unclear';
+  const tol = cfg.TOLERANCE_CENTS, far = cfg.UI.COACH_FAR_CENTS;
+  if (s.inTolRatio >= 0.6 && s.spread <= tol) return 'good';
+  if (Math.abs(s.mean) > far) return s.mean < 0 ? 'farLow' : 'farHigh';
+  if (Math.abs(s.mean) >= tol * 0.6) return s.mean < 0 ? 'low' : 'high';
+  return 'unsteady';
+}
+
+/**
+ * Bir sonraki yönlendirme cümlesi. state = { last, turns } çağrılar arasında korunur (aynı cümle üst üste gelmez).
+ * @returns {{key, text, path} | null}   path: CONFIG.TEXTS içindeki yer (ör. 'COACH.low.b')
+ */
+function coachMessage(summary, state, opts = {}, cfg = CONFIG) {
+  const key = coachKeyFor(summary, opts, cfg);
+  const group = key && cfg.TEXTS?.COACH?.[key];
+  if (!isPlainObject(group)) return null;
+  const variants = Object.entries(group).filter(([, t]) => typeof t === 'string' && t.trim());
+  if (!variants.length) return null;
+  state.turns ||= {};
+  let i = ((state.turns[key] ?? -1) + 1) % variants.length;
+  if (variants.length > 1 && variants[i][1] === state.last) i = (i + 1) % variants.length;
+  state.turns[key] = i;
+  state.last = variants[i][1];
+  return { key, text: variants[i][1], path: `COACH.${key}.${variants[i][0]}` };
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
 // DURUM MAKİNESİ (FSM) — yalnızca tablodaki geçişler serbest
 //   IDLE → PLAYING → LISTENING → VERIFIED → (LISTENING …) → COMPLETE → PLAYING (sıradaki soru) … → SUMMARY
 // ───────────────────────────────────────────────────────────────────────
@@ -1699,6 +1806,8 @@ function validateConfig(cfg) {
   num(cfg.AUDIO?.PIANO?.SAMPLE_EVERY, 1, 12, 'AUDIO.PIANO.SAMPLE_EVERY');
   num(cfg.UI?.CONTOUR_SECONDS, 1, 30, 'UI.CONTOUR_SECONDS');
   num(cfg.UI?.CONTOUR_RANGE_CENTS, 20, 1200, 'UI.CONTOUR_RANGE_CENTS');
+  num(cfg.UI?.COACH_INTERVAL_MS, 1000, 60000, 'UI.COACH_INTERVAL_MS');
+  num(cfg.UI?.COACH_FAR_CENTS, 30, 600, 'UI.COACH_FAR_CENTS');
   num(cfg.HISTORY?.MAX_ENTRIES, 1, 1000, 'HISTORY.MAX_ENTRIES');
   // Uygulanabilirlik: bu ayarlarla bir oturum gerçekten üretilebiliyor mu? (dar register vb. burada yakalanır)
   if (!errs.length) {
@@ -2106,9 +2215,9 @@ const ui = {
   sumBiasMark: $('sumBiasMark'), sumBiasMin: $('sumBiasMin'), sumBiasMax: $('sumBiasMax'), sumHardest: $('sumHardest'), sumHardestWhy: $('sumHardestWhy'),
   sumRows: $('sumRows'), sumRoles: $('sumRoles'), sumAdvice: $('sumAdvice'), sumNew: $('sumNewBtn'), sumClose: $('sumCloseBtn'),
   exTitle: $('exTitle'), stateLabel: $('stateLabel'), progress: $('examProgress'), progressText: $('progressText'), progressTimer: $('progressTimer'),
-  segments: $('segments'), notes: $('notes'), status: $('statusLine'), hint: $('hintLine'),
+  segments: $('segments'), notes: $('notes'), status: $('statusLine'), coach: $('coachLine'),
   staffPanel: $('staffPanel'), staff: $('staff'), staffMsg: $('staffMsg'),
-  tuner: $('tuner'), targetName: $('targetName'), targetFreq: $('targetFreq'), centsVal: $('centsVal'), zoneLabel: $('zoneLabel'),
+  tuner: $('tuner'), targetName: $('targetName'), targetFreq: $('targetFreq'), centsVal: $('centsVal'),
   heardFreq: $('heardFreq'), heardNote: $('heardNote'), gauge: $('gauge'), ticks: $('ticks'), needle: $('needle'),
   vgAbove: $('vgAbove'), vgTarget: $('vgTarget'), vgBelow: $('vgBelow'),
   sustainFill: $('sustainFill'), sustainText: $('sustainText'), contour: $('contour'), contourSpan: $('contourSpan'), contourTol: $('contourTol'),
@@ -2132,18 +2241,8 @@ const fmtDuration = (ms) => { const s = Math.round(ms / 1000), m = Math.floor(s 
 const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
 
 const STATE_TEXT  = { IDLE: 'Hazır', PLAYING: 'Çalıyor', LISTENING: 'Dinliyor', VERIFIED: 'Doğrulandı', COMPLETE: 'Soru bitti', SUMMARY: 'Test bitti' };
-const ZONE_TEXT   = { perfect: 'Tolerans içinde', ok: 'Sınırda', bad: 'Detone' };
 const STATUS_TEXT = { pending: 'sırada', current: 'şu an', done: 'tam', partial: 'kısmi', skipped: 'geçildi', timeout: 'süre doldu', unanswered: 'cevaplanmadı' };
-const HINTS = {
-  quiet:     'Ses algılanmıyor — biraz daha güçlü söyleyin ya da gürültü eşiğini düşürün.',
-  unclear:   'Perde net değil — vibratosuz, açık bir “na” ile söyleyin.',
-  hold:      'Tam yerinde — kaydırmadan sabit tutun.',
-  low:       'Biraz pes kalıyorsunuz — sesi hafifçe yükseltin.',
-  high:      'Biraz tiz kalıyorsunuz — sesi hafifçe alçaltın.',
-  octave:    'Oktav farkı — ilk sesi söylediğiniz oktavda kalın.',
-  octaveOff: 'Oktav farkı — sesi yazıldığı oktavda söyleyin (oktav toleransı kapalı).',
-  blind:     'Canlı geri bildirim kapalı (sınav provası): ses doğrulanınca kutu yeşile döner.',
-};
+// Anlık değişen uyarı yazıları (HINTS / ZONE_TEXT) kaldırıldı: yönlendirme artık aralıklı → CONFIG.TEXTS.COACH, setCoach()
 
 const ICON_ATTR = 'viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
 const BADGE = {
@@ -2496,7 +2595,9 @@ function updateHeaderText() {
 let gaugeHalf = 0;                       // göstergenin yarı yüksekliği (px)
 let needlePos = 0, needleTarget = 0;     // ibrenin merkezden yukarı uzaklığı (px; + tiz, − pes)
 let curZone = 'none';
-let hintKey = '';
+const coachWin = new CoachWindow();      // son yönlendirme aralığının özeti
+const coachState = { last: '', turns: {} };
+let coachMsg = null;                     // ekrandaki yönlendirme (null → bekleme metni)
 let lastSustainFrac = -1;
 let lastReadoutTs = 0;
 
@@ -2549,15 +2650,23 @@ function paintSustain(frac) {
     ui.sustainFill.style.transform = `scaleX(${frac.toFixed(4)})`;
   }
 }
-function setHint(key) {
-  if (key === 'octave' && !settings.fold) key = 'octaveOff';
-  if (key === hintKey) return;
-  hintKey = key;
-  ui.hint.textContent = HINTS[key] ?? '';
+/** Yönlendirme satırı (grafiğin altında). m = coachMessage() sonucu; null → bekleme metni (COACH.idle) */
+function setCoach(m) {
+  coachMsg = m;
+  const path = m ? m.path : 'COACH.idle.a';
+  const text = m ? m.text : (getPath(CONFIG.TEXTS, path) ?? '');
+  ui.coach.dataset.text = path;                     // "Adları sayfada düzenle" için: hangi cümle görünüyor
+  ui.coach.dataset.key = m ? m.key : 'idle';
+  ui.coach.classList.toggle('idle', !m);
+  setText(ui.coach, text);
+}
+/** Yeni ses / yeni çalım: özet sıfırlanır, satır bekleme metnine döner */
+function resetCoach() {
+  coachWin.reset();
+  setCoach(null);
 }
 function clearReadouts() {
   setText(ui.centsVal, '—');
-  setText(ui.zoneLabel, 'Ses bekleniyor');
   setText(ui.heardFreq, '— Hz');
   setText(ui.heardNote, ' ');
   setText(ui.clarityText, 'netlik —');
@@ -2565,7 +2674,6 @@ function clearReadouts() {
   ui.sustainFill.classList.remove('full');
   paintSustain(0);
   setZone('none');
-  setHint('');
   needleTarget = 0;
 }
 
@@ -3327,6 +3435,7 @@ const SETTINGS_SCHEMA = [
     { path: 'EXAM.REVEAL_NOTE_NAMES', label: 'Nota adlarını göster', type: 'select', options: [['after', 'Ses doğrulanınca'], ['end', 'Soru bitince'], ['always', 'Her zaman'], ['never', 'Hiçbir zaman']] },
     { path: 'EXAM.QUESTION_TIME_LIMIT_S', label: 'Soru süre sınırı (sn · 0 = yok)', type: 'number', min: 0, max: 600, step: 5 },
     { path: 'SCORING.REPLAY_PENALTY', label: 'Tekrar başına kesinti (%)', type: 'percent', min: 0, max: 100, step: 5 },
+    { path: 'UI.COACH_INTERVAL_MS', label: 'Yönlendirme aralığı (ms)', type: 'number', min: 1000, max: 30000, step: 500 },
     { path: 'EXAM.LIVE_FEEDBACK', label: 'Canlı geri bildirim (ibre, grafik)', type: 'bool' },
     { path: 'EXAM.ALLOW_REPLAY', label: 'Tekrar çalmaya izin ver', type: 'bool' },
     { path: 'EXAM.ALLOW_SKIP', label: 'Soruyu geçmeye izin ver', type: 'bool' },
@@ -3602,6 +3711,7 @@ function onStateChange(next, prev, payload) {
       tracker.reset();
       medianFilter.reset();
       clearReadouts();
+      resetCoach();
       break;
 
     case S.PLAYING: {                               // sesler çalınır; bu sırada mikrofon yok sayılır
@@ -3610,6 +3720,7 @@ function onStateChange(next, prev, payload) {
       tracker.reset();
       medianFilter.reset();
       clearReadouts();
+      resetCoach();
       stopAllSound();
       const dur = CONFIG.AUDIO.CHORD_DURATION_S;
       playHarmonic(exercise.notes, dur, audioCtx.currentTime + 0.06);
@@ -3624,6 +3735,7 @@ function onStateChange(next, prev, payload) {
       octaveVotes.clear();
       invalidMs = 0;
       clearReadouts();
+      resetCoach();                                 // yeni ses → yönlendirme özeti sıfırdan
       break;
 
     case S.VERIFIED: {                              // nota doğrulandı → kısa bekleme → kilit açılır
@@ -3867,18 +3979,21 @@ function frame(ts) {
 
   if (ts - lastReadoutTs >= CONFIG.UI.READOUT_INTERVAL_MS) {    // metinler ≈ 12 Hz'de güncellenir
     lastReadoutTs = ts;
-    if (feedback) {
+    if (feedback) {                                 // sayılar ve renk anlık; sözlü yönlendirme aşağıda, aralıklı
       setText(ui.centsVal, valid ? fmtCents(cents) : '—');
-      setText(ui.zoneLabel, valid ? ZONE_TEXT[zone] : (loud ? 'Perde net değil' : 'Ses bekleniyor'));
       setText(ui.heardFreq, valid ? `${nf1.format(freq)} Hz` : '— Hz');
       setText(ui.heardNote, valid ? `≈ ${nearestNoteName(freq)}` : ' ');
       setText(ui.sustainText, `${nf2.format(tracker.ms / 1000)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
-      setHint(!loud ? 'quiet' : !valid ? 'unclear' : absCents > 600 ? 'octave' : zone === 'perfect' ? 'hold' : cents < 0 ? 'low' : 'high');
-    } else {
-      setText(ui.zoneLabel, loud ? 'Dinleniyor…' : 'Ses bekleniyor');
-      setHint(!loud ? 'quiet' : 'blind');
     }
     setText(ui.clarityText, loud ? `netlik ${nf2.format(clarity)}` : 'netlik —');
+  }
+
+  // Yönlendirme: her COACH_INTERVAL_MS'de bir, son aralığın özetinden tek cümle
+  coachWin.push(dt, { loud, valid, cents, held: valid && absCents <= CONFIG.TOLERANCE_CENTS });
+  if (coachWin.ms >= CONFIG.UI.COACH_INTERVAL_MS) {
+    const m = coachMessage(coachWin.summary(), coachState, { live: feedback, fold: settings.fold }, CONFIG);
+    if (m) setCoach(m);
+    coachWin.reset();
   }
 
   const limit = session ? CONFIG.EXAM.QUESTION_TIME_LIMIT_S : 0;
@@ -4012,6 +4127,7 @@ function init() {
   if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
     showAlert('Mikrofon için sayfa https veya http://localhost üzerinden açılmalıdır (file:// bazı tarayıcılarda çalışmaz).');
   }
+  setCoach(null);
   drawContour(performance.now());
 }
 init();
