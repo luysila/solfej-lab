@@ -48,6 +48,7 @@ Akış: IDLE → PLAYING → LISTENING → VERIFIED → (LISTENING …) → COMP
 Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 
 ## Kurallar
+- **Dosyayı baştan yazma. Yalnızca gereken yerleri düzenle; iş bitince değiştirdiğin fonksiyonları ve satır aralıklarını listele.**
 - Mevcut davranışı bozma; yeni özellikleri var olan yapının üzerine ekle.
   Kullanıcı istemedikçe dosyayı bölme ya da bir çerçeveye (React vb.) taşıma.
 - Yeni her ayar: `CONFIG`'e (açıklayıcı yorumla), gerekiyorsa `SETTINGS_SCHEMA`'ya (panel) ve `validateConfig`'e (sınırlar).
@@ -67,6 +68,23 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 - Tutma (sustain) bant dışına çıkınca sıfırlanır; yalnızca algılama kopmalarına 60 ms pay var (`SUSTAIN_DROPOUT_GRACE_MS`).
 - Sınavda nota adları ses doğrulanınca açılır (`EXAM.REVEAL_NOTE_NAMES = 'after'`).
 - 5'li akor kuralı: her 5 soruluk sette en fazla 1 artmış/eksilmiş, en az 1 majör + 1 minör.
+- **Porte + perde grafiği tek görünüm** (canvas, VexFlow'a bağlı değil): sol ve fa anahtarlı çift porte, ortada Do4.
+  Perde konumu nota yazımına göre: hedef sesin tam perdesi o notanın nota başının ortasından geçer
+  (Re majörde Fa♯ → Fa'nın yeri, ♯ ile); ara perdeler komşu nota konumları arasında orantılı. Dönüşüm PURE bölümünde.
+  Oktav toleransı açıkken çizgi, puanlamadaki gibi hedefin oktavına katlanmış perdeyle çizilir.
+  "Portede göster" açık → porte görünümü (varsayılan), kapalı → eski sent grafiği. Ayrı VexFlow paneli varsayılan gizli (`CONFIG.UI`).
+  Sınavda nota başları ve hedef kılavuz çizgisi `EXAM.REVEAL_NOTE_NAMES`'e uyar; `EXAM.LIVE_FEEDBACK` kapalıysa canlı çizgi yok.
+- **Dikey akort aleti**: aşağı pes, yukarı tiz; ölçek ±100 sent (uçlar tam komşu yarım seslere denk gelir).
+  Ortada hedefin adı, uçlarda bir yarım ses aşağı/yukarı notanın adı; sınavda hedef açılmadıysa yalnızca "pes"/"tiz".
+  Yerleşim: porte solda ve geniş, gösterge sağda, aynı yükseklikte (telefonda da yan yana).
+- **Canlı nota başı**: okunan ses portede dolu nota başı; tolerans içinde yeşil, dışında kırmızı (çizgi de aynı renk).
+  "Sınırdayken sarı" seçeneği var, varsayılan kapalı. Serbest çalışmada porte görünümü her zaman açık başlar.
+- **Yönlendirme panik yaratmaz**: anlık değişen uyarı yazısı yok (renk ve gösterge anlık kalır). Sözlü yönlendirme
+  `UI.COACH_INTERVAL_MS` (5000) aralıkla, son aralığın özetinden tek sakin cümle; aynı cümle üst üste gelmez;
+  yeni seste özet sıfırlanır. `LIVE_FEEDBACK` kapalıysa pes/tiz yönü söylenmez, yalnızca teknik uyarılar.
+- **Arayüz adları `CONFIG.TEXTS`'te**: panel başlıkları, sekmeler, düğmeler, gösterge etiketleri, yönlendirme cümleleri.
+  Ayarlarda "Arayüz adları" grubu kendiliğinden üretilir; "Adları sayfada düzenle" ile yerinde düzenlenir;
+  "Adları kopyala" değişenleri JSON olarak verir. Ad boş olamaz, en fazla 80 karakter.
 
 ## Doğrulanmamış / bilinen sınırlar
 - Tone.js (14.8.49) ve VexFlow (4.2.5) gerçek kütüphaneleriyle henüz denenmedi (önceki geliştirme ortamında CDN'ler
