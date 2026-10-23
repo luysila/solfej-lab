@@ -266,6 +266,7 @@ input[type="number"]:focus-visible, textarea:focus-visible { outline: 2px solid 
 .key-line { display: inline-block; width: 16px; height: 2px; border-radius: 1px; vertical-align: middle; margin-right: 6px; }
 .k-pitch { background: var(--accent); } .k-held { background: var(--green); height: 3px; }
 .k-guide { background: rgba(138, 164, 255, .55); height: 1px; }
+.k-out { background: var(--red); height: 3px; }
 .key-band { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; background: rgba(52, 211, 153, .22); }
 .contour canvas { display: block; width: 100%; height: var(--view-h, 230px); border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
 
@@ -510,8 +511,9 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
         <span class="ch-staff">Porte · son <span id="staffSpan">6</span> sn · okunan perde, nota yazımına göre</span>
         <span class="ch-cents" hidden>Perde grafiği · son <span id="contourSpan">6</span> sn · hedefe göre sapma (sent)</span>
         <span class="contour-legend">
-          <span><i class="key-line k-pitch"></i>Okunan perde</span>
+          <span class="ch-cents" hidden><i class="key-line k-pitch"></i>Okunan perde</span>
           <span><i class="key-line k-held"></i>Tolerans içinde</span>
+          <span class="ch-staff"><i class="key-line k-out"></i>Dışında</span>
           <span class="ch-cents" hidden><i class="key-band"></i>±<span id="contourTol">20</span> sent bandı</span>
           <span class="ch-staff"><i class="key-line k-guide"></i>Hedef</span>
         </span>
@@ -740,6 +742,7 @@ const CONFIG = {
   UI: {
     SHOW_STAFF: true,             // "Portede göster" varsayılanı: perde grafiği çift porte üzerinde (false → sent grafiği)
     VEXFLOW_PANEL: false,         // ayrı VexFlow porte paneli (yalnızca "Portede göster" açıkken; kütüphane CDN'den yüklenir)
+    STAFF_WARN_YELLOW: false,     // portede canlı nota başı ve çizgi: true → sınırdayken (WARNING_CENTS içinde) sarı; false → yalnızca yeşil/kırmızı
     GAUGE_RANGE_CENTS: 100,       // dikey göstergenin yarı ölçeği (± sent); 100 → uçlar tam bir yarım ses aşağı/yukarı
     CONTOUR_SECONDS: 6,           // perde grafiğinin zaman penceresi
     CONTOUR_RANGE_CENTS: 100,     // perde grafiğinin dikey aralığı (± sent)
@@ -2621,8 +2624,8 @@ function setupContour() {
   else window.addEventListener('resize', measure);
 }
 /** midi: puanlamadaki gibi katlanmış perde (hedef.midi + sent/100) → porte basamağı burada, yazım bağlamıyla hesaplanır */
-function pushContour(t, cents, held, midi = NaN) {
-  contour.pts.push({ t, c: cents, h: held, s: staffMapFor(exercise.notes)(midi) });
+function pushContour(t, cents, held, midi = NaN, zone = 'none') {
+  contour.pts.push({ t, c: cents, h: held, s: staffMapFor(exercise.notes)(midi), z: zone });
   const cutoff = t - CONFIG.UI.CONTOUR_SECONDS * 1000 - 500;
   while (contour.pts.length && contour.pts[0].t < cutoff) contour.pts.shift();
 }
@@ -2945,25 +2948,28 @@ function drawStaffContour(now) {
     ctx.beginPath(); ctx.moveTo(G.L, y); ctx.lineTo(G.xNow, y); ctx.stroke();
   }
 
-  const pts = contour.pts;                                       // okunan perde
-  const stroke = (pick, color, width) => {
-    ctx.strokeStyle = color;
-    ctx.lineWidth = width;
-    ctx.lineJoin = 'round';
-    ctx.lineCap = 'round';
-    ctx.beginPath();
-    let open = false, prevT = -Infinity;
-    for (const p of pts) {
-      if (!Number.isFinite(p.s) || !pick(p)) { open = false; prevT = p.t; continue; }
-      const x = X(p.t), y = G.Y(p.s);
-      if (!open || p.t - prevT >= 120) ctx.moveTo(x, y); else ctx.lineTo(x, y);
-      open = true;
-      prevT = p.t;
+  // Okunan perde: her parça kendi karesinin rengiyle (tolerans içinde yeşil, dışında kırmızı; isteğe bağlı sarı)
+  const pts = contour.pts;
+  ctx.save();
+  ctx.beginPath();
+  ctx.rect(G.L, 0, G.xNow - G.L + 2, G.H);                       // anahtarların üstüne taşmasın
+  ctx.clip();
+  ctx.lineWidth = 2.5;
+  ctx.lineJoin = 'round';
+  ctx.lineCap = 'round';
+  let prev = null;
+  for (const p of pts) {
+    if (!Number.isFinite(p.s)) { prev = null; continue; }
+    if (prev && p.t - prev.t < 120) {
+      ctx.strokeStyle = zoneColor(p.z);
+      ctx.beginPath();
+      ctx.moveTo(X(prev.t), G.Y(prev.s));
+      ctx.lineTo(X(p.t), G.Y(p.s));
+      ctx.stroke();
     }
-    ctx.stroke();
-  };
-  stroke(() => true, C.accent, 2);
-  stroke((p) => p.h, C.green, 3);
+    prev = p;
+  }
+  ctx.restore();
   ctx.fillStyle = C.red;                                         // porte aralığı dışına taşan kareler: kenarda çentik
   for (const p of pts) {
     if (!Number.isFinite(p.s) || (p.s >= G.lo && p.s <= G.hi)) continue;
@@ -2975,7 +2981,8 @@ function drawStaffContour(now) {
   // "Şimdi" sütunu: alıştırmanın sesleri içi boş nota başı (sınavda yalnızca açılanlar)
   const states = staffStates();
   const COLOR = { done: C.green, missed: C.red, active: C.accent, pending: C.head };
-  for (const it of layoutHeads(exercise.notes, G)) {
+  const heads = layoutHeads(exercise.notes, G);
+  for (const it of heads) {
     if (!isNoteRevealed(it.i)) continue;
     const s = states[it.i], color = COLOR[s] ?? C.head;
     drawLedgers(ctx, G, it.pos, it.x, G.half * 1.3, C.staff);
@@ -2984,6 +2991,25 @@ function drawStaffContour(now) {
     drawHead(ctx, it.x, it.y, G.half, color, false, s === 'active' ? Math.max(2, G.half * 0.36) : Math.max(1.4, G.half * 0.26));
     ctx.shadowBlur = 0;
   }
+
+  // Canlı nota başı: okunan ses, sıradaki notanın sütununda hareket eder; doğru seste hedef başın üstüne biner
+  const last = pts[pts.length - 1];
+  if (last && Number.isFinite(last.s) && now - last.t < 160 && st === S.LISTENING) {
+    const x = heads.find((h) => h.i === exercise.index)?.x ?? G.xNow;
+    const color = zoneColor(last.z), pos = clamp(last.s, G.lo, G.hi);
+    drawLedgers(ctx, G, pos, x, G.half * 1.3, C.staff);
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 8;
+    drawHead(ctx, x, G.Y(pos), G.half * 0.92, color, true);
+    ctx.shadowBlur = 0;
+  }
+}
+/** Bölge rengi: tolerans içinde yeşil; sınırda sarı (UI.STAFF_WARN_YELLOW açıksa) ya da kırmızı; ötesi kırmızı */
+function zoneColor(zone) {
+  const C = contour.colors;
+  if (zone === 'perfect') return C.green;
+  if (zone === 'ok' && CONFIG.UI.STAFF_WARN_YELLOW) return C.yellow;
+  return C.red;
 }
 
 
@@ -3315,6 +3341,7 @@ const SETTINGS_SCHEMA = [
     { path: 'PITCH.MIN_CLARITY', label: 'En düşük netlik', type: 'number', min: 0.3, max: 0.99, step: 0.01 },
     { path: 'PITCH.MEDIAN_FRAMES', label: 'Medyan filtre (kare)', type: 'number', min: 1, max: 9, step: 1 },
     { path: 'UI.VEXFLOW_PANEL', label: 'Ayrı VexFlow porte paneli', type: 'bool' },
+    { path: 'UI.STAFF_WARN_YELLOW', label: 'Portede sınırdayken sarı', type: 'bool' },
   ] },
 ];
 const fieldId = (path) => `set-${path.replace(/\./g, '-')}`;
@@ -3763,8 +3790,10 @@ function setMode(next, { persist = true } = {}) {
   ui.examControls.hidden = next !== 'exam';
   ui.practiceControls.hidden = next !== 'practice';
   hideSummary();
-  if (next === 'practice') selectionChanged();      // egzersizi kurar + sıfırlar
-  else { exercise = new Exercise([]); buildNoteBoxes(); hardReset(); }
+  if (next === 'practice') {
+    selectionChanged();                             // egzersizi kurar + sıfırlar
+    setStaffEnabled(true, { persist: false });      // serbest çalışmada porte görünümü her zaman açık başlar
+  } else { exercise = new Exercise([]); buildNoteBoxes(); hardReset(); }
   if (persist) savePrefs();
 }
 
@@ -3829,7 +3858,7 @@ function frame(ts) {
 
   const feedback = !session || CONFIG.EXAM.LIVE_FEEDBACK;
   if (feedback) {
-    pushContour(ts, valid ? cents : NaN, valid && absCents <= CONFIG.TOLERANCE_CENTS, valid ? target.midi + cents / 100 : NaN);
+    pushContour(ts, valid ? cents : NaN, valid && absCents <= CONFIG.TOLERANCE_CENTS, valid ? target.midi + cents / 100 : NaN, zone);
     if (valid) needleTarget = (clamp(cents, -gaugeRange(), gaugeRange()) / gaugeRange()) * gaugeHalf;
     setZone(zone);
     paintSustain(tracker.progress);
@@ -3970,8 +3999,8 @@ function init() {
   renderDetectorChip();
   renderEngineChip();
   renderHistory();
-  setMode(prefs.mode === 'practice' ? 'practice' : 'exam', { persist: false });
   setStaffEnabled(typeof prefs.staffView === 'boolean' ? prefs.staffView : CONFIG.UI.SHOW_STAFF, { persist: false });
+  setMode(prefs.mode === 'practice' ? 'practice' : 'exam', { persist: false });   // serbest çalışma porteyi açar
   if (cfgProblem) showNotice(`Kayıtlı özel ayarlar geçersiz olduğu için varsayılanlar kullanılıyor (${cfgProblem}).`);
 
   // 3) Ses: AudioContext şimdi "askıda" oluşturulur, piyano örnekleri arka planda yüklenir.
@@ -4003,7 +4032,7 @@ if (new URLSearchParams(location.search).has('debug')) {
     get state() { return fsm.state; }, get exercise() { return exercise; }, get session() { return session; },
     get tracker() { return tracker; }, get detector() { return detector; }, get audioCtx() { return audioCtx; },
     get piano() { return piano; }, get diag() { return lastDiag; }, get staff() { return staffView; },
-    get overrides() { return configOverrides; }, fsm, CONFIG,
+    get overrides() { return configOverrides; }, get contour() { return contour; }, fsm, CONFIG,
   };
 }
 </script>

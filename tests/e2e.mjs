@@ -442,6 +442,48 @@ if (run('E')) {
   await context.close();
 }
 
+// ═══ SENARYO F: serbest çalışma · 6 sn boyunca 60 sent pes, sonra düzeltme → kırmızıdan yeşile ═══
+if (run('F')) {
+  log('F) serbest çalışma: 6 sn −60 sent, sonra düzeltme');
+  const { context, page, consoleMsgs } = await openPage('offline', FAST);
+  await page.click('#tabPractice');
+  await page.selectOption('#rootSelect', '0');            // Do
+  await page.selectOption('#octaveSelect', '4');
+  await page.selectOption('#typeSelect', 'single');
+  const staffOn = await page.isChecked('#staffToggle');
+  assert.ok(staffOn, 'serbest çalışmada porte görünümü açık başlamalı');
+  await page.evaluate(() => { const S = window.__singer; S.bias = -60; S.jitter = 2; });
+  await page.click('#playBtn');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  const t0 = Date.now();
+  await page.waitForTimeout(5600);                         // 5 sn'lik yönlendirme aralığı dolsun
+  const flat = await page.evaluate(() => ({
+    state: window.__dbg.state, zone: document.getElementById('tuner').dataset.zone,
+    zones: window.__dbg.contour.pts.filter((p) => Number.isFinite(p.s)).map((p) => p.z),
+    gauge: ['vgAbove', 'vgTarget', 'vgBelow'].map((id) => document.getElementById(id).textContent).join(' / '),
+  }));
+  log('pes evre:', flat.state, '· bölge', flat.zone, '· gösterge', flat.gauge, '· kare', flat.zones.length);
+  assert.equal(flat.state, 'LISTENING', '−60 sentte doğrulanmamalı');
+  assert.equal(flat.zone, 'bad');
+  assert.ok(flat.zones.length > 50 && flat.zones.every((z) => z === 'bad'), 'çizgi kırmızı olmalı');
+  assert.equal(flat.gauge, 'Do♯ / Do / Si');
+  await (await page.$('#tuner')).screenshot({ path: `${OUT}/e2e-9a-flat-red.png` });
+  await page.waitForTimeout(Math.max(0, 6000 - (Date.now() - t0)));
+  await page.evaluate(() => { window.__singer.bias = 3; });  // düzeltme
+  await waitFor(page, () => window.__dbg.state === 'COMPLETE', null, 10000);
+  const fixed = await page.evaluate(() => {
+    const z = window.__dbg.contour.pts.filter((p) => Number.isFinite(p.s)).map((p) => p.z);
+    return { first: z[0], last: z[z.length - 1], greens: z.filter((x) => x === 'perfect').length };
+  });
+  log('düzeltme sonrası:', JSON.stringify(fixed));
+  assert.equal(fixed.first, 'bad');
+  assert.equal(fixed.last, 'perfect');
+  assert.ok(fixed.greens >= 5, 'yeşil parça olmalı');
+  await (await page.$('#tuner')).screenshot({ path: `${OUT}/e2e-9b-corrected-green.png` });
+  assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
+  await context.close();
+}
+
 await browser.close();
 server.close();
 log('TÜM UÇTAN UCA TESTLER GEÇTİ');
