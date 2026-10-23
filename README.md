@@ -1,5 +1,11 @@
 # Solfej Lab
 
+**Site:** https://luysila.github.io/solfej-lab/ · **Depo:** https://github.com/luysila/solfej-lab
+
+**Güncelleme:** Site GitHub Pages ile `main` dalının kökünden yayınlanır. `main`'e her gönderim (`git push`)
+siteyi bir iki dakika içinde kendiliğinden günceller; ayrı bir derleme adımı yok.
+Çalışmaya başlamadan `git pull` ile son hâli alın; bitince `npm test` → `git commit` → `git push`.
+
 Konservatuvar adayları için web tabanlı işitme eğitimi uygulaması: sesler piyanoyla çalınır, siz kökten başlayarak
 "na" hecesiyle sırayla söylersiniz; uygulama perdenizi ölçer ve sınav sonunda teşhis çıkarır.
 

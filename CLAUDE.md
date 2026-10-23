@@ -28,6 +28,16 @@ perdeyi ölçer, sesi tolerans içinde yeterince tutunca bir sonrakinin kilidini
 - Uçtan uca test `?seed=4242` ile sabit bir soru seti kullanır; soru üreticisini bilerek değiştirirsen
   beklenen değerleri (puan, soru tipleri) de güncelle.
 
+## Yayın ve ortak çalışma
+- Site GitHub Pages'te: https://luysila.github.io/solfej-lab/ (depo: https://github.com/luysila/solfej-lab,
+  `main` dalının kökünden yayın; `.nojekyll` dosyalar olduğu gibi yayınlansın diye var). `main`'e her gönderim siteyi günceller.
+- Her oturumda ilk iş `git pull` ile son hâli al. Kaydedilmemiş değişiklik varsa çekmeden önce kullanıcıya sor.
+- Bir iş bitince `npm test` çalıştır; geçerse kaydetmeyi (commit) ve göndermeyi (push) öner.
+- Önemli kararları bu dosyaya yaz: konuşma geçmişi başka bilgisayara geçmez, ortak bilgi yalnızca depoda kalır.
+- Kayıtlarda kişisel e-posta değil GitHub noreply adresi kullanılır:
+  `luysila` · `347091712+luysila@users.noreply.github.com`. Yeni bir bilgisayarda depoyu klonlayınca
+  `git config user.name` / `git config user.email` ile bunu ayarla (ya da kullanıcıya hatırlat).
+
 ## Mimari (tek dosya: index.html — derleme adımı yok, vanilla JS / ES modülleri, çerçeve yok)
 0. `CONFIG`: tüm ayarlar betiğin en üstünde (TOLERANCE_CENTS, SUSTAIN_TIME_MS, QUESTION_COUNTS, REGISTER,
    CHORD_RULES, EXAM, SCORING, ANALYSIS, PITCH, AUDIO, UI, HISTORY, LIBS, PRESETS). `DEFAULT_CONFIG` dondurulmuş kopyası.
