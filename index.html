@@ -112,11 +112,11 @@ select {
 select:disabled { opacity: .5; }
 select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 option, optgroup { background: var(--field); color: var(--text); }
-input[type="number"], textarea {
+input[type="number"], input[type="text"], textarea {
   width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line);
   background: var(--field); color: var(--text); font: inherit; font-size: 14px;
 }
-input[type="number"]:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input[type="number"]:focus-visible, input[type="text"]:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
 
 .common { display: grid; gap: 4px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
 .device-field { max-width: 420px; }
@@ -347,6 +347,21 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
 .settings-msg.err { color: var(--red); }
 .set-h3 { margin: 6px 0 0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
 .settings-top { display: grid; grid-template-columns: minmax(0, 360px); }
+.set-intro { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; margin-bottom: 12px; }
+.set-intro .switch { margin-top: 0; }
+
+/* ── Adları sayfada düzenle ── */
+.edit-names [data-text] { outline: 1px dashed rgba(138, 164, 255, .8); outline-offset: 2px; cursor: text; }
+.edit-names #editBar [data-text] { outline: none; }
+.name-editor {
+  position: fixed; z-index: 1000; padding: 4px 8px; border-radius: 8px; border: 2px solid var(--accent);
+  background: var(--field); color: var(--text); box-shadow: 0 10px 30px rgba(0, 0, 0, .5); min-width: 0;
+}
+.edit-bar {
+  position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 900; width: max-content; max-width: calc(100% - 32px);
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; padding: 10px 14px; border-radius: 14px;
+  background: var(--panel-2); border: 1px solid var(--accent); box-shadow: 0 14px 40px rgba(0, 0, 0, .55); font-size: 13px; color: var(--text-2);
+}
 
 .tips { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
 
@@ -378,18 +393,19 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
 
   <!-- ── Mod + kontroller ── -->
   <section class="panel" aria-label="Çalışma modu">
+    <div class="panel-head"><h2 data-text="panelMode">Çalışma modu</h2></div>
     <div class="tabs" role="tablist" aria-label="Mod">
-      <button class="tab" id="tabExam" role="tab" type="button" aria-selected="true" aria-controls="examControls">Sınav</button>
-      <button class="tab" id="tabPractice" role="tab" type="button" aria-selected="false" aria-controls="practiceControls">Serbest çalışma</button>
+      <button class="tab" id="tabExam" role="tab" type="button" aria-selected="true" aria-controls="examControls" data-text="tabExam">Sınav</button>
+      <button class="tab" id="tabPractice" role="tab" type="button" aria-selected="false" aria-controls="practiceControls" data-text="tabPractice">Serbest çalışma</button>
     </div>
 
     <div id="examControls" role="tabpanel" aria-labelledby="tabExam">
       <p class="exam-info" id="examInfo"></p>
       <div class="actions">
-        <button class="btn primary" id="startBtn" type="button">▶ Teste Başla</button>
-        <button class="btn" id="examReplayBtn" type="button" disabled>↻ Tekrar Çal</button>
-        <button class="btn" id="skipBtn" type="button" disabled>⏭ Soruyu Geç</button>
-        <button class="btn ghost" id="endBtn" type="button" disabled>■ Testi Bitir</button>
+        <button class="btn primary" id="startBtn" type="button" data-text="btnStart">▶ Teste Başla</button>
+        <button class="btn" id="examReplayBtn" type="button" disabled data-text="btnExamReplay">↻ Tekrar Çal</button>
+        <button class="btn" id="skipBtn" type="button" disabled data-text="btnSkip">⏭ Soruyu Geç</button>
+        <button class="btn ghost" id="endBtn" type="button" disabled data-text="btnEnd">■ Testi Bitir</button>
       </div>
     </div>
 
@@ -400,9 +416,9 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
         <label class="field"><span>Ses / aralık / akor</span><select id="typeSelect"></select></label>
       </div>
       <div class="actions">
-        <button class="btn primary" id="playBtn" type="button">▶ Çal &amp; Başla</button>
-        <button class="btn" id="replayBtn" type="button" disabled>↻ Tekrar Çal</button>
-        <button class="btn ghost" id="resetBtn" type="button" disabled>⟲ Sıfırla</button>
+        <button class="btn primary" id="playBtn" type="button" data-text="btnPlay">▶ Çal &amp; Başla</button>
+        <button class="btn" id="replayBtn" type="button" disabled data-text="btnReplay">↻ Tekrar Çal</button>
+        <button class="btn ghost" id="resetBtn" type="button" disabled data-text="btnReset">⟲ Sıfırla</button>
       </div>
     </div>
 
@@ -412,12 +428,12 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
         <label class="switch">
           <input type="checkbox" id="foldToggle" checked>
           <span class="track"></span>
-          <span class="switch-text">Oktav toleransı<small id="foldHint"></small></span>
+          <span class="switch-text"><span data-text="toggleFold">Oktav toleransı</span><small id="foldHint"></small></span>
         </label>
         <label class="switch">
           <input type="checkbox" id="staffToggle">
           <span class="track"></span>
-          <span class="switch-text">Portede göster<small>Perde nota portesi üzerinde çizilir (kapalı: sent grafiği)</small></span>
+          <span class="switch-text"><span data-text="toggleStaff">Portede göster</span><small data-text="toggleStaffHint">Perde nota portesi üzerinde çizilir (kapalı: sent grafiği)</small></span>
         </label>
       </div>
     </div>
@@ -426,7 +442,7 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
   <!-- ── Sınav sonucu: teşhis ekranı ── -->
   <section class="panel summary" id="summaryPanel" hidden aria-labelledby="summaryTitle">
     <div class="panel-head">
-      <h2 id="summaryTitle">Sınav sonucu · teşhis</h2>
+      <h2 id="summaryTitle" data-text="panelSummary">Sınav sonucu · teşhis</h2>
       <span class="stage" id="sumMeta"></span>
     </div>
     <div class="summary-top">
@@ -461,15 +477,15 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
     <div class="roles" id="sumRoles"></div>
     <ul class="advice" id="sumAdvice"></ul>
     <div class="actions">
-      <button class="btn primary" id="sumNewBtn" type="button">▶ Yeni Test</button>
-      <button class="btn ghost" id="sumCloseBtn" type="button">Kapat</button>
+      <button class="btn primary" id="sumNewBtn" type="button" data-text="btnNewTest">▶ Yeni Test</button>
+      <button class="btn ghost" id="sumCloseBtn" type="button" data-text="btnClose">Kapat</button>
     </div>
   </section>
 
   <!-- ── Okunacak sesler ── -->
   <section class="panel" aria-label="Okunacak sesler">
     <div class="panel-head">
-      <h2>Okunacak sesler <span class="ex-title" id="exTitle"></span></h2>
+      <h2><span data-text="panelNotes">Okunacak sesler</span> <span class="ex-title" id="exTitle"></span></h2>
       <span class="stage" id="stateLabel" data-s="IDLE">Hazır</span>
     </div>
     <div class="exam-progress" id="examProgress" hidden>
@@ -483,25 +499,26 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
 
   <!-- ── Porte (isteğe bağlı) ── -->
   <section class="panel" id="staffPanel" hidden aria-label="Nota portesi">
-    <div class="panel-head"><h2>Porte</h2><span class="stage">VexFlow</span></div>
+    <div class="panel-head"><h2 data-text="panelStaff">Porte</h2><span class="stage">VexFlow</span></div>
     <div class="staff-paper"><div class="staff-host" id="staff"></div></div>
     <p class="staff-msg" id="staffMsg"></p>
   </section>
 
   <!-- ── Akort aleti ── -->
   <section class="panel tuner" id="tuner" data-zone="none" aria-label="Akort ibresi">
+    <div class="panel-head"><h2 data-text="panelTuner">Akort</h2></div>
     <div class="readouts">
       <div class="target">
-        <span class="label">Hedef</span>
+        <span class="label" data-text="labelTarget">Hedef</span>
         <b id="targetName">—</b>
         <span class="mono muted" id="targetFreq">— Hz</span>
       </div>
       <div class="cents">
         <span class="mono" id="centsVal">—</span>
-        <span class="zone-label">hedefe göre</span>
+        <span class="zone-label" data-text="labelDeviation">hedefe göre</span>
       </div>
       <div class="heard">
-        <span class="label">Okunan</span>
+        <span class="label" data-text="labelHeard">Okunan</span>
         <b class="mono" id="heardFreq">— Hz</b>
         <span class="mono muted" id="heardNote">&nbsp;</span>
       </div>
@@ -512,18 +529,18 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
         <span class="ch-staff">Porte · son <span id="staffSpan">6</span> sn · okunan perde, nota yazımına göre</span>
         <span class="ch-cents" hidden>Perde grafiği · son <span id="contourSpan">6</span> sn · hedefe göre sapma (sent)</span>
         <span class="contour-legend">
-          <span class="ch-cents" hidden><i class="key-line k-pitch"></i>Okunan perde</span>
-          <span><i class="key-line k-held"></i>Tolerans içinde</span>
-          <span class="ch-staff"><i class="key-line k-out"></i>Dışında</span>
+          <span class="ch-cents" hidden><i class="key-line k-pitch"></i><span data-text="legendPitch">Okunan perde</span></span>
+          <span><i class="key-line k-held"></i><span data-text="legendHeld">Tolerans içinde</span></span>
+          <span class="ch-staff"><i class="key-line k-out"></i><span data-text="legendOut">Dışında</span></span>
           <span class="ch-cents" hidden><i class="key-band"></i>±<span id="contourTol">20</span> sent bandı</span>
-          <span class="ch-staff"><i class="key-line k-guide"></i>Hedef</span>
+          <span class="ch-staff"><i class="key-line k-guide"></i><span data-text="legendGuide">Hedef</span></span>
         </span>
       </div>
       <div class="view-row">
         <canvas id="contour" role="img" aria-label="Okunan perde, nota portesi üzerinde"></canvas>
         <!-- Dikey akort aleti: aşağı pes, yukarı tiz; uçlar bir yarım ses aşağı/yukarı -->
         <div class="vgauge" aria-hidden="true">
-          <div class="vg-names"><span class="vg-above" id="vgAbove">tiz</span><span class="vg-target" id="vgTarget"></span><span class="vg-below" id="vgBelow">pes</span></div>
+          <div class="vg-names"><span class="vg-above" id="vgAbove" data-text="gaugeSharp">tiz</span><span class="vg-target" id="vgTarget"></span><span class="vg-below" id="vgBelow" data-text="gaugeFlat">pes</span></div>
           <div class="gauge" id="gauge"><div class="needle" id="needle"></div></div>
           <div class="ticks" id="ticks"></div>
         </div>
@@ -532,7 +549,7 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
     </div>
 
     <div class="sustain">
-      <div class="sustain-head"><span>Süreklilik (sustain)</span><span class="mono" id="sustainText">0,00 / 0,25 s</span></div>
+      <div class="sustain-head"><span data-text="labelSustain">Süreklilik (sustain)</span><span class="mono" id="sustainText">0,00 / 0,25 s</span></div>
       <div class="bar"><div class="fill" id="sustainFill"></div></div>
     </div>
 
@@ -552,8 +569,8 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
   <!-- ── Önceki testlerim ── -->
   <section class="panel" id="historyPanel" aria-labelledby="historyTitle">
     <div class="panel-head">
-      <h2 id="historyTitle">Önceki testlerim</h2>
-      <button class="btn ghost small" id="historyClear" type="button">Geçmişi temizle</button>
+      <h2 id="historyTitle" data-text="panelHistory">Önceki testlerim</h2>
+      <button class="btn ghost small" id="historyClear" type="button" data-text="btnHistoryClear">Geçmişi temizle</button>
     </div>
     <p class="small-note" id="historyEmpty">Henüz kayıtlı test yok. Bir testi bitirdiğinizde puan ve teşhis burada saklanır (yalnızca bu tarayıcıda).</p>
     <div class="history-chart" id="historyChart"></div>
@@ -562,7 +579,7 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
 
   <!-- ── Ayarlar ve standartlar ── -->
   <details class="panel settings" id="settingsPanel">
-    <summary><span class="sum-title">Ayarlar ve standartlar</span><span class="muted">tolerans · süre · soru yapısı · ses · algılama</span></summary>
+    <summary><span class="sum-title" data-text="panelSettings">Ayarlar ve standartlar</span><span class="muted">tolerans · süre · soru yapısı · ses · algılama</span></summary>
     <div class="settings-body">
       <p class="small-note">Buradaki değerler bu tarayıcıda saklanır ve koddaki CONFIG varsayılanlarının üzerine yazılır. Soru sayıları, register ve aralık havuzu bir sonraki testte geçerli olur.</p>
       <div class="settings-top">
@@ -570,8 +587,8 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
       </div>
       <form id="settingsForm" class="settings-form" novalidate></form>
       <div class="actions">
-        <button class="btn primary" id="applySettings" type="button">Kaydet ve uygula</button>
-        <button class="btn ghost" id="resetSettings" type="button">Varsayılana dön</button>
+        <button class="btn primary" id="applySettings" type="button" data-text="btnApply">Kaydet ve uygula</button>
+        <button class="btn ghost" id="resetSettings" type="button" data-text="btnDefaults">Varsayılana dön</button>
       </div>
       <p class="settings-msg" id="settingsMsg" role="status" aria-live="polite"></p>
 
@@ -579,14 +596,20 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
       <p class="small-note">Yalnızca varsayılandan farklı ayarlar listelenir. Bir kurumun standardını dosya olarak paylaşmak için dışa aktarın; öğrenciler içe aktararak aynı ayarlarla çalışır.</p>
       <textarea id="jsonArea" class="json-area" spellcheck="false" aria-label="Özel ayarlar (JSON)"></textarea>
       <div class="actions">
-        <button class="btn" id="jsonApply" type="button">JSON'u uygula</button>
-        <button class="btn ghost" id="jsonExport" type="button">Dışa aktar (.json)</button>
-        <button class="btn ghost" id="jsonImportBtn" type="button">İçe aktar…</button>
-        <button class="btn ghost" id="jsonCopyAll" type="button">Tüm CONFIG'i kopyala</button>
+        <button class="btn" id="jsonApply" type="button" data-text="btnJsonApply">JSON'u uygula</button>
+        <button class="btn ghost" id="jsonExport" type="button" data-text="btnJsonExport">Dışa aktar (.json)</button>
+        <button class="btn ghost" id="jsonImportBtn" type="button" data-text="btnJsonImport">İçe aktar…</button>
+        <button class="btn ghost" id="jsonCopyAll" type="button" data-text="btnJsonCopyAll">Tüm CONFIG'i kopyala</button>
         <input type="file" id="jsonImport" accept="application/json,.json" hidden>
       </div>
     </div>
   </details>
+
+  <div class="edit-bar" id="editBar" role="region" aria-label="Ad düzenleme" hidden>
+    <span>Ad düzenleme: kesik çizgili bir yazıya tıklayın · Enter kaydeder, Esc vazgeçer</span>
+    <button class="btn small" id="editCopyBtn" type="button">Adları kopyala</button>
+    <button class="btn small primary" id="editDoneBtn" type="button">Bitir</button>
+  </div>
 
   <p class="tips">
     İpuçları: Kulaklık kullanın — hoparlörden çıkan piyano mikrofona karışırsa doğrulama bozulur.
@@ -774,6 +797,51 @@ const CONFIG = {
 
   // ══ 10. ARAYÜZ METİNLERİ ════════════════════════════════════════════
   TEXTS: {
+    // Arayüz adları: panel başlıkları, sekmeler, düğmeler, gösterge etiketleri. Arayüz bunları textContent ile yazar.
+    // Ayarlar → "Arayüz adları" grubunda kendiliğinden listelenir; "Adları sayfada düzenle" ile yerinde değiştirilir.
+    // Kural (validateConfig): ad boş olamaz, en fazla 80 karakter (yönlendirme cümleleri en fazla 160).
+    panelMode: 'Çalışma modu',
+    panelSummary: 'Sınav sonucu · teşhis',
+    panelNotes: 'Okunacak sesler',
+    panelStaff: 'Porte',
+    panelTuner: 'Akort',
+    panelHistory: 'Önceki testlerim',
+    panelSettings: 'Ayarlar ve standartlar',
+    tabExam: 'Sınav',
+    tabPractice: 'Serbest çalışma',
+    btnStart: '▶ Teste Başla',
+    btnNewTest: '▶ Yeni Test',
+    btnExamReplay: '↻ Tekrar Çal',
+    btnSkip: '⏭ Soruyu Geç',
+    btnEnd: '■ Testi Bitir',
+    btnPlay: '▶ Çal & Başla',
+    btnRestart: '▶ Baştan Başla',
+    btnReplay: '↻ Tekrar Çal',
+    btnReset: '⟲ Sıfırla',
+    btnClose: 'Kapat',
+    btnHistoryClear: 'Geçmişi temizle',
+    btnHistoryConfirm: 'Silmek için tekrar tıklayın',
+    btnApply: 'Kaydet ve uygula',
+    btnDefaults: 'Varsayılana dön',
+    btnJsonApply: "JSON'u uygula",
+    btnJsonExport: 'Dışa aktar (.json)',
+    btnJsonImport: 'İçe aktar…',
+    btnJsonCopyAll: "Tüm CONFIG'i kopyala",
+    btnCopyNames: 'Adları kopyala',
+    toggleFold: 'Oktav toleransı',
+    toggleStaff: 'Portede göster',
+    toggleStaffHint: 'Perde nota portesi üzerinde çizilir (kapalı: sent grafiği)',
+    toggleEditNames: 'Adları sayfada düzenle',
+    labelTarget: 'Hedef',
+    labelHeard: 'Okunan',
+    labelDeviation: 'hedefe göre',
+    labelSustain: 'Süreklilik (sustain)',
+    gaugeSharp: 'tiz',
+    gaugeFlat: 'pes',
+    legendPitch: 'Okunan perde',
+    legendHeld: 'Tolerans içinde',
+    legendOut: 'Dışında',
+    legendGuide: 'Hedef',
     // Yönlendirme cümleleri: her durum için 2–3 söyleyiş (sırayla kullanılır, aynı cümle üst üste gelmez)
     COACH: {
       idle:      { a: 'Yönlendirme birkaç saniye içinde burada görünür.' },
@@ -1752,6 +1820,18 @@ function pianoSampleMap(reg, every = 3, pattern = '{name}.mp3') {
   return urls;
 }
 
+/** TEXTS ağacının yaprakları: [['btnStart', '▶ Teste Başla'], ['COACH.low.a', '…'], …] */
+function textLeaves(obj, prefix = '') {
+  const out = [];
+  for (const [k, v] of Object.entries(obj || {})) {
+    const p = prefix ? `${prefix}.${k}` : k;
+    if (isPlainObject(v)) out.push(...textLeaves(v, p)); else out.push([p, v]);
+  }
+  return out;
+}
+/** Ad en fazla 80 karakter; yönlendirme cümleleri (COACH.*) en fazla 160 */
+const textMaxLen = (path) => (path.startsWith('COACH.') ? 160 : 80);
+
 /** Birleştirilmiş yapılandırmayı denetler; hata listesi döner (boş = geçerli) */
 function validateConfig(cfg) {
   const errs = [];
@@ -1809,6 +1889,10 @@ function validateConfig(cfg) {
   num(cfg.UI?.COACH_INTERVAL_MS, 1000, 60000, 'UI.COACH_INTERVAL_MS');
   num(cfg.UI?.COACH_FAR_CENTS, 30, 600, 'UI.COACH_FAR_CENTS');
   num(cfg.HISTORY?.MAX_ENTRIES, 1, 1000, 'HISTORY.MAX_ENTRIES');
+  for (const [p, v] of textLeaves(cfg.TEXTS)) {                // arayüz adları: boş olamaz, uzunluk sınırı
+    if (typeof v !== 'string' || !v.trim()) errs.push(`TEXTS.${p}: ad boş olamaz`);
+    else if (v.length > textMaxLen(p)) errs.push(`TEXTS.${p}: en fazla ${textMaxLen(p)} karakter`);
+  }
   // Uygulanabilirlik: bu ayarlarla bir oturum gerçekten üretilebiliyor mu? (dar register vb. burada yakalanır)
   if (!errs.length) {
     try { generateSession(cfg, mulberry32(1)); }
@@ -2227,6 +2311,7 @@ const ui = {
   settingsPanel: $('settingsPanel'), presetSelect: $('presetSelect'), settingsForm: $('settingsForm'), applySettings: $('applySettings'),
   resetSettings: $('resetSettings'), settingsMsg: $('settingsMsg'), jsonArea: $('jsonArea'), jsonApply: $('jsonApply'),
   jsonExport: $('jsonExport'), jsonImportBtn: $('jsonImportBtn'), jsonImport: $('jsonImport'), jsonCopyAll: $('jsonCopyAll'),
+  editBar: $('editBar'), editCopyBtn: $('editCopyBtn'), editDoneBtn: $('editDoneBtn'),
 };
 
 const nf0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
@@ -2438,10 +2523,10 @@ function renderStatus() {
     }
   } else if (mode === 'exam') {
     msg = starting ? 'Hazırlanıyor… (ilk kullanımda mikrofon izni istenir)'
-      : '“Teste Başla”ya basın. Her soruda sesler aynı anda çalınır; ardından kökten başlayarak “na” hecesiyle sırayla söylersiniz.';
+      : `“${btnName('btnStart')}” düğmesine basın. Her soruda sesler aynı anda çalınır; ardından kökten başlayarak “na” hecesiyle sırayla söylersiniz.`;
   } else {
     switch (st) {
-      case S.IDLE:      msg = 'Bir ses, aralık ya da akor seçip ▶ düğmesine basın. İlk kullanımda mikrofon izni istenir.'; break;
+      case S.IDLE:      msg = `Bir ses, aralık ya da akor seçip “${btnName('btnPlay')}” düğmesine basın. İlk kullanımda mikrofon izni istenir.`; break;
       case S.PLAYING:   msg = 'Çalıyor — kök sesten başlayarak sesleri ayırt etmeye çalışın…'; break;
       case S.LISTENING: msg = `${cur.role}: ${cur.name} (${cur.solfege}) sesini “na” ile söyleyin ve yeşil bölgede ${sec} sn sabit tutun.`; break;
       case S.VERIFIED:  msg = 'Doğrulandı ✓ — sıradaki sese geçiliyor…'; break;
@@ -2502,7 +2587,7 @@ function renderAll() {
   ui.device.disabled = !micStream || !ui.device.options.length || active || starting;
   // Sınav düğmeleri
   ui.startBtn.disabled = starting || active;
-  setText(ui.startBtn, st === S.SUMMARY ? '▶ Yeni Test' : '▶ Teste Başla');
+  setTextKey(ui.startBtn, st === S.SUMMARY ? 'btnNewTest' : 'btnStart');
   ui.examReplay.disabled = !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_REPLAY);
   ui.skipBtn.disabled = !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_SKIP);
   ui.endBtn.disabled = !active;
@@ -2510,7 +2595,7 @@ function renderAll() {
   ui.play.disabled = starting || !!session || !(st === S.IDLE || st === S.COMPLETE) || !exercise.notes.length;
   ui.replay.disabled = !!session || st !== S.LISTENING;
   ui.reset.disabled = !!session || st === S.IDLE;
-  setText(ui.play, st === S.COMPLETE ? '▶ Baştan Başla' : '▶ Çal & Başla');
+  setTextKey(ui.play, st === S.COMPLETE ? 'btnRestart' : 'btnPlay');
   // Hedef göstergesi
   const cur = exercise.current;
   const showTarget = cur && (st === S.LISTENING || st === S.VERIFIED);
@@ -2524,6 +2609,7 @@ function renderAll() {
   renderStatus();
   renderProgress();
   scheduleStaffDraw();
+  if (editNames) unlockForEditing();                // ad düzenleme modunda devre dışı düğmelere de tıklanabilsin
 }
 
 function showAlert(msg) { ui.alert.textContent = msg; ui.alert.hidden = false; }
@@ -2621,9 +2707,10 @@ function buildTicks() {
 /** Ortada hedefin adı, uçlarda bir yarım ses aşağı/yukarı; hedef açık değilse yalnızca "tiz" / "pes" */
 function renderGaugeNames(note) {
   const nb = note ? semitoneNeighbors(note) : null;
-  setText(ui.vgAbove, nb ? nb.above.solfege : 'tiz');
+  const end = (node, name, key) => { if (name) { delete node.dataset.text; setText(node, name); } else setTextKey(node, key); };
+  end(ui.vgAbove, nb?.above.solfege, 'gaugeSharp');
   setText(ui.vgTarget, note ? note.solfege : '');
-  setText(ui.vgBelow, nb ? nb.below.solfege : 'pes');
+  end(ui.vgBelow, nb?.below.solfege, 'gaugeFlat');
 }
 function observeGauge() {
   const measure = () => { gaugeHalf = ui.gauge.clientHeight / 2; };
@@ -3410,6 +3497,131 @@ function historyItem(e) {
 
 
 // ── Ayarlar paneli (şema ile üretilir: yeni ayar eklemek için SETTINGS_SCHEMA'ya bir satır yeter) ──
+// ── Arayüz adları (CONFIG.TEXTS) — yazılar textContent ile; [data-text="yol"] taşıyan her öğe düzenlenebilir ──
+const T = (path) => { const v = getPath(CONFIG.TEXTS, path); return typeof v === 'string' ? v : (getPath(DEFAULT_CONFIG.TEXTS, path) ?? ''); };
+/** Durum metninde düğme adı: baştaki simge (▶ ↻ …) atılır → “Teste Başla” */
+const btnName = (path) => T(path).replace(/^[^\p{L}\p{N}]+/u, '').trim();
+function setTextKey(node, path) { node.dataset.text = path; setText(node, T(path)); }
+function applyTexts() { for (const n of document.querySelectorAll('[data-text]')) setText(n, T(n.dataset.text)); }
+
+const COACH_KEY_LABEL = {
+  idle: 'bekleme', quiet: 'ses yok', unclear: 'perde net değil', blind: 'sınav provası', octave: 'oktav farkı',
+  octaveOff: 'oktav farkı (tolerans kapalı)', good: 'tam yerinde', low: 'biraz pes', high: 'biraz tiz',
+  farLow: 'epey pes', farHigh: 'epey tiz', unsteady: 'dalgalı',
+};
+/** Ayarlar paneli alanları: DEFAULT_CONFIG.TEXTS'teki her yaprak için bir metin kutusu (kendiliğinden) */
+function textFields(filter) {
+  return textLeaves(DEFAULT_CONFIG.TEXTS).filter(([p]) => filter(p)).map(([p, def]) => {
+    const coach = p.startsWith('COACH.');
+    const [, key, variant] = p.split('.');
+    return {
+      path: `TEXTS.${p}`, type: 'text', max: textMaxLen(p), placeholder: def, wide: coach,
+      label: coach ? `${COACH_KEY_LABEL[key] ?? key} · ${variant}` : `«${def}»`,
+    };
+  });
+}
+
+// "Adları sayfada düzenle": kesik çizgili yazıya tıkla → üstünde metin kutusu (Enter kaydeder, Esc vazgeçer, dışarı tıklamak kaydeder)
+let editNames = false;
+let editing = null;                     // { el, path, input }
+function setEditNames(on) {
+  finishEdit(true);
+  editNames = on;
+  document.body.classList.toggle('edit-names', on);
+  ui.editBar.hidden = !on;
+  const t = document.getElementById('editNamesToggle');
+  if (t) t.checked = on;
+  if (on) unlockForEditing();
+  else { renderAll(); renderHistory(); }           // düğmelerin gerçek durumu geri gelir
+}
+function unlockForEditing() {
+  for (const b of document.querySelectorAll('button[data-text]:disabled')) b.disabled = false;
+}
+function onEditClick(e) {
+  if (!editNames) return;
+  const t = e.target.closest?.('[data-text]');
+  if (!t || t.closest('#editBar')) return;
+  e.preventDefault();                               // düğme / sekme / anahtar işlemi başlamasın
+  e.stopPropagation();
+  startEdit(t);
+}
+function startEdit(node) {
+  finishEdit(true);
+  const path = node.dataset.text;
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.className = 'name-editor';
+  input.value = T(path);
+  input.maxLength = textMaxLen(path);
+  input.setAttribute('aria-label', `Yeni ad (şu an: ${T(path)})`);
+  input.style.font = getComputedStyle(node).font;
+  document.body.append(input);
+  editing = { el: node, path, input };
+  positionEditor();
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') { e.preventDefault(); finishEdit(true); }
+    else if (e.key === 'Escape') { e.preventDefault(); finishEdit(false); }
+  });
+  input.addEventListener('blur', () => finishEdit(true));
+  input.focus();
+  input.select();
+}
+/** Düzenleme kutusunu yazının üstüne yerleştirir (açılışta, kaydırmada, pencere boyutu değişince) */
+function positionEditor() {
+  if (!editing) return;
+  const r = editing.el.getBoundingClientRect(), s = editing.input.style;
+  const w = Math.min(window.innerWidth - 16, Math.max(r.width + 32, 200));
+  s.left = `${clamp(r.left - 6, 8, window.innerWidth - w - 8)}px`;
+  s.top = `${clamp(r.top - 4, 8, window.innerHeight - 48)}px`;
+  s.width = `${w}px`;
+  s.height = `${Math.max(32, r.height + 8)}px`;
+}
+function finishEdit(save) {
+  if (!editing) return;
+  const { path, input } = editing;
+  editing = null;
+  const value = input.value.trim();
+  input.remove();
+  if (!save || value === T(path)) return;
+  const r = applyOverrides(deepMerge(configOverrides, { TEXTS: setPath({}, path, value) }));
+  if (!r.ok) showNotice(`Ad kaydedilmedi: ${r.errors.join(' · ')}`, 6000);
+}
+/** Değişen adları JSON olarak panoya kopyalar (varsayılan yapmak için geliştiriciye verilir) */
+async function onCopyNames() {
+  const changed = diffConfig(DEFAULT_CONFIG.TEXTS, CONFIG.TEXTS);
+  const n = textLeaves(changed).length;
+  let msg;
+  if (!n) msg = 'Değişen ad yok; kopyalanacak bir şey bulunmadı.';
+  else {
+    const json = JSON.stringify({ TEXTS: changed }, null, 2);
+    try { await navigator.clipboard.writeText(json); msg = `Değişen ${n} ad panoya kopyalandı (JSON).`; }
+    catch { ui.jsonArea.value = json; msg = 'Pano kullanılamadı; değişen adlar “Gelişmiş · JSON” kutusuna yazıldı.'; }
+  }
+  showNotice(msg, 6000);
+  showSettingsMsg(msg);
+}
+/** "Arayüz adları" grubunun başı: düzenleme anahtarı + "Adları kopyala" */
+function buildNamesIntro() {
+  const box = el('div', 'set-intro');
+  const lab = el('label', 'switch');
+  const input = el('input');
+  input.type = 'checkbox';
+  input.id = 'editNamesToggle';
+  input.checked = editNames;
+  input.addEventListener('change', () => setEditNames(input.checked));
+  const txt = el('span', 'switch-text');
+  const name = el('span', null, T('toggleEditNames'));
+  name.dataset.text = 'toggleEditNames';
+  txt.append(name, el('small', null, 'Açıkken değiştirilebilir yazıların çevresinde kesik çizgi çıkar; tıklayıp yazın.'));
+  lab.append(input, el('span', 'track'), txt);
+  const copy = el('button', 'btn small', T('btnCopyNames'));
+  copy.type = 'button';
+  copy.dataset.text = 'btnCopyNames';
+  copy.addEventListener('click', onCopyNames);
+  box.append(lab, copy);
+  return box;
+}
+
 const MIDI_OPTIONS = Array.from({ length: 61 }, (_, i) => 36 + i);   // C2 – C7
 const SETTINGS_SCHEMA = [
   { title: 'Sınav standardı', fields: [
@@ -3452,6 +3664,9 @@ const SETTINGS_SCHEMA = [
     { path: 'UI.VEXFLOW_PANEL', label: 'Ayrı VexFlow porte paneli', type: 'bool' },
     { path: 'UI.STAFF_WARN_YELLOW', label: 'Portede sınırdayken sarı', type: 'bool' },
   ] },
+  // Arayüz adları: CONFIG.TEXTS'teki her ad kendiliğinden listelenir (yeni ad için TEXTS'e eklemek yeter)
+  { title: 'Arayüz adları', intro: () => buildNamesIntro(), fields: textFields((p) => !p.startsWith('COACH.')) },
+  { title: 'Yönlendirme cümleleri', fields: textFields((p) => p.startsWith('COACH.')) },
 ];
 const fieldId = (path) => `set-${path.replace(/\./g, '-')}`;
 
@@ -3460,6 +3675,7 @@ function buildSettingsForm() {
   for (const group of SETTINGS_SCHEMA) {
     const fs = el('fieldset', 'set-group');
     fs.append(el('legend', null, group.title));
+    if (group.intro) fs.append(group.intro());
     const grid = el('div', 'settings-grid');
     for (const f of group.fields) grid.append(buildField(f));
     fs.append(grid);
@@ -3467,6 +3683,19 @@ function buildSettingsForm() {
   }
 }
 function buildField(f) {
+  if (f.type === 'text') {                          // arayüz adı (CONFIG.TEXTS)
+    const wrap = el('label', `field${f.wide ? ' wide' : ''}`);
+    wrap.append(el('span', null, f.label));
+    const input = el('input');
+    input.type = 'text';
+    input.maxLength = f.max;
+    input.placeholder = f.placeholder ?? '';
+    input.id = fieldId(f.path);
+    input.dataset.path = f.path;
+    input.dataset.kind = 'text';
+    wrap.append(input);
+    return wrap;
+  }
   if (f.type === 'bool') {
     const wrap = el('label', 'check');
     const input = el('input');
@@ -3536,6 +3765,7 @@ function readSettingsForm(draft) {
       case 'multi':  setPath(draft, path, [...node.querySelectorAll('input:checked')].map((cb) => cb.value)); break;
       case 'select': setPath(draft, path, node.value); break;
       case 'midi':   setPath(draft, path, parseInt(node.value, 10)); break;
+      case 'text':   setPath(draft, path, node.value.trim()); break;
       default: {
         const num = parseFloat(String(node.value).replace(',', '.'));
         if (!Number.isFinite(num)) { bad.push(`${labelOf(path)}: sayı girin`); break; }
@@ -3690,6 +3920,7 @@ function onConfigChanged(prev) {
     selectionChanged();
   }
   updateVexPanel();
+  applyTexts();
   fillSettingsForm(CONFIG);
   refreshJsonArea();
   renderHistory();
@@ -4045,13 +4276,13 @@ function bindEvents() {
 
   ui.historyClear.addEventListener('click', () => {
     if (!historyClearArmed) {                       // iki adımlı onay (engelleyici diyalog yok)
-      ui.historyClear.textContent = 'Silmek için tekrar tıklayın';
-      historyClearArmed = setTimeout(() => { historyClearArmed = 0; ui.historyClear.textContent = 'Geçmişi temizle'; }, 4000);
+      setTextKey(ui.historyClear, 'btnHistoryConfirm');
+      historyClearArmed = setTimeout(() => { historyClearArmed = 0; setTextKey(ui.historyClear, 'btnHistoryClear'); }, 4000);
       return;
     }
     clearTimeout(historyClearArmed);
     historyClearArmed = 0;
-    ui.historyClear.textContent = 'Geçmişi temizle';
+    setTextKey(ui.historyClear, 'btnHistoryClear');
     clearHistory();
   });
 
@@ -4064,6 +4295,11 @@ function bindEvents() {
   ui.jsonImportBtn.addEventListener('click', () => ui.jsonImport.click());
   ui.jsonImport.addEventListener('change', onJsonImportFile);
   ui.jsonCopyAll.addEventListener('click', onCopyAll);
+  ui.editCopyBtn.addEventListener('click', onCopyNames);
+  ui.editDoneBtn.addEventListener('click', () => setEditNames(false));
+  document.addEventListener('click', onEditClick, true);   // yakalama evresi: düzenleme modunda düğme işlemi başlamaz
+  window.addEventListener('scroll', positionEditor, { passive: true });   // düzenleme kutusu yazının üstünde kalır
+  window.addEventListener('resize', positionEditor);
 
   document.addEventListener('visibilitychange', () => { if (document.hidden) { tracker.reset(); medianFilter.reset(); } });
   navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (micStream) refreshDevices(); });
@@ -4106,6 +4342,7 @@ function init() {
   bindEvents();
 
   uiReady = true;
+  applyTexts();
   fillSettingsForm(CONFIG);
   refreshJsonArea();
   updateHeaderText();

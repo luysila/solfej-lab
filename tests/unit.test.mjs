@@ -259,6 +259,26 @@ test('Yönlendirme: 5 sn özeti → tek sakin cümle, tekrar yok, sınav provas�
   for (const t of Object.values(cfg.TEXTS.COACH.high)) assert.match(t, /üst|tiz|aşağı/);
 });
 
+test('Arayüz adları: boş olamaz, en fazla 80 karakter (cümleler 160), dışarıdan gelen ad ayıklanır', () => {
+  const D = M.DEFAULT_CONFIG;
+  assert.deepEqual(M.validateConfig(D), [], 'varsayılan adlar geçerli');
+  const leaves = M.textLeaves(D.TEXTS);
+  assert.ok(leaves.some(([p]) => p === 'btnStart') && leaves.some(([p]) => p === 'COACH.low.a'));
+  assert.ok(leaves.every(([, v]) => typeof v === 'string' && v.trim()));
+  const withText = (path, v) => M.deepMerge(D, { TEXTS: M.setPath({}, path, v) });
+  assert.match(M.validateConfig(withText('btnStart', '   ')).join(), /TEXTS\.btnStart: ad boş olamaz/);
+  assert.match(M.validateConfig(withText('tabExam', 'x'.repeat(81))).join(), /TEXTS\.tabExam: en fazla 80 karakter/);
+  assert.deepEqual(M.validateConfig(withText('tabExam', 'x'.repeat(80))), []);
+  assert.deepEqual(M.validateConfig(withText('COACH.low.a', 'y'.repeat(150))), []);
+  assert.match(M.validateConfig(withText('COACH.low.a', 'y'.repeat(161))).join(), /en fazla 160/);
+  assert.equal(M.textMaxLen('panelTuner'), 80);
+  assert.equal(M.textMaxLen('COACH.good.b'), 160);
+  // İçe aktarılan JSON: bilinmeyen ad ve metin olmayan değer atılır, geçerli ad kalır
+  const r = M.sanitizeOverrides({ TEXTS: { btnStart: 'Başlat', yokBoyleBirAd: 'x', tabExam: 5, COACH: { low: { a: 'Biraz pes.' } } } });
+  assert.deepEqual(r.clean, { TEXTS: { btnStart: 'Başlat', COACH: { low: { a: 'Biraz pes.' } } } });
+  assert.equal(r.warnings.length, 2);
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {
