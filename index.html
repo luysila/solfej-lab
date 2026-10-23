@@ -1,0 +1,3601 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<title>Solfej Lab · İşitme Eğitimi</title>
+
+<style>
+/* ──────────────────────────────────────────────────────────────────────
+   Tasarım belirteçleri — koyu tema
+   ────────────────────────────────────────────────────────────────────── */
+:root {
+  --bg: #080b12;
+  --bg-glow: #131c33;
+  --panel: #101726;
+  --panel-2: #161f33;
+  --field: #0b1120;
+  --line: rgba(148, 163, 184, .14);
+  --grid: rgba(148, 163, 184, .14);
+  --axis: rgba(148, 163, 184, .34);
+  --text: #e8edf7;
+  --text-2: #c3cad8;
+  --muted: #8894ab;
+  --accent: #8aa4ff;
+  --green: #34d399;
+  --yellow: #fbbf24;
+  --red: #f87171;
+  --flat: #3987e5;          /* sapma göstergesi: pes kutbu (soğuk) */
+  --sharp: #e66767;         /* sapma göstergesi: tiz kutbu (sıcak) */
+  --neutral: #383835;       /* sapma göstergesi: nötr orta */
+  --radius: 18px;
+  --mono: ui-monospace, "SF Mono", "JetBrains Mono", Menlo, Consolas, monospace;
+  --sans: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { margin: 0; }
+body {
+  min-height: 100vh;
+  color: var(--text);
+  font: 15px/1.5 var(--sans);
+  -webkit-font-smoothing: antialiased;
+  background:
+    radial-gradient(1100px 560px at 12% -8%, var(--bg-glow), transparent 62%),
+    radial-gradient(800px 480px at 105% 0%, rgba(94, 234, 212, .06), transparent 55%),
+    var(--bg);
+}
+.app { max-width: 960px; margin: 0 auto; padding: 30px 16px 64px; display: grid; gap: 16px; }
+.mono { font-family: var(--mono); font-variant-numeric: tabular-nums; }
+.muted { color: var(--muted); }
+
+/* ── Üst başlık ── */
+.top { display: flex; flex-wrap: wrap; gap: 14px 24px; align-items: flex-end; justify-content: space-between; }
+h1 { margin: 0; font-size: 26px; letter-spacing: -.02em; }
+.sub { margin: 4px 0 0; color: var(--muted); max-width: 62ch; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip {
+  display: inline-flex; align-items: center; gap: 8px; padding: 6px 12px;
+  border-radius: 999px; background: var(--panel); border: 1px solid var(--line);
+  font-size: 12.5px; color: var(--muted);
+}
+.chip .dot { width: 8px; height: 8px; border-radius: 50%; background: #475569; }
+.chip.on { color: var(--text); }
+.chip.on .dot { background: var(--green); box-shadow: 0 0 10px var(--green); }
+.chip.warn { color: var(--text); }
+.chip.warn .dot { background: var(--yellow); box-shadow: 0 0 10px var(--yellow); }
+.chip-btn { font: inherit; font-size: 12.5px; cursor: pointer; color: var(--accent); border-color: rgba(138, 164, 255, .45); }
+.chip-btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.alert, .notice { padding: 12px 14px; border-radius: 12px; font-size: 13.5px; }
+.alert  { border: 1px solid rgba(248, 113, 113, .4); background: rgba(248, 113, 113, .1); color: #fecaca; }
+.notice { border: 1px solid rgba(138, 164, 255, .4); background: rgba(138, 164, 255, .08); color: #dbe4ff; }
+
+/* ── Paneller ── */
+.panel {
+  background: linear-gradient(180deg, var(--panel), #0e1524);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 18px;
+  min-width: 0;
+}
+.panel-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 14px; flex-wrap: wrap; }
+.panel-head h2 { margin: 0; font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.ex-title { margin-left: 8px; color: var(--text); letter-spacing: 0; text-transform: none; font-size: 14px; }
+.stage { font-size: 12px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); white-space: nowrap; }
+.stage[data-s="PLAYING"]   { color: var(--yellow); border-color: rgba(251, 191, 36, .45); }
+.stage[data-s="LISTENING"] { color: var(--accent); border-color: rgba(138, 164, 255, .55); }
+.stage[data-s="VERIFIED"],
+.stage[data-s="COMPLETE"],
+.stage[data-s="SUMMARY"]   { color: var(--green);  border-color: rgba(52, 211, 153, .55); }
+
+/* ── Mod sekmeleri ── */
+.tabs { display: inline-flex; gap: 4px; padding: 4px; border-radius: 14px; background: var(--field); border: 1px solid var(--line); margin-bottom: 16px; max-width: 100%; }
+.tab {
+  appearance: none; border: 0; background: transparent; color: var(--muted); cursor: pointer;
+  font: 600 13.5px var(--sans); padding: 8px 18px; border-radius: 10px; transition: background .2s, color .2s;
+}
+.tab[aria-selected="true"] { background: var(--panel-2); color: var(--text); box-shadow: inset 0 0 0 1px rgba(138, 164, 255, .45); }
+.tab:disabled { cursor: not-allowed; opacity: .55; }
+.tab:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.exam-info { margin: 0; color: var(--muted); font-size: 13.5px; }
+.exam-info b { color: var(--text); font-weight: 600; }
+
+/* ── Kontroller ── */
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px 16px; }
+.field { display: grid; gap: 6px; font-size: 12px; color: var(--muted); align-content: start; min-width: 0; }
+.field small { font-size: 11.5px; color: var(--muted); }
+select {
+  appearance: none; width: 100%; padding: 10px 36px 10px 12px; border-radius: 12px;
+  border: 1px solid var(--line); color: var(--text); font: inherit; font-size: 14px;
+  background: var(--field) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1.5l5 5 5-5' fill='none' stroke='%238894ab' stroke-width='1.6' stroke-linecap='round'/%3E%3C/svg%3E") no-repeat right 12px center;
+}
+select:disabled { opacity: .5; }
+select:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+option, optgroup { background: var(--field); color: var(--text); }
+input[type="number"], textarea {
+  width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid var(--line);
+  background: var(--field); color: var(--text); font: inherit; font-size: 14px;
+}
+input[type="number"]:focus-visible, textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+
+.common { display: grid; gap: 4px; margin-top: 18px; padding-top: 16px; border-top: 1px solid var(--line); }
+.device-field { max-width: 420px; }
+.switch-row { display: flex; flex-wrap: wrap; gap: 0 32px; }
+.switch { display: flex; gap: 12px; align-items: center; margin-top: 14px; cursor: pointer; user-select: none; position: relative; width: fit-content; max-width: 100%; }
+.switch input { position: absolute; opacity: 0; pointer-events: none; }
+.switch .track { flex: none; width: 40px; height: 23px; border-radius: 999px; background: #273247; position: relative; transition: background .2s; }
+.switch .track::after { content: ""; position: absolute; top: 3px; left: 3px; width: 17px; height: 17px; border-radius: 50%; background: #cbd5e1; transition: transform .2s; }
+.switch input:checked + .track { background: rgba(138, 164, 255, .6); }
+.switch input:checked + .track::after { transform: translateX(17px); background: #fff; }
+.switch input:focus-visible + .track { outline: 2px solid var(--accent); outline-offset: 2px; }
+.switch input:disabled + .track { opacity: .4; }
+.switch-text { display: grid; font-size: 13.5px; }
+.switch-text small { color: var(--muted); font-size: 12px; }
+
+.actions { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 18px; }
+.btn {
+  appearance: none; border: 1px solid var(--line); background: var(--panel-2); color: var(--text);
+  padding: 11px 18px; border-radius: 12px; font: 600 14px var(--sans); cursor: pointer;
+  transition: transform .12s, border-color .2s, opacity .2s;
+}
+.btn:hover:not(:disabled) { border-color: rgba(138, 164, 255, .55); transform: translateY(-1px); }
+.btn:active:not(:disabled) { transform: translateY(0); }
+.btn:disabled { opacity: .4; cursor: not-allowed; }
+.btn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.btn.primary { background: linear-gradient(135deg, #6f8cff, #5eead4); color: #06101f; border: 0; }
+.btn.ghost { background: transparent; }
+.btn.small { padding: 7px 12px; font-size: 12.5px; border-radius: 10px; }
+
+/* ── Sınav ilerlemesi ── */
+.exam-progress { display: grid; gap: 8px; margin-bottom: 16px; }
+.progress-head { display: flex; justify-content: space-between; gap: 12px; font-size: 13px; color: var(--text-2); }
+.segments { display: flex; gap: 3px; }
+.seg { flex: 1; min-width: 6px; height: 8px; border-radius: 4px; background: #1f293d; transition: background .25s; }
+.seg.gap { margin-left: 9px; }
+.seg[data-s="current"]    { background: var(--accent); }
+.seg[data-s="done"]       { background: var(--green); }
+.seg[data-s="partial"]    { background: var(--yellow); }
+.seg[data-s="skipped"],
+.seg[data-s="timeout"]    { background: var(--red); }
+.seg[data-s="unanswered"] { background: #1f293d; opacity: .45; }
+.progress-legend { display: flex; flex-wrap: wrap; gap: 4px 16px; font-size: 11.5px; color: var(--muted); }
+.progress-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+.lg-done { background: var(--green); } .lg-partial { background: var(--yellow); } .lg-fail { background: var(--red); }
+
+/* ── Nota kutuları (kilitli ilerleme) ── */
+.notes { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 12px; }
+.note {
+  position: relative; display: grid; gap: 3px; padding: 14px 14px 13px; border-radius: 16px;
+  background: var(--panel-2); border: 1px solid var(--line);
+  transition: border-color .25s, background .25s, opacity .25s;
+}
+.note .step  { font: 600 11px var(--mono); letter-spacing: .08em; text-transform: uppercase; color: var(--muted); }
+.note .name  { font-size: 40px; font-weight: 700; letter-spacing: -.03em; line-height: 1.05; }
+.note .name.hidden-name { color: var(--muted); }
+.note .sub   { font: 12px var(--mono); color: var(--muted); }
+.note .badge { position: absolute; top: 12px; right: 12px; display: grid; place-items: center; color: var(--muted); }
+.note[data-state="locked"] { opacity: .42; }
+.note[data-state="ready"]  { border-color: rgba(138, 164, 255, .38); }
+.note[data-state="active"] {
+  border-color: var(--accent);
+  background: linear-gradient(180deg, rgba(138, 164, 255, .20), rgba(138, 164, 255, .05));
+  box-shadow: 0 14px 44px -18px rgba(138, 164, 255, .7);
+  animation: pulse 1.8s ease-in-out infinite;
+}
+.note[data-state="active"] .badge { color: var(--accent); }
+.note[data-state="done"] { border-color: rgba(52, 211, 153, .5); background: linear-gradient(180deg, rgba(52, 211, 153, .16), rgba(52, 211, 153, .04)); }
+.note[data-state="done"] .badge { color: var(--green); }
+.note[data-state="missed"] { border-color: rgba(248, 113, 113, .5); background: linear-gradient(180deg, rgba(248, 113, 113, .13), rgba(248, 113, 113, .03)); }
+.note[data-state="missed"] .badge { color: var(--red); }
+.note.flash { animation: flash .8s ease-out; }
+@keyframes pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.025); } }
+@keyframes flash { 0% { box-shadow: 0 0 0 0 rgba(52, 211, 153, .7); } 100% { box-shadow: 0 0 0 20px rgba(52, 211, 153, 0); } }
+.empty-notes { margin: 0; padding: 18px; border: 1px dashed var(--line); border-radius: 16px; color: var(--muted); font-size: 13.5px; }
+
+.status { margin: 16px 0 0; font-size: 14.5px; }
+.hint   { margin: 4px 0 0; min-height: 1.5em; font-size: 13px; color: var(--muted); }
+
+/* ── Porte (VexFlow) ── */
+.staff-paper { background: #f7f5ef; border-radius: 14px; padding: 6px 0; min-height: 140px; display: grid; place-items: center; overflow: hidden; }
+.staff-host { width: 100%; display: flex; justify-content: center; }
+.staff-host svg { display: block; max-width: 100%; height: auto; }
+.staff-msg { margin: 10px 0 0; font-size: 13px; color: var(--muted); min-height: 1.3em; }
+
+/* ── Akort aleti ── */
+.tuner { --zc: var(--muted); }
+.tuner[data-zone="perfect"] { --zc: var(--green); }
+.tuner[data-zone="ok"]      { --zc: var(--yellow); }
+.tuner[data-zone="bad"]     { --zc: var(--red); }
+
+.readouts { display: grid; grid-template-columns: 1fr auto 1fr; gap: 12px; align-items: end; margin-bottom: 20px; }
+.label { display: block; font-size: 11px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); }
+.target b { display: block; font-size: 34px; line-height: 1.1; letter-spacing: -.02em; }
+.cents { text-align: center; min-width: 180px; }
+#centsVal { display: block; font-size: 44px; font-weight: 600; line-height: 1; color: var(--zc); transition: color .15s; }
+.zone-label { display: block; margin-top: 6px; min-height: 1.2em; font-size: 12.5px; color: var(--zc); transition: color .15s; }
+.heard { text-align: right; }
+.heard b { display: block; font-size: 22px; font-weight: 600; }
+@media (max-width: 600px) {
+  .readouts { grid-template-columns: 1fr 1fr; }
+  .cents { grid-column: 1 / -1; order: -1; min-width: 0; }
+}
+
+.gauge-wrap { padding: 0 14px; }
+.gauge { position: relative; height: 60px; border-radius: 14px; border: 1px solid var(--line); }
+.gauge::before { content: ""; position: absolute; left: 50%; top: 0; bottom: 0; width: 1px; background: rgba(255, 255, 255, .28); }
+.needle {
+  position: absolute; left: 50%; top: -8px; bottom: -8px; width: 4px; margin-left: -2px;
+  border-radius: 3px; background: var(--zc); box-shadow: 0 0 16px var(--zc);
+  will-change: transform; transition: background .15s, opacity .2s;
+}
+.tuner[data-zone="none"] .needle { opacity: .35; box-shadow: none; }
+.ticks { position: relative; height: 20px; margin-top: 10px; }
+.tick { position: absolute; top: 0; transform: translateX(-50%); font: 11px var(--mono); color: var(--muted); }
+.gauge-legend { display: flex; justify-content: space-between; padding: 0 14px; font-size: 11px; letter-spacing: .14em; color: var(--muted); }
+
+.sustain { margin-top: 22px; }
+.sustain-head { display: flex; justify-content: space-between; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.bar { height: 12px; border-radius: 999px; background: var(--field); border: 1px solid var(--line); overflow: hidden; }
+.fill {
+  height: 100%; width: 100%; border-radius: inherit; transform-origin: left center; transform: scaleX(0);
+  background: linear-gradient(90deg, #10b981, #34d399); will-change: transform;
+}
+.fill.full { filter: brightness(1.25); }
+
+/* ── Perde grafiği (kontur) ── */
+.contour { margin-top: 22px; }
+.contour-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 6px 14px; font-size: 12.5px; color: var(--muted); margin-bottom: 8px; }
+.contour-legend { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.key-line { display: inline-block; width: 16px; height: 2px; border-radius: 1px; vertical-align: middle; margin-right: 6px; }
+.k-pitch { background: var(--accent); } .k-held { background: var(--green); height: 3px; }
+.key-band { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; background: rgba(52, 211, 153, .22); }
+.contour canvas { display: block; width: 100%; height: 150px; border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
+
+.meter-row { display: grid; grid-template-columns: minmax(110px, 1fr) 1.8fr auto; gap: 14px; align-items: center; margin-top: 22px; font-size: 12.5px; color: var(--muted); }
+.meter { position: relative; height: 8px; border-radius: 999px; background: var(--field); border: 1px solid var(--line); overflow: hidden; }
+.meter-fill { height: 100%; transform-origin: left center; transform: scaleX(0); background: linear-gradient(90deg, #38bdf8, #818cf8); }
+.meter-thr { position: absolute; top: 0; bottom: 0; width: 2px; background: #f472b6; }
+.thr { display: flex; align-items: center; gap: 10px; }
+.thr input { flex: 1; min-width: 80px; accent-color: var(--accent); }
+@media (max-width: 620px) { .meter-row { grid-template-columns: 1fr; } }
+
+/* ── Sınav sonucu (teşhis) ── */
+.summary { border-color: rgba(138, 164, 255, .35); }
+.summary-top { display: grid; grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px 30px; align-items: start; margin-bottom: 20px; }
+@media (max-width: 760px) { .summary-top { grid-template-columns: 1fr; } }
+.sum-hero b { display: block; font-size: 60px; font-weight: 700; line-height: 1; letter-spacing: -.03em; margin-top: 4px; }
+.sum-hero .muted { font-size: 13px; }
+.sum-tendency b, .sum-hardest b { display: block; font-size: 22px; font-weight: 600; margin: 4px 0 8px; }
+.bias { max-width: 360px; }
+.bias-track { position: relative; height: 10px; border-radius: 999px; background: linear-gradient(90deg, var(--flat), var(--neutral) 50%, var(--sharp)); }
+.bias-mark { position: absolute; top: -6px; bottom: -6px; width: 4px; margin-left: -2px; border-radius: 2px; background: var(--text); box-shadow: 0 0 0 2px var(--panel); }
+.bias-scale, .bias-poles { display: flex; justify-content: space-between; font-size: 11px; color: var(--muted); margin-top: 6px; }
+.bias-scale { font-family: var(--mono); }
+.table-wrap { overflow-x: auto; border: 1px solid var(--line); border-radius: 14px; }
+.sum-table { width: 100%; border-collapse: collapse; font-size: 13px; min-width: 680px; }
+.sum-table th { text-align: left; font-weight: 600; color: var(--muted); font-size: 11px; letter-spacing: .06em; text-transform: uppercase; padding: 10px 12px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+.sum-table td { padding: 11px 12px; border-bottom: 1px solid var(--line); font-variant-numeric: tabular-nums; vertical-align: middle; }
+.sum-table tr:last-child td { border-bottom: 0; }
+.sum-table td small { display: block; color: var(--muted); font-size: 11.5px; }
+.tag { display: inline-block; margin-left: 6px; padding: 1px 7px; border-radius: 999px; font-size: 10.5px; font-weight: 600; letter-spacing: .04em; color: #06101f; background: var(--accent); vertical-align: 1px; }
+.diff { display: flex; align-items: center; gap: 8px; }
+.diff-bar { width: 72px; height: 6px; border-radius: 999px; background: #1f293d; overflow: hidden; flex: none; }
+.diff-fill { height: 100%; border-radius: inherit; background: var(--accent); }
+.roles { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 14px; }
+.advice { margin: 16px 0 0; padding-left: 20px; display: grid; gap: 7px; font-size: 14px; color: var(--text-2); }
+
+/* ── Önceki testlerim ── */
+.history-chart { width: 100%; }
+.history-chart svg { display: block; }
+.hc-grid { stroke: var(--grid); stroke-width: 1; }
+.hc-base { stroke: var(--axis); stroke-width: 1; }
+.hc-tick { fill: var(--muted); font: 11px var(--mono); }
+.hc-label { fill: var(--text-2); font: 600 11.5px var(--sans); }
+.hc-bar { fill: var(--accent); }
+.hc-bar.partial { opacity: .45; }
+.hc-col { outline: none; }
+.hc-col:hover .hc-bar, .hc-col:focus .hc-bar { filter: brightness(1.18); }
+.hc-col:focus-visible .hc-hit { stroke: var(--accent); stroke-width: 1.5; }
+.history-list { list-style: none; margin: 14px 0 0; padding: 0; display: grid; gap: 6px; }
+.h-item { display: grid; grid-template-columns: 112px minmax(0, 1fr) auto; gap: 6px 14px; align-items: center; padding: 10px 12px; border-radius: 12px; background: var(--panel-2); border: 1px solid var(--line); font-size: 13px; }
+.h-date { color: var(--text-2); font-variant-numeric: tabular-nums; }
+.h-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.h-meta span { padding: 2px 8px; border-radius: 999px; border: 1px solid var(--line); color: var(--muted); font-size: 11.5px; }
+.h-score b { font-size: 18px; }
+@media (max-width: 560px) { .h-item { grid-template-columns: 1fr auto; } .h-meta { grid-column: 1 / -1; order: 3; } }
+.small-note { margin: 0; font-size: 12.5px; color: var(--muted); }
+
+/* ── Ayarlar ── */
+details.settings > summary { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 14px; cursor: pointer; list-style: none; }
+details.settings > summary::-webkit-details-marker { display: none; }
+details.settings > summary::before { content: "▸"; color: var(--muted); display: inline-block; transition: transform .2s; }
+details.settings[open] > summary::before { transform: rotate(90deg); }
+details.settings > summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 4px; border-radius: 6px; }
+.sum-title { font-size: 12.5px; letter-spacing: .12em; text-transform: uppercase; color: var(--muted); font-weight: 600; }
+.settings-body { margin-top: 16px; display: grid; gap: 14px; }
+.settings-form { display: grid; gap: 14px; }
+.set-group { border: 1px solid var(--line); border-radius: 14px; padding: 12px 14px 14px; margin: 0; min-width: 0; }
+.set-group legend { padding: 0 6px; font-size: 11.5px; color: var(--muted); letter-spacing: .1em; text-transform: uppercase; }
+.settings-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 12px 16px; }
+.field.wide { grid-column: 1 / -1; }
+.checks { display: flex; flex-wrap: wrap; gap: 8px 16px; padding-top: 2px; }
+.check { display: inline-flex; gap: 8px; align-items: center; font-size: 13px; color: var(--text); cursor: pointer; }
+.check input { accent-color: var(--accent); width: 16px; height: 16px; margin: 0; }
+.json-area { min-height: 150px; resize: vertical; font: 12.5px/1.5 var(--mono); }
+.settings-msg { margin: 0; min-height: 1.3em; font-size: 13px; color: var(--green); }
+.settings-msg.err { color: var(--red); }
+.set-h3 { margin: 6px 0 0; font-size: 12px; letter-spacing: .1em; text-transform: uppercase; color: var(--muted); }
+.settings-top { display: grid; grid-template-columns: minmax(0, 360px); }
+
+.tips { margin: 0; font-size: 12.5px; color: var(--muted); line-height: 1.6; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; }
+}
+</style>
+</head>
+
+<body>
+<main class="app">
+
+  <header class="top">
+    <div>
+      <h1>Solfej Lab</h1>
+      <p class="sub" id="subLine"></p>
+    </div>
+    <div class="chips">
+      <span class="chip" id="micChip"><i class="dot"></i><span id="micChipText">Mikrofon kapalı</span></span>
+      <span class="chip" id="engineChip"><i class="dot"></i><span id="engineChipText">Ses: piyano</span></span>
+      <span class="chip mono" id="detChip">Algılama: YIN</span>
+      <span class="chip mono" id="latChip" hidden></span>
+      <button class="chip chip-btn" id="cfgChip" type="button" hidden>Özel ayarlar etkin</button>
+    </div>
+  </header>
+
+  <div class="alert" id="alert" role="alert" hidden></div>
+  <div class="notice" id="notice" role="status" hidden></div>
+
+  <!-- ── Mod + kontroller ── -->
+  <section class="panel" aria-label="Çalışma modu">
+    <div class="tabs" role="tablist" aria-label="Mod">
+      <button class="tab" id="tabExam" role="tab" type="button" aria-selected="true" aria-controls="examControls">Sınav</button>
+      <button class="tab" id="tabPractice" role="tab" type="button" aria-selected="false" aria-controls="practiceControls">Serbest çalışma</button>
+    </div>
+
+    <div id="examControls" role="tabpanel" aria-labelledby="tabExam">
+      <p class="exam-info" id="examInfo"></p>
+      <div class="actions">
+        <button class="btn primary" id="startBtn" type="button">▶ Teste Başla</button>
+        <button class="btn" id="examReplayBtn" type="button" disabled>↻ Tekrar Çal</button>
+        <button class="btn" id="skipBtn" type="button" disabled>⏭ Soruyu Geç</button>
+        <button class="btn ghost" id="endBtn" type="button" disabled>■ Testi Bitir</button>
+      </div>
+    </div>
+
+    <div id="practiceControls" role="tabpanel" aria-labelledby="tabPractice" hidden>
+      <div class="fields">
+        <label class="field"><span>Kök ses</span><select id="rootSelect"></select></label>
+        <label class="field"><span>Kök oktavı</span><select id="octaveSelect"></select></label>
+        <label class="field"><span>Ses / aralık / akor</span><select id="typeSelect"></select></label>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="playBtn" type="button">▶ Çal &amp; Başla</button>
+        <button class="btn" id="replayBtn" type="button" disabled>↻ Tekrar Çal</button>
+        <button class="btn ghost" id="resetBtn" type="button" disabled>⟲ Sıfırla</button>
+      </div>
+    </div>
+
+    <div class="common">
+      <label class="field device-field"><span>Mikrofon girişi</span><select id="deviceSelect" disabled><option>Mikrofon açılınca listelenir</option></select></label>
+      <div class="switch-row">
+        <label class="switch">
+          <input type="checkbox" id="foldToggle" checked>
+          <span class="track"></span>
+          <span class="switch-text">Oktav toleransı<small id="foldHint"></small></span>
+        </label>
+        <label class="switch">
+          <input type="checkbox" id="staffToggle">
+          <span class="track"></span>
+          <span class="switch-text">Portede göster<small>Dinlenen aralık / akor nota portesine çizilir</small></span>
+        </label>
+      </div>
+    </div>
+  </section>
+
+  <!-- ── Sınav sonucu: teşhis ekranı ── -->
+  <section class="panel summary" id="summaryPanel" hidden aria-labelledby="summaryTitle">
+    <div class="panel-head">
+      <h2 id="summaryTitle">Sınav sonucu · teşhis</h2>
+      <span class="stage" id="sumMeta"></span>
+    </div>
+    <div class="summary-top">
+      <div class="sum-hero">
+        <span class="label">Puan</span>
+        <b id="sumScore">—</b>
+        <span class="muted" id="sumScoreSub">/ 100</span>
+      </div>
+      <div class="sum-tendency">
+        <span class="label">Genel eğilim (hedefe göre)</span>
+        <b id="sumTendency">—</b>
+        <div class="bias" aria-hidden="true">
+          <div class="bias-track"><span class="bias-mark" id="sumBiasMark"></span></div>
+          <div class="bias-scale"><span id="sumBiasMin">−30</span><span>0</span><span id="sumBiasMax">+30</span></div>
+          <div class="bias-poles"><span>◀ Pes (flat)</span><span>Tiz (sharp) ▶</span></div>
+        </div>
+      </div>
+      <div class="sum-hardest">
+        <span class="label">En çok zorlanılan soru tipi</span>
+        <b id="sumHardest">—</b>
+        <span class="muted" id="sumHardestWhy"></span>
+      </div>
+    </div>
+    <div class="table-wrap">
+      <table class="sum-table">
+        <thead>
+          <tr><th>Soru tipi</th><th>Doğrulanan ses</th><th>Ort. süre / ses</th><th>Tekrar / soru</th><th>Ort. sapma</th><th>Eğilim</th><th>Zorlanma</th></tr>
+        </thead>
+        <tbody id="sumRows"></tbody>
+      </table>
+    </div>
+    <div class="roles" id="sumRoles"></div>
+    <ul class="advice" id="sumAdvice"></ul>
+    <div class="actions">
+      <button class="btn primary" id="sumNewBtn" type="button">▶ Yeni Test</button>
+      <button class="btn ghost" id="sumCloseBtn" type="button">Kapat</button>
+    </div>
+  </section>
+
+  <!-- ── Okunacak sesler ── -->
+  <section class="panel" aria-label="Okunacak sesler">
+    <div class="panel-head">
+      <h2>Okunacak sesler <span class="ex-title" id="exTitle"></span></h2>
+      <span class="stage" id="stateLabel" data-s="IDLE">Hazır</span>
+    </div>
+    <div class="exam-progress" id="examProgress" hidden>
+      <div class="progress-head"><span id="progressText"></span><span class="mono" id="progressTimer"></span></div>
+      <div class="segments" id="segments" role="list" aria-label="Soru ilerlemesi"></div>
+      <div class="progress-legend"><span><i class="lg-done"></i>Tam</span><span><i class="lg-partial"></i>Kısmi</span><span><i class="lg-fail"></i>Geçildi / süre doldu</span></div>
+    </div>
+    <div class="notes" id="notes" role="list"></div>
+    <p class="status" id="statusLine" role="status" aria-live="polite"></p>
+    <p class="hint" id="hintLine"></p>
+  </section>
+
+  <!-- ── Porte (isteğe bağlı) ── -->
+  <section class="panel" id="staffPanel" hidden aria-label="Nota portesi">
+    <div class="panel-head"><h2>Porte</h2><span class="stage">VexFlow</span></div>
+    <div class="staff-paper"><div class="staff-host" id="staff"></div></div>
+    <p class="staff-msg" id="staffMsg"></p>
+  </section>
+
+  <!-- ── Akort aleti ── -->
+  <section class="panel tuner" id="tuner" data-zone="none" aria-label="Akort ibresi">
+    <div class="readouts">
+      <div class="target">
+        <span class="label">Hedef</span>
+        <b id="targetName">—</b>
+        <span class="mono muted" id="targetFreq">— Hz</span>
+      </div>
+      <div class="cents">
+        <span class="mono" id="centsVal">—</span>
+        <span class="zone-label" id="zoneLabel">Ses bekleniyor</span>
+      </div>
+      <div class="heard">
+        <span class="label">Okunan</span>
+        <b class="mono" id="heardFreq">— Hz</b>
+        <span class="mono muted" id="heardNote">&nbsp;</span>
+      </div>
+    </div>
+
+    <div class="gauge-wrap">
+      <div class="gauge" id="gauge"><div class="needle" id="needle"></div></div>
+      <div class="ticks" id="ticks"></div>
+    </div>
+    <div class="gauge-legend"><span>◀ PES</span><span>TİZ ▶</span></div>
+
+    <div class="sustain">
+      <div class="sustain-head"><span>Süreklilik (sustain)</span><span class="mono" id="sustainText">0,00 / 0,25 s</span></div>
+      <div class="bar"><div class="fill" id="sustainFill"></div></div>
+    </div>
+
+    <div class="contour">
+      <div class="contour-head">
+        <span>Perde grafiği · son <span id="contourSpan">6</span> sn · hedefe göre sapma (sent)</span>
+        <span class="contour-legend">
+          <span><i class="key-line k-pitch"></i>Okunan perde</span>
+          <span><i class="key-line k-held"></i>Tolerans içinde</span>
+          <span><i class="key-band"></i>±<span id="contourTol">20</span> sent bandı</span>
+        </span>
+      </div>
+      <canvas id="contour" role="img" aria-label="Okunan perdenin hedefe göre zaman içindeki sapması"></canvas>
+    </div>
+
+    <div class="meter-row">
+      <div class="meter" title="Mikrofon seviyesi (pembe çizgi = gürültü eşiği)">
+        <div class="meter-fill" id="levelFill"></div>
+        <div class="meter-thr" id="levelThr"></div>
+      </div>
+      <label class="thr">Gürültü eşiği (RMS)
+        <input type="range" id="thrRange" min="-70" max="-15" step="1" value="-40">
+        <span class="mono" id="thrText">−40 dBFS</span>
+      </label>
+      <span class="mono muted" id="clarityText">netlik —</span>
+    </div>
+  </section>
+
+  <!-- ── Önceki testlerim ── -->
+  <section class="panel" id="historyPanel" aria-labelledby="historyTitle">
+    <div class="panel-head">
+      <h2 id="historyTitle">Önceki testlerim</h2>
+      <button class="btn ghost small" id="historyClear" type="button">Geçmişi temizle</button>
+    </div>
+    <p class="small-note" id="historyEmpty">Henüz kayıtlı test yok. Bir testi bitirdiğinizde puan ve teşhis burada saklanır (yalnızca bu tarayıcıda).</p>
+    <div class="history-chart" id="historyChart"></div>
+    <ol class="history-list" id="historyList"></ol>
+  </section>
+
+  <!-- ── Ayarlar ve standartlar ── -->
+  <details class="panel settings" id="settingsPanel">
+    <summary><span class="sum-title">Ayarlar ve standartlar</span><span class="muted">tolerans · süre · soru yapısı · ses · algılama</span></summary>
+    <div class="settings-body">
+      <p class="small-note">Buradaki değerler bu tarayıcıda saklanır ve koddaki CONFIG varsayılanlarının üzerine yazılır. Soru sayıları, register ve aralık havuzu bir sonraki testte geçerli olur.</p>
+      <div class="settings-top">
+        <label class="field"><span>Hazır standart</span><select id="presetSelect"></select></label>
+      </div>
+      <form id="settingsForm" class="settings-form" novalidate></form>
+      <div class="actions">
+        <button class="btn primary" id="applySettings" type="button">Kaydet ve uygula</button>
+        <button class="btn ghost" id="resetSettings" type="button">Varsayılana dön</button>
+      </div>
+      <p class="settings-msg" id="settingsMsg" role="status" aria-live="polite"></p>
+
+      <h3 class="set-h3">Gelişmiş · JSON</h3>
+      <p class="small-note">Yalnızca varsayılandan farklı ayarlar listelenir. Bir kurumun standardını dosya olarak paylaşmak için dışa aktarın; öğrenciler içe aktararak aynı ayarlarla çalışır.</p>
+      <textarea id="jsonArea" class="json-area" spellcheck="false" aria-label="Özel ayarlar (JSON)"></textarea>
+      <div class="actions">
+        <button class="btn" id="jsonApply" type="button">JSON'u uygula</button>
+        <button class="btn ghost" id="jsonExport" type="button">Dışa aktar (.json)</button>
+        <button class="btn ghost" id="jsonImportBtn" type="button">İçe aktar…</button>
+        <button class="btn ghost" id="jsonCopyAll" type="button">Tüm CONFIG'i kopyala</button>
+        <input type="file" id="jsonImport" accept="application/json,.json" hidden>
+      </div>
+    </div>
+  </details>
+
+  <p class="tips">
+    İpuçları: Kulaklık kullanın — hoparlörden çıkan piyano mikrofona karışırsa doğrulama bozulur.
+    Tarayıcının yankı giderme, gürültü bastırma ve otomatik kazanç işlemleri kapatılır; ses kartınızın
+    giriş kazancını sesiniz kırpılmayacak şekilde ayarlayın. Pembe çizgi, altındaki sinyallerin yok sayıldığı gürültü eşiğidir.
+    <br>Piyano örnekleri: Salamander Grand Piano (Alexander Holm, CC BY 3.0) · Tone.js · VexFlow ·
+    YIN algoritması: de Cheveigné &amp; Kawahara (2002) · MPM: pitchy (isteğe bağlı).
+  </p>
+</main>
+
+<script type="module">
+// ═════════════════════════════════════════════════════════════════════════
+//  SOLFEJ LAB — Web tabanlı işitme eğitimi (konservatuvar hazırlık)
+//  Tek dosya · Vanilla JS (ES Modules) · Web Audio API
+//
+//  Dış kütüphaneler CDN'den, gerektiğinde yüklenir. Yüklenemezlerse uygulama yedek yolla çalışır:
+//    Tone.js  → piyano örnekleri (Salamander Grand Piano)   · yedek: dahili sentez
+//    VexFlow  → "Portede göster" nota çizimi                · yedek: porte paneli mesaj gösterir
+//    pitchy   → MPM perde algılama (Ayarlar'dan seçilirse)   · varsayılan: dahili YIN
+//
+//  Çalıştırma: mikrofon için güvenli bağlam gerekir (https veya localhost).
+//      python -m http.server 8000    →   http://localhost:8000
+//
+//  Geliştirici notları
+//    • Tüm ayarlar hemen aşağıdaki CONFIG nesnesindedir. Arayüzdeki "Ayarlar ve standartlar"
+//      paneli yalnızca bu tarayıcı için CONFIG'in üzerine yazar (localStorage).
+//    • Konsoldan:  solfejLab.setConfig({ TOLERANCE_CENTS: 15 })   solfejLab.resetConfig()
+//                  solfejLab.generateSession(42)   (aynı tohum → aynı sorular)
+//    • URL:        ?seed=123  → ilk test bu tohumla üretilir (herkese aynı soru seti)
+//                  ?debug     → window.__dbg (test / hata ayıklama)
+//
+//  Dosya haritası
+//    0) CONFIG               merkezi yapılandırma (en üstte)
+//    1) Saf mantık (PURE)    yardımcılar, nota teorisi, soru üreticisi, YIN, sustain,
+//                            durum makinesi, sınav oturumu, analitik, geçmiş kaydı
+//    2) Kütüphane yükleyici  CDN adreslerini sırayla dener, zaman aşımı uygular
+//    3) Ses motoru           AudioContext · Tone.js piyano · yedek sentez
+//    4) Mikrofon & algılama  getUserMedia (işlemsiz) → AnalyserNode → YIN / MPM
+//    5) Arayüz               notalar, ilerleme, ibre, perde grafiği, porte, özet, geçmiş, ayarlar
+//    6) Durum makinesi eylemleri
+//    7) Ana döngü            requestAnimationFrame: ölçüm → puanlama → durum makinesi
+//    8) Kalıcılık ve başlatma
+// ═════════════════════════════════════════════════════════════════════════
+
+
+/* >>> PURE:BEGIN — DOM ve Web Audio'dan bağımsız saf mantık (Node testleri bu bölümü ayrıca çalıştırır) */
+
+// ───────────────────────────────────────────────────────────────────────
+// 0) MERKEZİ YAPILANDIRMA — tüm ayarlar burada
+// ───────────────────────────────────────────────────────────────────────
+const CONFIG = {
+  // ══ 1. SINAV STANDARDI ══════════════════════════════════════════════
+  TOLERANCE_CENTS: 20,            // Hedeften sapma payı: −20 … +20 sent içi "doğru" (yeşil)
+  WARNING_CENTS: 35,              // Göstergede sarı ("sınırda") bandın sınırı; ötesi kırmızı
+  SUSTAIN_TIME_MS: 250,           // "na" hecesiyle yeşil bantta KESİNTİSİZ tutma süresi (0,25 sn)
+  SUSTAIN_DROPOUT_GRACE_MS: 60,   // Yalnızca ALGILAMA kopmalarına (tek kare sessizlik / düşük netlik) tolerans.
+                                  // Bant dışına çıkmaya tolerans yoktur. 0 = tamamen katı.
+  QUESTION_COUNTS: { single: 5, double: 5, triple: 5 },   // Sınav yapısı: tek, iki, üç ses
+  QUESTION_ORDER: 'grouped',      // 'grouped' → tek → iki → üç ses (sınavdaki sıra) · 'shuffled' → karışık
+  REGISTER: { minMidi: 48, maxMidi: 72 },                  // C3 – C5: tüm sesler bu aralıktan seçilir
+  A4_HZ: 440,                     // Diyapazon (orkestra çalışması için 442)
+  OCTAVE_MODE: 'free',            // Oktav toleransı açıkken:
+                                  //   'free'     → her ses kendi en yakın oktavına katlanır (algılama oktav hatalarına en dayanıklı)
+                                  //   'anchored' → ilk ses hangi oktavda söylendiyse sorunun geri kalanı da o oktavda (daha katı)
+                                  //   'off'      → mutlak oktav (yazıldığı gibi)
+                                  //   Not: oktav aralığı sorularında (aynı perde sınıfı iki kez) 'free' otomatik olarak 'anchored' olur.
+
+  CHORD_RULES: {                  // Üç ses soruları: kök durumunda 5'li akorlar
+    SET_SIZE: 5,                  // kurallar her 5 soruluk sete ayrı uygulanır
+    MAX_ALTERED_PER_SET: 1,       // sette EN FAZLA 1 artmış (aug) / eksilmiş (dim) akor
+    ALTERED_CHANCE: 0.5,          // bir sette artmış/eksilmiş akor bulunma olasılığı (0 = hiç, 1 = her sette)
+    ALTERED_TYPES: ['augmented', 'diminished'],
+    MAIN_WEIGHTS: { major: 1, minor: 1 },                  // geri kalanlar: majör / minör (ağırlıklı seçim)
+    MIN_EACH_MAIN: 1,             // her sette en az 1 majör ve 1 minör (yer varsa)
+  },
+  INTERVAL_RULES: {               // İki ses soruları: aralıklar (alttaki ses kök)
+    POOL: ['m2', 'M2', 'm3', 'M3', 'P4', 'A4', 'P5', 'm6', 'M6', 'm7', 'M7', 'P8'],   // 'd5' de eklenebilir
+    WEIGHTS: {},                  // ör. { A4: 0.5 } → triton yarı sıklıkta; boş = hepsi eşit
+  },
+  SPELLING: {
+    ALLOW_DOUBLE_ACCIDENTALS: false,   // çift diyez / çift bemol gerektiren köklerden kaçın
+    SINGLE_NOTE_ACCIDENTALS: 'mixed',  // tek seste siyah tuş yazımı: 'mixed' | 'sharp' | 'flat'
+  },
+  NO_REPEAT: true,                // aynı oturumda aynı soru (aynı tip + aynı kök) tekrar etmez
+
+  // ══ 2. SINAV AKIŞI ══════════════════════════════════════════════════
+  EXAM: {
+    REVEAL_NOTE_NAMES: 'after',   // 'after' → ses doğrulanınca adı açılır · 'end' → soru bitince · 'always' · 'never'
+    LIVE_FEEDBACK: true,          // ibre, perde grafiği ve sustain dolumu (false = sınav provası: körlemesine)
+    NEXT_QUESTION_DELAY_MS: 1400, // soru bitince sıradakine geçmeden önce
+    QUESTION_TIME_LIMIT_S: 0,     // soru başına dinleme süresi sınırı (sn); 0 = sınırsız
+    ALLOW_REPLAY: true,
+    ALLOW_SKIP: true,
+  },
+
+  // ══ 3. PUANLAMA ═════════════════════════════════════════════════════
+  SCORING: {
+    PARTIAL_CREDIT: true,         // 3 sesin 2'si doğrulandıysa sorunun 2/3'ü; false → hepsi ya da hiç
+    TYPE_WEIGHTS: { single: 1, double: 1, triple: 1 },
+    REPLAY_PENALTY: 0,            // her "tekrar çal" için soru kredisinden düşülen oran (ör. 0.1 = %10)
+  },
+
+  // ══ 4. ANALİTİK (teşhis ekranı) — hesap computeDiagnostics() içinde ═══
+  ANALYSIS: {
+    BIAS_WINDOW_CENTS: 50,        // eğilim hesabına giren kareler: hedefe ±50 sent yakın olanlar
+    BIAS_NEUTRAL_CENTS: 5,        // |ortalama sapma| bunun altındaysa "dengeli"
+    MIN_FRAMES: 15,               // eğilimi yorumlamak için gereken en az kare
+    NOTABLE_DIFFICULTY: 0.3,      // "en çok zorlanılan" yorumu için en düşük zorlanma puanı (0–1)
+    DIFFICULTY_WEIGHTS: { failure: 0.45, time: 0.25, replays: 0.15, deviation: 0.15 },
+    TIME_REF_MS: 8000,            // ses başına bu süre → süre bileşeni %100
+    REPLAY_REF: 2,                // soru başına bu kadar tekrar → %100
+    DEVIATION_REF_CENTS: 25,      // ortalama mutlak sapma bu değerde → %100
+  },
+
+  // ══ 5. PERDE ALGILAMA ═══════════════════════════════════════════════
+  PITCH: {
+    ALGORITHM: 'YIN',             // 'YIN' → dahili, kütüphanesiz · 'MPM' → pitchy (McLeod Pitch Method)
+    FFT_SIZE: 'auto',             // analiz penceresi (örnek): 'auto' → 48 kHz'de 2048 (≈ 43 ms), 96 kHz'de 4096
+    YIN_THRESHOLD: 0.15,          // YIN mutlak eşiği (makalede 0,10–0,15)
+    YIN_ADAPTIVE_K: 0.95,         // uyarlamalı eşik: belirgin periyot varken sığ alt-periyot çukurlarını reddeder
+                                  // (baskın üst harmonikte oktav-üstü hatasını azaltır). 0 = klasik YIN
+    MIN_CLARITY: 0.80,            // netlik (YIN: 1 − d′, MPM: NSDF tepesi) bunun altındaysa kare geçersiz
+    MIN_FREQ: 55,                 // Hz — oktav katlamayla bas sesler (≈ A1) de okunabilsin
+    MAX_FREQ: 1400,               // Hz
+    MEDIAN_FRAMES: 3,             // tek karelik oktav sıçramalarını süzen medyan filtre (1 = kapalı)
+    NOISE_GATE_DB: -40,           // gürültü eşiği varsayılanı (dBFS); arayüzdeki kaydırıcıyla değişir
+    NOISE_GATE_MIN_DB: -70,
+    NOISE_GATE_MAX_DB: -15,
+    MAX_FRAME_GAP_MS: 150,        // iki kare arası bundan uzunsa (sekme gizlendi vb.) süreklilik sıfırlanır
+  },
+
+  // ══ 6. SES (ÇALIM) ══════════════════════════════════════════════════
+  AUDIO: {
+    INSTRUMENT: 'piano',          // 'piano' → Tone.js + gerçek piyano örnekleri · 'synth' → dahili sentez (çevrimdışı)
+    CHORD_DURATION_S: 1.8,        // seslerin aynı anda (armonik) çalınma süresi
+    LISTEN_DELAY_MS: 450,         // çalım bitince dinlemeye başlamadan önce (kuyruk sönsün)
+    VERIFIED_HOLD_MS: 650,        // doğrulamadan sonra sıradaki sese geçmeden önce
+    MASTER_GAIN: 0.6,             // yedek sentez seviyesi
+    SYNTH_RELEASE_TAU: 0.12,      // yedek sentez bırakma zaman sabiti (sn)
+    PIANO: {
+      // Salamander Grand Piano V3 — Alexander Holm, CC BY 3.0 (Tone.js örnek deposu).
+      // Başka bir örnek seti (ör. MIDI.js soundfont mp3'leri) için BASE_URL / FILE_PATTERN değiştirilir.
+      BASE_URL: 'https://tonejs.github.io/audio/salamander/',
+      FILE_PATTERN: '{name}.mp3', // {name} → C4, Ds4, Fs4, A4 ("#" yerine "s")
+      SAMPLE_EVERY: 3,            // her 3 yarım seste bir örnek (C, D♯, F♯, A); Tone.Sampler aradakileri kaydırır
+      RELEASE_S: 0.8,
+      VOLUME_DB: -6,
+      VELOCITY: 0.7,
+      LOAD_TIMEOUT_MS: 15000,
+      WAIT_ON_START_MS: 6000,     // "Teste Başla"da piyano hâlâ yükleniyorsa en fazla bu kadar beklenir
+    },
+  },
+
+  // ══ 7. ARAYÜZ ═══════════════════════════════════════════════════════
+  UI: {
+    SHOW_STAFF: false,            // "Portede göster" varsayılanı
+    GAUGE_RANGE_CENTS: 50,        // ibre skalasının yarı genişliği
+    CONTOUR_SECONDS: 6,           // perde grafiğinin zaman penceresi
+    CONTOUR_RANGE_CENTS: 100,     // perde grafiğinin dikey aralığı (± sent)
+    NEEDLE_SMOOTHING_MS: 55,      // ibre yumuşatma (yalnızca görsel; puanlama ham değerle yapılır)
+    READOUT_INTERVAL_MS: 80,      // sayısal göstergelerin yenileme aralığı
+  },
+
+  // ══ 8. KAYIT — "Önceki Testlerim" ═══════════════════════════════════
+  HISTORY: {
+    ENABLED: true,
+    STORAGE_KEY: 'solfejlab.history.v1',
+    MAX_ENTRIES: 50,
+    CHART_LAST_N: 12,             // grafikte gösterilecek son test sayısı
+    LIST_LAST_N: 8,               // listede gösterilecek son test sayısı
+    SAVE_UNFINISHED: true,        // yarıda bitirilen testler de kaydedilsin
+  },
+
+  // ══ 9. DIŞ KÜTÜPHANELER (CDN; sırayla denenir) ══════════════════════
+  LIBS: {
+    TONE:    ['https://cdn.jsdelivr.net/npm/tone@14.8.49/build/Tone.js', 'https://unpkg.com/tone@14.7.77/build/Tone.js'],
+    VEXFLOW: ['https://cdn.jsdelivr.net/npm/vexflow@4.2.5/build/cjs/vexflow.js', 'https://unpkg.com/vexflow@4.2.5/build/cjs/vexflow.js'],
+    PITCHY:  ['https://esm.sh/pitchy@4', 'https://cdn.jsdelivr.net/npm/pitchy@4/+esm'],
+    TIMEOUT_MS: 15000,
+  },
+
+  // ══ 10. HAZIR STANDARTLAR (Ayarlar panelinden seçilir) ══════════════
+  PRESETS: {
+    varsayilan: { label: 'Varsayılan · ±20 sent · 0,25 sn', values: {} },
+    siki:       { label: 'Sıkı · ±10 sent · 0,5 sn',       values: { TOLERANCE_CENTS: 10, WARNING_CENTS: 25, SUSTAIN_TIME_MS: 500, SUSTAIN_DROPOUT_GRACE_MS: 0 } },
+    esnek:      { label: 'Esnek (başlangıç) · ±30 sent · 0,2 sn', values: { TOLERANCE_CENTS: 30, WARNING_CENTS: 50, SUSTAIN_TIME_MS: 200 } },
+    prova:      { label: 'Sınav provası · geri bildirim kapalı', values: { EXAM: { LIVE_FEEDBACK: false, REVEAL_NOTE_NAMES: 'end' } } },
+  },
+};
+
+/** Koddaki varsayılanların dondurulmuş kopyası ("Varsayılana dön" ve özel ayar farkı için) */
+const DEFAULT_CONFIG = deepFreeze(deepClone(CONFIG));
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 1) GENEL YARDIMCILAR
+// ───────────────────────────────────────────────────────────────────────
+const clamp   = (v, lo, hi) => Math.min(hi, Math.max(lo, v));
+const dbToLin = (db) => Math.pow(10, db / 20);
+const isPlainObject = (v) => v !== null && typeof v === 'object' && !Array.isArray(v);
+
+function deepClone(v) { return v === undefined ? undefined : JSON.parse(JSON.stringify(v)); }
+function deepFreeze(o) {
+  if (o && typeof o === 'object' && !Object.isFrozen(o)) { Object.values(o).forEach(deepFreeze); Object.freeze(o); }
+  return o;
+}
+/** base'in derin kopyasına over'ı işler (diziler bütün olarak değiştirilir) */
+function deepMerge(base, over) {
+  const out = deepClone(base);
+  const walk = (dst, src) => {
+    for (const [k, v] of Object.entries(src || {})) {
+      if (isPlainObject(v) && isPlainObject(dst[k])) walk(dst[k], v);
+      else dst[k] = deepClone(v);
+    }
+  };
+  walk(out, over);
+  return out;
+}
+/** Yalnızca base'den farklı yaprakları döndürür → "özel ayarlar" */
+function diffConfig(base, cur) {
+  const out = {};
+  for (const [k, v] of Object.entries(cur || {})) {
+    const b = base?.[k];
+    if (isPlainObject(v) && isPlainObject(b)) {
+      const d = diffConfig(b, v);
+      if (Object.keys(d).length) out[k] = d;
+    } else if (JSON.stringify(v) !== JSON.stringify(b)) out[k] = deepClone(v);
+  }
+  return out;
+}
+function getPath(obj, path) { return path.split('.').reduce((o, k) => (o == null ? undefined : o[k]), obj); }
+function setPath(obj, path, value) {
+  const keys = path.split('.');
+  let o = obj;
+  for (const k of keys.slice(0, -1)) { if (!isPlainObject(o[k])) o[k] = {}; o = o[k]; }
+  o[keys[keys.length - 1]] = value;
+  return obj;
+}
+
+// Yeni anahtar kabul eden sözlükler (değerleri sayı olmalı)
+const OPEN_MAPS = new Set(['INTERVAL_RULES.WEIGHTS', 'CHORD_RULES.MAIN_WEIGHTS', 'SCORING.TYPE_WEIGHTS']);
+
+/**
+ * Dışarıdan gelen (localStorage / içe aktarılan JSON) özel ayarları ayıklar:
+ * bilinmeyen anahtarlar ve tür uyuşmazlıkları atılır, uyarı listesi döner.
+ */
+function sanitizeOverrides(over, base = DEFAULT_CONFIG, path = '', warnings = []) {
+  const clean = {};
+  if (!isPlainObject(over)) { warnings.push(`${path || 'ayarlar'}: nesne bekleniyordu`); return { clean, warnings }; }
+  for (const [k, v] of Object.entries(over)) {
+    const p = path ? `${path}.${k}` : k;
+    if (!path && k === 'PRESETS') { warnings.push('PRESETS: koddan düzenlenir'); continue; }
+    if (!(k in base)) {
+      if (OPEN_MAPS.has(path)) {
+        if (typeof v === 'number' && Number.isFinite(v) && v >= 0) clean[k] = v;
+        else warnings.push(`${p}: sayı bekleniyordu`);
+      } else warnings.push(`${p}: bilinmeyen ayar (yok sayıldı)`);
+      continue;
+    }
+    const b = base[k];
+    if (isPlainObject(b)) {
+      const r = sanitizeOverrides(v, b, p, warnings);
+      if (Object.keys(r.clean).length) clean[k] = r.clean;
+    } else if (Array.isArray(b)) {
+      const want = typeof (b[0] ?? 'string');
+      if (Array.isArray(v) && v.every((x) => typeof x === want)) clean[k] = deepClone(v);
+      else warnings.push(`${p}: liste bekleniyordu`);
+    } else if (typeof b === 'number') {
+      if (typeof v === 'number' && Number.isFinite(v)) clean[k] = v;
+      else warnings.push(`${p}: sayı bekleniyordu`);
+    } else if (typeof v === typeof b || (k === 'FFT_SIZE' && typeof v === 'number')) {
+      clean[k] = v;
+    } else warnings.push(`${p}: ${typeof b} bekleniyordu`);
+  }
+  return { clean, warnings };
+}
+
+// Tohumlanabilir RNG (aynı tohum → aynı soru seti)
+function mulberry32(seed) {
+  let a = seed >>> 0;
+  return function rand() {
+    a = (a + 0x6D2B79F5) | 0;
+    let t = Math.imul(a ^ (a >>> 15), 1 | a);
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+}
+function shuffle(arr, rng) {
+  for (let i = arr.length - 1; i > 0; i--) {
+    const j = Math.floor(rng() * (i + 1));
+    [arr[i], arr[j]] = [arr[j], arr[i]];
+  }
+  return arr;
+}
+function weightedPick(items, weightOf, rng) {
+  let total = 0;
+  for (const it of items) total += Math.max(0, weightOf(it) || 0);
+  if (!(total > 0)) return items[Math.floor(rng() * items.length)];
+  let r = rng() * total;
+  for (const it of items) { r -= Math.max(0, weightOf(it) || 0); if (r < 0) return it; }
+  return items[items.length - 1];
+}
+
+// Biçimlendirme (teşhis metinleri için)
+const NF0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+const NF1 = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const MINUS = '−';
+function fmtSigned(v, digits = 0) {
+  const s = (digits ? NF1 : NF0).format(Math.abs(v));
+  if (/^0([.,]0+)?$/.test(s)) return s;
+  return (v < 0 ? MINUS : '+') + s;
+}
+const fmtSeconds = (ms) => NF1.format(ms / 1000);
+
+
+// ───────────────────────────────────────────────────────────────────────
+// Nota teorisi — doğru enharmonik yazım (C–E♭–G♭ gibi) için diyatonik adım mantığı
+// ───────────────────────────────────────────────────────────────────────
+const LETTERS     = ['C', 'D', 'E', 'F', 'G', 'A', 'B'];
+const SOLFEGE     = ['Do', 'Re', 'Mi', 'Fa', 'Sol', 'La', 'Si'];
+const NATURAL_PC  = [0, 2, 4, 5, 7, 9, 11];                          // doğal notaların yarım ses değerleri
+const ACC_GLYPH   = { '-2': '♭♭', '-1': '♭', '0': '', '1': '♯', '2': '×' };   // × = çift diyez
+const SHARP_NAMES = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+
+const spell      = (letter, acc) => LETTERS[letter] + ACC_GLYPH[acc];
+const solfege    = (letter, acc) => SOLFEGE[letter] + ACC_GLYPH[acc];
+const midiToFreq = (midi, a4 = CONFIG.A4_HZ) => a4 * Math.pow(2, (midi - 69) / 12);
+const freqToMidi = (freq, a4 = CONFIG.A4_HZ) => 69 + 12 * Math.log2(freq / a4);
+const midiName   = (m) => SHARP_NAMES[((m % 12) + 12) % 12] + (Math.floor(m / 12) - 1);
+
+// Kök listesi (kromatik sırada; enharmonik karşılıkları ayrı yazımlarla)
+const ROOTS = [
+  { letter: 0, acc:  0 }, { letter: 0, acc:  1 },                       // C   C♯
+  { letter: 1, acc: -1 }, { letter: 1, acc:  0 }, { letter: 1, acc: 1 }, // D♭  D  D♯
+  { letter: 2, acc: -1 }, { letter: 2, acc:  0 },                       // E♭  E
+  { letter: 3, acc:  0 }, { letter: 3, acc:  1 },                       // F   F♯
+  { letter: 4, acc: -1 }, { letter: 4, acc:  0 }, { letter: 4, acc: 1 }, // G♭  G  G♯
+  { letter: 5, acc: -1 }, { letter: 5, acc:  0 }, { letter: 5, acc: 1 }, // A♭  A  A♯
+  { letter: 6, acc: -1 }, { letter: 6, acc:  0 },                       // B♭  B
+];
+
+// Bir soru tipi "tone" listesidir: steps = diyatonik adım (3'lü → 2), semis = yarım ses
+const ROOT_TONE = { steps: 0, semis: 0, role: 'Kök' };
+const third = (semis) => ({ steps: 2, semis, role: "3'lü" });
+const fifth = (semis) => ({ steps: 4, semis, role: "5'li" });
+const upper = (steps, semis) => [ROOT_TONE, { steps, semis, role: 'Üst ses' }];
+
+const SINGLES   = 'Tek ses';
+const INTERVALS = 'İki ses · aralıklar (kök + üst ses)';
+const CHORDS    = "Üç ses · 5'li akorlar (kök – 3. – 5.)";
+const CHORD_TYPES = [
+  { id: 'single',     kind: 'single',   group: SINGLES,   label: 'Tek ses',      tones: [{ steps: 0, semis: 0, role: 'Ses' }] },
+
+  { id: 'm2', kind: 'interval', group: INTERVALS, label: "Küçük 2'li",             tones: upper(1, 1)  },
+  { id: 'M2', kind: 'interval', group: INTERVALS, label: "Büyük 2'li",             tones: upper(1, 2)  },
+  { id: 'm3', kind: 'interval', group: INTERVALS, label: "Küçük 3'lü",             tones: upper(2, 3)  },
+  { id: 'M3', kind: 'interval', group: INTERVALS, label: "Büyük 3'lü",             tones: upper(2, 4)  },
+  { id: 'P4', kind: 'interval', group: INTERVALS, label: "Tam 4'lü",               tones: upper(3, 5)  },
+  { id: 'A4', kind: 'interval', group: INTERVALS, label: "Artmış 4'lü (triton)",   tones: upper(3, 6)  },
+  { id: 'd5', kind: 'interval', group: INTERVALS, label: "Eksilmiş 5'li (triton)", tones: upper(4, 6)  },
+  { id: 'P5', kind: 'interval', group: INTERVALS, label: "Tam 5'li",               tones: upper(4, 7)  },
+  { id: 'm6', kind: 'interval', group: INTERVALS, label: "Küçük 6'lı",             tones: upper(5, 8)  },
+  { id: 'M6', kind: 'interval', group: INTERVALS, label: "Büyük 6'lı",             tones: upper(5, 9)  },
+  { id: 'm7', kind: 'interval', group: INTERVALS, label: "Küçük 7'li",             tones: upper(6, 10) },
+  { id: 'M7', kind: 'interval', group: INTERVALS, label: "Büyük 7'li",             tones: upper(6, 11) },
+  { id: 'P8', kind: 'interval', group: INTERVALS, label: "Tam 8'li (oktav)",       tones: upper(7, 12) },
+
+  { id: 'major',      kind: 'chord', group: CHORDS, label: 'Majör',        tones: [ROOT_TONE, third(4), fifth(7)] },
+  { id: 'minor',      kind: 'chord', group: CHORDS, label: 'Minör',        tones: [ROOT_TONE, third(3), fifth(7)] },
+  { id: 'augmented',  kind: 'chord', group: CHORDS, label: 'Artmış (+)',   tones: [ROOT_TONE, third(4), fifth(8)] },
+  { id: 'diminished', kind: 'chord', group: CHORDS, label: 'Eksilmiş (°)', tones: [ROOT_TONE, third(3), fifth(6)] },
+];
+const TYPE_BY_ID     = Object.fromEntries(CHORD_TYPES.map((t) => [t.id, t]));
+const INTERVAL_TYPES = CHORD_TYPES.filter((t) => t.kind === 'interval');
+
+// Sınav kategorileri
+const KINDS       = ['single', 'double', 'triple'];
+const KIND_LABEL  = { single: 'Tek ses', double: 'İki ses', triple: 'Üç ses' };
+const KIND_DETAIL = { single: 'tek ses tekrarı', double: 'aralık', triple: "5'li akor" };
+
+/**
+ * Kök + oktav + tipten nota listesi üretir (kökten yukarı doğru, sıralı).
+ * Yazım: hedef harf = kök harfi + diyatonik adım; değiştirici (♭♭…×) = gerçek MIDI − doğal nota MIDI'si.
+ */
+function buildNotes(root, octave, type, a4 = CONFIG.A4_HZ) {
+  const rootMidi = 12 * (octave + 1) + NATURAL_PC[root.letter] + root.acc;
+  return type.tones.map((tone, i) => {
+    const absStep    = root.letter + tone.steps;
+    const letter     = absStep % 7;
+    const noteOctave = octave + Math.floor(absStep / 7);                  // B → C geçişinde oktav artar
+    const midi       = rootMidi + tone.semis;
+    const acc        = midi - (12 * (noteOctave + 1) + NATURAL_PC[letter]);
+    return {
+      index: i,
+      role: tone.role,
+      letter, acc, midi,
+      octave: noteOctave,
+      name: spell(letter, acc),
+      solfege: solfege(letter, acc),
+      fullName: spell(letter, acc) + noteOctave,
+      freq: midiToFreq(midi, a4),
+    };
+  });
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// SORU ÜRETİCİSİ — register'a sığan, doğru yazılmış, kurallara uyan rastgele sorular
+// ───────────────────────────────────────────────────────────────────────
+/**
+ * Bir tip için register'a sığan rastgele kök + oktav seçer.
+ *  1) Tüm (yazım, oktav) adaylarını üret → register ve çift değiştirici süzgeci
+ *  2) Kök MIDI'sini eşit olasılıkla seç (siyah tuşun iki yazımı var diye 2 kat seçilmesin)
+ *  3) O kök için toplam değiştiricisi en az olan yazımı seç (D♭ majör, C♯ majör'e tercih edilir)
+ */
+function pickVoicing(type, cfg = CONFIG, rng = Math.random, avoid = null) {
+  const { minMidi, maxMidi } = cfg.REGISTER;
+  const byRoot = new Map();
+  for (const root of ROOTS) {
+    for (let octave = 0; octave <= 8; octave++) {
+      const notes = buildNotes(root, octave, type, cfg.A4_HZ);
+      const lo = notes[0].midi, hi = notes[notes.length - 1].midi;
+      if (lo < minMidi || hi > maxMidi) continue;
+      if (!cfg.SPELLING.ALLOW_DOUBLE_ACCIDENTALS && notes.some((n) => Math.abs(n.acc) > 1)) continue;
+      const key = `${type.id}:${lo}`;
+      if (avoid && avoid.has(key)) continue;
+      const accCount = notes.reduce((s, n) => s + Math.abs(n.acc), 0);
+      if (!byRoot.has(lo)) byRoot.set(lo, []);
+      byRoot.get(lo).push({ root, octave, notes, key, accCount });
+    }
+  }
+  if (!byRoot.size) return null;
+  const rootMidis = [...byRoot.keys()];
+  let cands = byRoot.get(rootMidis[Math.floor(rng() * rootMidis.length)]);
+  const minAcc = Math.min(...cands.map((c) => c.accCount));
+  cands = cands.filter((c) => c.accCount === minAcc);
+  if (cands.length > 1 && type.kind === 'single') {
+    const pref = cfg.SPELLING.SINGLE_NOTE_ACCIDENTALS;
+    const want = pref === 'sharp' ? 1 : pref === 'flat' ? -1 : 0;
+    if (want) { const f = cands.filter((c) => Math.sign(c.notes[0].acc) === want); if (f.length) cands = f; }
+  }
+  return cands[Math.floor(rng() * cands.length)];
+}
+
+/** İki ses: havuzdan ağırlıklı, mümkün olduğunca tekrarsız ve art arda aynı olmayan aralıklar */
+function planIntervals(count, rules = CONFIG.INTERVAL_RULES, rng = Math.random) {
+  const w = (id) => rules.WEIGHTS?.[id] ?? 1;
+  const pool = (rules.POOL || []).filter((id) => TYPE_BY_ID[id]?.kind === 'interval' && w(id) > 0);
+  if (!pool.length) throw Object.assign(new Error('Aralık havuzu boş: en az bir aralık seçin'), { code: 'CONFIG' });
+  const out = [];
+  let bag = [];
+  for (let i = 0; i < count; i++) {
+    if (!bag.length) bag = pool.slice();
+    let choices = bag.filter((id) => id !== out[out.length - 1]);
+    if (!choices.length) choices = bag;
+    const id = weightedPick(choices, w, rng);
+    bag.splice(bag.indexOf(id), 1);
+    out.push(id);
+  }
+  return out.map((id) => TYPE_BY_ID[id]);
+}
+
+/**
+ * Üç ses: her SET_SIZE'lık sette EN FAZLA MAX_ALTERED_PER_SET artmış/eksilmiş akor
+ * (ALTERED_CHANCE olasılıkla), geri kalanı majör/minör (MAIN_WEIGHTS; MIN_EACH_MAIN garantisiyle).
+ */
+function planTriads(count, rules = CONFIG.CHORD_RULES, rng = Math.random) {
+  const setSize  = Math.max(1, Math.floor(rules.SET_SIZE || 5));
+  const mainIds  = Object.keys(rules.MAIN_WEIGHTS || {}).filter((id) => TYPE_BY_ID[id]?.kind === 'chord' && rules.MAIN_WEIGHTS[id] > 0);
+  const altIds   = (rules.ALTERED_TYPES || []).filter((id) => TYPE_BY_ID[id]?.kind === 'chord');
+  if (!mainIds.length) throw Object.assign(new Error('CHORD_RULES.MAIN_WEIGHTS: en az bir ana akor tipi gerekli'), { code: 'CONFIG' });
+  const out = [];
+  for (let start = 0; start < count; start += setSize) {
+    const size   = Math.min(setSize, count - start);
+    const maxAlt = Math.min(Math.max(0, Math.floor(rules.MAX_ALTERED_PER_SET ?? 1)), size);
+    let nAlt = 0;
+    if (altIds.length && maxAlt > 0 && rng() < (rules.ALTERED_CHANCE ?? 0.5)) nAlt = 1 + Math.floor(rng() * maxAlt);
+    const set = [];
+    for (let k = 0; k < nAlt; k++) set.push(altIds[Math.floor(rng() * altIds.length)]);
+    const mainSlots = size - nAlt;
+    const main = [];
+    const minEach = Math.max(0, Math.floor(rules.MIN_EACH_MAIN ?? 0));
+    for (let r = 0; r < minEach; r++) for (const id of mainIds) if (main.length < mainSlots) main.push(id);
+    while (main.length < mainSlots) main.push(weightedPick(mainIds, (id) => rules.MAIN_WEIGHTS[id], rng));
+    set.push(...main);
+    out.push(...shuffle(set, rng));
+  }
+  return out.map((id) => TYPE_BY_ID[id]);
+}
+
+function questionTitle(type, notes) {
+  if (type.kind === 'single')   return `${notes[0].fullName} · ${notes[0].solfege}`;
+  if (type.kind === 'interval') return `${type.label} · ${notes.map((n) => n.fullName).join('–')}`;
+  return `${notes[0].name} ${type.label} · ${notes.map((n) => n.fullName).join('–')}`;
+}
+
+/**
+ * Sınav oturumu üretir: QUESTION_COUNTS kadar tek / iki / üç ses sorusu.
+ * @returns {Array<{index, kind, type, notes, key, title}>}
+ */
+function generateSession(cfg = CONFIG, rng = Math.random) {
+  const plan = [];
+  for (const kind of KINDS) {
+    const n = Math.max(0, Math.floor(cfg.QUESTION_COUNTS?.[kind] ?? 0));
+    if (!n) continue;
+    const types = kind === 'single' ? Array.from({ length: n }, () => TYPE_BY_ID.single)
+      : kind === 'double' ? planIntervals(n, cfg.INTERVAL_RULES, rng)
+      : planTriads(n, cfg.CHORD_RULES, rng);
+    for (const type of types) plan.push({ kind, type });
+  }
+  if (!plan.length) throw Object.assign(new Error('Soru sayılarının hepsi 0: en az bir soru olmalı'), { code: 'CONFIG' });
+  if (cfg.QUESTION_ORDER === 'shuffled') shuffle(plan, rng);
+  const used = new Set();
+  return plan.map(({ kind, type }, index) => {
+    const v = pickVoicing(type, cfg, rng, cfg.NO_REPEAT ? used : null) || pickVoicing(type, cfg, rng, null);
+    if (!v) {
+      throw Object.assign(new Error(`Register ${midiName(cfg.REGISTER.minMidi)}–${midiName(cfg.REGISTER.maxMidi)} "${type.label}" için çok dar`), { code: 'REGISTER' });
+    }
+    used.add(v.key);
+    return { index, kind, type, notes: v.notes, key: v.key, title: questionTitle(type, v.notes) };
+  });
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// Sent hesabı, oktav modu ve bölge sınıflandırması
+// ───────────────────────────────────────────────────────────────────────
+/**
+ * cents = 1200 · log2(okunan / hedef). Oktav moduna göre:
+ *  'off'      → mutlak karşılaştırma
+ *  'free'     → en yakın oktava katlanır ([−600, +600])
+ *  'anchored' → ilk ses doğrulanana kadar 'free'; sonra o sesin oktav kayması (anchorK) sabitlenir
+ * @returns {{cents:number, octave:number}}  octave = katlanan oktav sayısı (k)
+ */
+function compareToTarget(freq, targetFreq, mode = 'free', anchorK = null) {
+  const raw = 1200 * Math.log2(freq / targetFreq);
+  if (mode === 'off') return { cents: raw, octave: 0 };
+  if (mode === 'anchored' && anchorK !== null) return { cents: raw - 1200 * anchorK, octave: anchorK };
+  const k = Math.round(raw / 1200);
+  return { cents: raw - 1200 * k, octave: k };
+}
+/** Egzersiz için geçerli oktav modu. 'free' modda aynı perde sınıfı iki kez geçiyorsa (oktav aralığı) sabit oktava geçilir. */
+function octaveModeFor(exercise, foldOn, cfg = CONFIG) {
+  if (!foldOn) return 'off';
+  if (cfg.OCTAVE_MODE === 'free' && !exercise.foldable) return 'anchored';
+  return cfg.OCTAVE_MODE;
+}
+
+function zoneOf(absCents, cfg = CONFIG) {
+  if (absCents <= cfg.TOLERANCE_CENTS) return 'perfect';   // ±20 sent → doğru
+  if (absCents <= cfg.WARNING_CENTS)   return 'ok';        // ±35 sent → sınırda
+  return 'bad';                                            // ötesi → detone
+}
+
+function nearestNoteName(freq, a4 = CONFIG.A4_HZ) {
+  return midiName(Math.round(freqToMidi(freq, a4)));
+}
+
+function rootMeanSquare(buf) {
+  let sum = 0;
+  for (let i = 0; i < buf.length; i++) { const v = buf[i]; sum += v * v; }
+  return Math.sqrt(sum / buf.length);
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// PERDE ALGILAMA — YIN (de Cheveigné & Kawahara, 2002)
+//  1) fark fonksiyonu  d(τ) = Σ (x[j] − x[j+τ])²
+//  2) birikimli ortalamayla normalize (CMNDF)  d′(τ) = d(τ)·τ / Σ_{k≤τ} d(k)
+//  3) mutlak eşik: d′ eşiğin altına inen İLK çukur → oktav-altı hatalarını önler.
+//     Uyarlamalı ek: eşik = min(T, 1 − k·(1 − d′min)). Çok belirgin bir periyot varsa (d′min ≈ 0)
+//     yarım/üçte bir periyottaki sığ çukurlar reddedilir → baskın üst harmonikli ünlülerde
+//     oktav-üstü hata azalır (MPM'deki "anahtar tepe" kuralının YIN karşılığı). k = 0 → klasik YIN.
+//  4) parabolik ara değerleme → alt-örnek hassasiyeti
+//  Netlik (clarity) = 1 − d′(τ): pitchy'nin "clarity" değeriyle aynı ölçekte (0–1) yorumlanır.
+// ───────────────────────────────────────────────────────────────────────
+class YinDetector {
+  constructor(size, { threshold = 0.15, adaptiveK = 0.95, minFreq = 55, maxFreq = 1400 } = {}) {
+    this.size = size;
+    this.w = size >> 1;                         // entegrasyon penceresi W = N/2
+    this.d = new Float32Array(this.w + 2);      // bir kez ayrılır → sıcak döngüde bellek tahsisi yok
+    this.threshold = threshold;
+    this.adaptiveK = adaptiveK;
+    this.minFreq = minFreq;
+    this.maxFreq = maxFreq;
+  }
+  /** @returns {[number, number]} [frekans (Hz), netlik 0–1] */
+  findPitch(buf, sampleRate) {
+    const W = this.w, d = this.d;
+    const tauMin = Math.max(2, Math.floor(sampleRate / this.maxFreq));
+    const tauMax = Math.min(W, Math.ceil(sampleRate / this.minFreq) + 1);
+    if (tauMax <= tauMin + 2 || buf.length < W + tauMax) return [0, 0];
+
+    for (let tau = 1; tau <= tauMax; tau++) {                 // 1) fark fonksiyonu
+      let sum = 0;
+      for (let j = 0; j < W; j++) { const diff = buf[j] - buf[j + tau]; sum += diff * diff; }
+      d[tau] = sum;
+    }
+    d[0] = 1;                                                 // 2) CMNDF (yerinde)
+    let running = 0;
+    for (let tau = 1; tau <= tauMax; tau++) {
+      running += d[tau];
+      d[tau] = running > 0 ? (d[tau] * tau) / running : 1;
+    }
+    let dMin = 1;                                             // 3) mutlak (uyarlamalı) eşik
+    for (let t = tauMin; t < tauMax; t++) if (d[t] < dMin) dMin = d[t];
+    const thr = this.adaptiveK > 0 ? Math.min(this.threshold, 1 - this.adaptiveK * (1 - dMin)) : this.threshold;
+    let tau = -1;
+    for (let t = tauMin; t < tauMax; t++) {
+      if (d[t] < thr) {
+        while (t + 1 < tauMax && d[t + 1] < d[t]) t++;        // çukurun dibine in
+        tau = t;
+        break;
+      }
+    }
+    if (tau < 0) {                                            // eşik altı çukur yok → genel minimum (düşük netlik)
+      tau = tauMin;
+      for (let t = tauMin + 1; t < tauMax; t++) if (d[t] < d[tau]) tau = t;
+    }
+    let better = tau;                                         // 4) parabolik ara değerleme
+    if (tau > 1 && tau < tauMax) {
+      const s0 = d[tau - 1], s1 = d[tau], s2 = d[tau + 1];
+      const den = s0 - 2 * s1 + s2;
+      if (den > 0) better = tau + clamp((s0 - s2) / (2 * den), -1, 1);
+    }
+    return [sampleRate / better, clamp(1 - d[tau], 0, 1)];
+  }
+}
+
+/** Tek karelik oktav sıçramalarını süzer (perde MIDI değeri üzerinde, log ölçekte) */
+class MedianFilter {
+  constructor(size = 3) { this.size = Math.max(1, Math.floor(size)); this.buf = []; }
+  reset() { this.buf.length = 0; }
+  push(v) {
+    if (this.size <= 1) return v;
+    this.buf.push(v);
+    if (this.buf.length > this.size) this.buf.shift();
+    if (this.buf.length < this.size) return v;
+    const s = this.buf.slice().sort((a, b) => a - b);
+    return s[(s.length - 1) >> 1];
+  }
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// SÜREKLİLİK (SUSTAIN) FİLTRESİ
+//  • Yalnızca ±TOLERANCE_CENTS bandındaki GEÇERLİ kareler süre biriktirir.
+//  • Geçerli ama bant DIŞI bir kare → sayaç anında sıfırlanır (glissando koruması).
+//  • Geçersiz kare (sessizlik / düşük netlik) → sayaç dondurulur; kopma
+//    SUSTAIN_DROPOUT_GRACE_MS'i aşarsa sıfırlanır. 0 → tamamen katı.
+//  • Süre kare sayısıyla değil gerçek zamanla (ms) ölçülür; banda giren ilk kare süre eklemez.
+//  • Ayarlar her karede CONFIG'ten okunur → panelden yapılan değişiklik anında geçerli olur.
+// ───────────────────────────────────────────────────────────────────────
+class SustainTracker {
+  constructor(cfg = CONFIG) { this.cfg = cfg; this.reset(); }
+  reset() { this.ms = 0; this.dropoutMs = 0; this.armed = false; }
+  get requiredMs() { return this.cfg.SUSTAIN_TIME_MS; }
+  get progress() { return Math.min(1, this.ms / this.requiredMs); }
+
+  /** @returns {boolean} süreklilik şartı bu karede tamamlandı mı */
+  update(dtMs, valid, absCents) {
+    const c = this.cfg;
+    if (valid) {
+      this.dropoutMs = 0;
+      if (absCents <= c.TOLERANCE_CENTS) {
+        if (this.armed) this.ms = Math.min(c.SUSTAIN_TIME_MS, this.ms + dtMs);
+        this.armed = true;
+      } else {
+        this.ms = 0;                       // yeşil alandan çıktı → baştan
+        this.armed = false;
+      }
+    } else {
+      this.dropoutMs += dtMs;
+      if (this.dropoutMs > c.SUSTAIN_DROPOUT_GRACE_MS) { this.ms = 0; this.armed = false; }
+    }
+    return this.ms >= c.SUSTAIN_TIME_MS - 1e-6;   // kayan nokta birikimine karşı küçük pay
+  }
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// DURUM MAKİNESİ (FSM) — yalnızca tablodaki geçişler serbest
+//   IDLE → PLAYING → LISTENING → VERIFIED → (LISTENING …) → COMPLETE → PLAYING (sıradaki soru) … → SUMMARY
+// ───────────────────────────────────────────────────────────────────────
+const S = Object.freeze({
+  IDLE: 'IDLE', PLAYING: 'PLAYING', LISTENING: 'LISTENING', VERIFIED: 'VERIFIED', COMPLETE: 'COMPLETE', SUMMARY: 'SUMMARY',
+});
+const ALLOWED = Object.freeze({
+  IDLE:      ['PLAYING'],
+  PLAYING:   ['LISTENING', 'IDLE', 'SUMMARY'],
+  LISTENING: ['VERIFIED', 'PLAYING', 'COMPLETE', 'IDLE', 'SUMMARY'],   // PLAYING: tekrar çal · COMPLETE: geç / süre doldu
+  VERIFIED:  ['LISTENING', 'COMPLETE', 'IDLE', 'SUMMARY'],
+  COMPLETE:  ['PLAYING', 'SUMMARY', 'IDLE'],
+  SUMMARY:   ['PLAYING', 'IDLE'],
+});
+
+function createMachine(table, initial, onChange) {
+  let state = initial;
+  return {
+    get state() { return state; },
+    can(next) { return table[state].includes(next); },
+    go(next, payload) {
+      if (!table[state].includes(next)) {
+        console.warn(`[FSM] yasak geçiş: ${state} → ${next}`);
+        return false;
+      }
+      const prev = state;
+      state = next;                                // önce durumu değiştir, sonra dinleyiciyi çağır
+      onChange(next, prev, payload);
+      return true;
+    },
+  };
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// KİLİTLİ İLERLEME — sıradaki nota doğrulanmadan bir sonrakine geçilemez
+// ───────────────────────────────────────────────────────────────────────
+class Exercise {
+  constructor(notes) {
+    this.notes = notes;
+    // Aynı perde sınıfından iki nota varsa (oktav aralığı) 'free' katlama anlamsızdır
+    this.foldable = new Set(notes.map((n) => ((n.midi % 12) + 12) % 12)).size === notes.length;
+    this.restart();
+  }
+  restart()       { this.index = 0; this.verified = this.notes.map(() => false); this.anchorK = null; this.abandoned = false; }
+  get current()   { return this.notes[this.index] ?? null; }
+  get finished()  { return this.index >= this.notes.length; }
+  markVerified()  { if (!this.finished) this.verified[this.index] = true; }
+  advance() {
+    if (this.finished || !this.verified[this.index]) throw new Error('Kilit: doğrulanmamış nota atlanamaz');
+    this.index++;
+    return this.finished;                          // true → tüm notalar tamam
+  }
+  abandon()       { this.abandoned = true; }       // soru geçildi / süre doldu
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// SINAV OTURUMU — sorular + her ses için ölçüm kaydı
+// ───────────────────────────────────────────────────────────────────────
+function newNoteStats() {
+  return {
+    verified: false,
+    timeMs: 0,                                      // bu ses için dinleme süresi (çalım süresi hariç)
+    valid: 0, far: 0,                               // geçerli kare sayısı · hedefe uzak kare sayısı
+    near: { n: 0, sum: 0, sumAbs: 0 },              // hedefe ±BIAS_WINDOW içindeki kareler → eğilim
+    held: { n: 0, sum: 0 },                         // tolerans içindeki kareler
+  };
+}
+/** Bir ölçüm karesini ses istatistiğine ekler (yalnızca LISTENING sırasında çağrılır) */
+function recordPitchFrame(stats, cents, cfg = CONFIG) {
+  stats.valid++;
+  const a = Math.abs(cents);
+  if (a <= cfg.ANALYSIS.BIAS_WINDOW_CENTS) { stats.near.n++; stats.near.sum += cents; stats.near.sumAbs += a; }
+  else stats.far++;
+  if (a <= cfg.TOLERANCE_CENTS) { stats.held.n++; stats.held.sum += cents; }
+}
+
+class ExamSession {
+  constructor(questions, { seed = 0, startedAt = Date.now() } = {}) {
+    this.questions = questions;
+    this.seed = seed;
+    this.startedAt = startedAt;
+    this.finishedAt = null;
+    this.aborted = false;
+    this.index = 0;
+    this.results = questions.map((q) => ({
+      kind: q.kind, typeId: q.type.id, label: q.type.label, title: q.title,
+      notes: q.notes.map((n) => ({ midi: n.midi, name: n.fullName, role: n.role })),
+      noteResults: q.notes.map(() => newNoteStats()),
+      replays: 0, listenMs: 0,
+      status: 'pending',                            // pending · done · partial · skipped · timeout · unanswered
+      endReason: null,
+    }));
+  }
+  get current() { return this.questions[this.index] ?? null; }
+  get result()  { return this.results[this.index] ?? null; }
+  get isLast()  { return this.index >= this.questions.length - 1; }
+  /** Geçerli soruyu kapatır. reason: 'done' | 'skipped' | 'timeout' */
+  finishQuestion(reason = 'done') {
+    const r = this.result;
+    if (!r || r.status !== 'pending') return r;
+    const ok = r.noteResults.filter((n) => n.verified).length;
+    r.endReason = reason;
+    r.status = ok === r.noteResults.length ? 'done' : ok > 0 ? 'partial' : reason === 'timeout' ? 'timeout' : 'skipped';
+    return r;
+  }
+  /** Testi yarıda bitirir: hiç denenmemiş sorular "cevaplanmadı" olur */
+  abort() {
+    this.aborted = true;
+    for (const r of this.results) if (r.status === 'pending') r.status = 'unanswered';
+  }
+  get attempted() { return this.results.filter((r) => r.status !== 'pending' && r.status !== 'unanswered'); }
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// ANALİTİK — teşhis ekranının tüm hesapları (düzenlenebilir tek fonksiyon)
+//  • Puan: soru kredisi (kısmi puan seçeneğiyle) × tip ağırlığı, 0–100
+//  • Zorlanma (0–1): başarısızlık, süre, tekrar ve sapma bileşenlerinin ağırlıklı ortalaması
+//  • Eğilim: hedefe ±BIAS_WINDOW içindeki karelerin işaretli ortalaması (+ tiz / − pes)
+// ───────────────────────────────────────────────────────────────────────
+const TENDENCY_LABEL = { sharp: 'Tiz', flat: 'Pes', balanced: 'Dengeli', unknown: 'Belirsiz' };
+
+function tendencyOf(bias, A = CONFIG.ANALYSIS) {
+  if (bias == null || !Number.isFinite(bias)) return 'unknown';
+  if (Math.abs(bias) < A.BIAS_NEUTRAL_CENTS) return 'balanced';
+  return bias > 0 ? 'sharp' : 'flat';
+}
+
+function computeDiagnostics(results, cfg = CONFIG) {
+  const A = cfg.ANALYSIS, SC = cfg.SCORING;
+  const pool = (list) => list.reduce((acc, s) => {
+    acc.n += s.n; acc.sum += s.sum; acc.sumAbs += s.sumAbs || 0; return acc;
+  }, { n: 0, sum: 0, sumAbs: 0 });
+
+  // 1) Puan
+  const credits = results.map((r) => {
+    const total = r.noteResults.length;
+    const ok = r.noteResults.filter((n) => n.verified).length;
+    const base = SC.PARTIAL_CREDIT ? ok / total : (ok === total ? 1 : 0);
+    return Math.max(0, base - (SC.REPLAY_PENALTY || 0) * r.replays);
+  });
+  let wSum = 0, sSum = 0;
+  results.forEach((r, i) => { const w = Math.max(0, SC.TYPE_WEIGHTS?.[r.kind] ?? 1); wSum += w; sSum += w * credits[i]; });
+  const score = wSum > 0 ? Math.round((1000 * sSum) / wSum) / 10 : 0;
+
+  // 2) Soru tipine göre
+  const byType = {};
+  for (const kind of KINDS) {
+    const idx = results.map((r, i) => (r.kind === kind ? i : -1)).filter((i) => i >= 0);
+    if (!idx.length) continue;
+    const rs = idx.map((i) => results[i]);
+    const notes = rs.flatMap((r) => r.noteResults);
+    const verified = notes.filter((n) => n.verified);
+    const accuracy = notes.length ? verified.length / notes.length : 0;
+    const meanTimeMs = verified.length ? verified.reduce((s, n) => s + n.timeMs, 0) / verified.length : null;
+    const replaysPerQuestion = rs.reduce((s, r) => s + r.replays, 0) / rs.length;
+    const near = pool(notes.map((n) => n.near));
+    const biasCents = near.n >= A.MIN_FRAMES ? near.sum / near.n : null;
+    const meanAbsCents = near.n >= A.MIN_FRAMES ? near.sumAbs / near.n : null;
+    const components = {
+      failure: 1 - accuracy,
+      time: meanTimeMs == null ? 1 : clamp(meanTimeMs / A.TIME_REF_MS, 0, 1),
+      replays: clamp(replaysPerQuestion / A.REPLAY_REF, 0, 1),
+      deviation: meanAbsCents == null ? 1 : clamp(meanAbsCents / A.DEVIATION_REF_CENTS, 0, 1),
+    };
+    let wt = 0, acc = 0;
+    for (const [k, v] of Object.entries(components)) { const w = Math.max(0, A.DIFFICULTY_WEIGHTS?.[k] ?? 0); wt += w; acc += w * v; }
+    byType[kind] = {
+      kind, questions: rs.length, notes: notes.length, verified: verified.length,
+      accuracy, meanTimeMs, replaysPerQuestion, biasCents, meanAbsCents, frames: near.n,
+      difficulty: wt > 0 ? acc / wt : 0, components,
+      score: Math.round((1000 * idx.reduce((s, i) => s + credits[i], 0)) / idx.length) / 10,
+    };
+  }
+
+  // 3) Genel eğilim ve ses konumuna göre (kök / 3. ses / 5. ses / üst ses)
+  const allNear = pool(results.flatMap((r) => r.noteResults.map((n) => n.near)));
+  const overallBias = allNear.n >= A.MIN_FRAMES ? allNear.sum / allNear.n : null;
+  const roleMap = {};
+  results.forEach((r) => r.noteResults.forEach((n, i) => {
+    const role = r.notes[i]?.role ?? '?';
+    (roleMap[role] ||= []).push(n.near);
+  }));
+  const byRole = {};
+  for (const [role, list] of Object.entries(roleMap)) {
+    const p = pool(list);
+    byRole[role] = { frames: p.n, biasCents: p.n >= A.MIN_FRAMES ? p.sum / p.n : null };
+  }
+
+  // 4) En çok zorlanılan tip
+  const ranked = Object.values(byType).sort((a, b) => b.difficulty - a.difficulty);
+  const allNotes = results.flatMap((r) => r.noteResults);
+  const diag = {
+    score, byType, byRole,
+    overall: {
+      biasCents: overallBias, tendency: tendencyOf(overallBias, A), frames: allNear.n,
+      meanAbsCents: allNear.n >= A.MIN_FRAMES ? allNear.sumAbs / allNear.n : null,
+    },
+    hardest: ranked.length ? ranked[0].kind : null,
+    ranked: ranked.map((t) => t.kind),
+    totals: {
+      questions: results.length,
+      full: results.filter((r) => r.status === 'done').length,
+      partial: results.filter((r) => r.status === 'partial').length,
+      failed: results.filter((r) => r.status === 'skipped' || r.status === 'timeout').length,
+      notes: allNotes.length,
+      verified: allNotes.filter((n) => n.verified).length,
+    },
+  };
+  diag.messages = buildAdvice(diag, cfg);
+  return diag;
+}
+
+/** Teşhis ekranındaki yorum cümleleri */
+function buildAdvice(d, cfg = CONFIG) {
+  const A = cfg.ANALYSIS, out = [], t = d.totals;
+  const typeCount = Object.keys(d.byType).length;
+  out.push(`Tam doğrulanan soru: ${t.full} / ${t.questions}${t.partial ? ` · kısmi: ${t.partial}` : ''}${t.failed ? ` · geçilen: ${t.failed}` : ''}. Doğrulanan ses: ${t.verified} / ${t.notes}.`);
+
+  const h = d.hardest ? d.byType[d.hardest] : null;
+  if (h && typeCount > 1 && h.difficulty >= A.NOTABLE_DIFFICULTY) {
+    out.push(`En çok zorlandığınız tip: ${KIND_LABEL[h.kind]} (${KIND_DETAIL[h.kind]}). Seslerin %${NF0.format(h.accuracy * 100)} kadarı doğrulandı${h.meanTimeMs != null ? `; doğrulanan ses başına ortalama ${fmtSeconds(h.meanTimeMs)} sn sürdü` : ''}.`);
+  } else if (h && typeCount > 1) {
+    out.push('Soru tipleri arasında belirgin bir zorlanma farkı yok.');
+  }
+
+  const o = d.overall;
+  if (o.tendency === 'sharp') {
+    out.push(`Genel eğilim tiz: hedefe yakın söylediğiniz anlarda ortalama ${fmtSigned(o.biasCents, 1)} sent yukarıdasınız. Tizleşme sık sık fazla nefes basıncı ya da gerginlikle ilişkilidir; sesi daha rahat, bastırmadan verin.`);
+  } else if (o.tendency === 'flat') {
+    out.push(`Genel eğilim pes: hedefe yakın söylediğiniz anlarda ortalama ${fmtSigned(o.biasCents, 1)} sent aşağıdasınız. Pes kalma sık sık sesin sonuna doğru düşen nefes desteğiyle ilişkilidir; desteği tutma süresi boyunca koruyun.`);
+  } else if (o.tendency === 'balanced') {
+    out.push(`Belirgin bir tiz/pes eğilimi yok: ortalama sapma ${fmtSigned(o.biasCents, 1)} sent (±${A.BIAS_NEUTRAL_CENTS} sent içinde).`);
+  } else {
+    out.push('Tiz/pes eğilimini yorumlamak için yeterli ses verisi toplanamadı.');
+  }
+
+  for (const kind of KINDS) {                                   // tipe göre ters / belirgin eğilim
+    const bt = d.byType[kind];
+    if (!bt || bt.biasCents == null) continue;
+    const tk = tendencyOf(bt.biasCents, A);
+    if (typeCount > 1 && tk !== 'balanced' && tk !== o.tendency && Math.abs(bt.biasCents) >= A.BIAS_NEUTRAL_CENTS * 1.5) {
+      out.push(`${KIND_LABEL[kind]} sorularında eğilim farklı: ${fmtSigned(bt.biasCents, 1)} sent (${TENDENCY_LABEL[tk].toLocaleLowerCase('tr')}).`);
+    }
+  }
+
+  // Ses konumu (kök / 3'lü / 5'li / üst ses) genel ortalamadan belirgin ayrışıyorsa söyle
+  const roles = Object.entries(d.byRole)
+    .filter(([, r]) => r.biasCents != null && o.biasCents != null
+      && Math.abs(r.biasCents) >= A.BIAS_NEUTRAL_CENTS && Math.abs(r.biasCents - o.biasCents) >= A.BIAS_NEUTRAL_CENTS)
+    .sort((a, b) => Math.abs(b[1].biasCents - o.biasCents) - Math.abs(a[1].biasCents - o.biasCents));
+  if (roles.length && Object.keys(d.byRole).length > 1) {
+    const [role, r] = roles[0];
+    out.push(`"${role}" konumundaki sesler genel ortalamadan ayrışıyor: ortalama ${fmtSigned(r.biasCents, 1)} sent (${r.biasCents > 0 ? 'tiz' : 'pes'}).`);
+  }
+
+  const rep = KINDS.map((k) => d.byType[k]).filter((bt) => bt && bt.replaysPerQuestion >= 1)
+    .sort((a, b) => b.replaysPerQuestion - a.replaysPerQuestion)[0];
+  if (rep) out.push(`${KIND_LABEL[rep.kind]} sorularında soru başına ortalama ${NF1.format(rep.replaysPerQuestion)} kez tekrar dinlediniz; sesleri tek dinleyişte belleğe almayı hedefleyin.`);
+  return out;
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// GEÇMİŞ KAYDI (localStorage'a yazılan özet) ve yapılandırma doğrulama
+// ───────────────────────────────────────────────────────────────────────
+const round1 = (v) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 10) / 10);
+const round3 = (v) => (v == null || !Number.isFinite(v) ? null : Math.round(v * 1000) / 1000);
+
+function makeHistoryEntry(session, diag, cfg = CONFIG) {
+  return {
+    v: 1,
+    id: `${session.startedAt}-${session.seed}`,
+    at: session.startedAt,
+    durationMs: Math.max(0, (session.finishedAt ?? session.startedAt) - session.startedAt),
+    seed: session.seed,
+    score: diag.score,
+    complete: !session.aborted,
+    answered: diag.totals.questions,
+    total: session.questions.length,
+    tendency: diag.overall.tendency,
+    biasCents: round1(diag.overall.biasCents),
+    hardest: diag.hardest,
+    byType: Object.fromEntries(Object.entries(diag.byType).map(([k, t]) => [k, {
+      accuracy: round3(t.accuracy), meanTimeMs: t.meanTimeMs == null ? null : Math.round(t.meanTimeMs),
+      biasCents: round1(t.biasCents), difficulty: round3(t.difficulty), score: t.score,
+    }])),
+    settings: {
+      tol: cfg.TOLERANCE_CENTS, sustainMs: cfg.SUSTAIN_TIME_MS, counts: { ...cfg.QUESTION_COUNTS },
+      algo: cfg.PITCH.ALGORITHM, a4: cfg.A4_HZ,
+    },
+  };
+}
+function normalizeHistory(raw, max = CONFIG.HISTORY.MAX_ENTRIES) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter((e) => isPlainObject(e) && Number.isFinite(e.score) && Number.isFinite(e.at)).slice(-max);
+}
+
+/** Piyano örnek haritası: register ±3 yarım ses içindeki her SAMPLE_EVERY'inci nota (C, D♯, F♯, A) */
+function pianoSampleMap(reg, every = 3, pattern = '{name}.mp3') {
+  const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const lo = Math.max(21, reg.minMidi - 3), hi = Math.min(108, reg.maxMidi + 3);
+  const urls = {};
+  for (let m = lo; m <= hi; m++) {
+    if (m % every !== 0) continue;
+    const name = NAMES[m % 12] + (Math.floor(m / 12) - 1);
+    urls[name] = pattern.replace('{name}', name.replace('#', 's'));
+  }
+  return urls;
+}
+
+/** Birleştirilmiş yapılandırmayı denetler; hata listesi döner (boş = geçerli) */
+function validateConfig(cfg) {
+  const errs = [];
+  const num = (v, lo, hi, name) => {
+    if (typeof v !== 'number' || !Number.isFinite(v) || v < lo || v > hi) errs.push(`${name}: ${lo}–${hi} arasında olmalı`);
+  };
+  const oneOf = (v, list, name) => { if (!list.includes(v)) errs.push(`${name}: ${list.join(' | ')} olmalı`); };
+
+  num(cfg.TOLERANCE_CENTS, 1, 200, 'TOLERANCE_CENTS');
+  num(cfg.WARNING_CENTS, 1, 600, 'WARNING_CENTS');
+  if (cfg.WARNING_CENTS < cfg.TOLERANCE_CENTS) errs.push('WARNING_CENTS, TOLERANCE_CENTS değerinden küçük olamaz');
+  num(cfg.SUSTAIN_TIME_MS, 20, 10000, 'SUSTAIN_TIME_MS');
+  num(cfg.SUSTAIN_DROPOUT_GRACE_MS, 0, 1000, 'SUSTAIN_DROPOUT_GRACE_MS');
+  num(cfg.A4_HZ, 380, 480, 'A4_HZ');
+  for (const k of KINDS) num(cfg.QUESTION_COUNTS?.[k], 0, 100, `QUESTION_COUNTS.${k}`);
+  num(cfg.REGISTER?.minMidi, 21, 108, 'REGISTER.minMidi');
+  num(cfg.REGISTER?.maxMidi, 21, 108, 'REGISTER.maxMidi');
+  if (!(cfg.REGISTER?.maxMidi > cfg.REGISTER?.minMidi)) errs.push('REGISTER: üst sınır alt sınırdan büyük olmalı');
+  oneOf(cfg.OCTAVE_MODE, ['anchored', 'free', 'off'], 'OCTAVE_MODE');
+  oneOf(cfg.QUESTION_ORDER, ['grouped', 'shuffled'], 'QUESTION_ORDER');
+  oneOf(cfg.EXAM?.REVEAL_NOTE_NAMES, ['after', 'end', 'always', 'never'], 'EXAM.REVEAL_NOTE_NAMES');
+  num(cfg.EXAM?.QUESTION_TIME_LIMIT_S, 0, 3600, 'EXAM.QUESTION_TIME_LIMIT_S');
+  num(cfg.EXAM?.NEXT_QUESTION_DELAY_MS, 0, 20000, 'EXAM.NEXT_QUESTION_DELAY_MS');
+  oneOf(cfg.SPELLING?.SINGLE_NOTE_ACCIDENTALS, ['mixed', 'sharp', 'flat'], 'SPELLING.SINGLE_NOTE_ACCIDENTALS');
+  num(cfg.CHORD_RULES?.SET_SIZE, 1, 100, 'CHORD_RULES.SET_SIZE');
+  num(cfg.CHORD_RULES?.MAX_ALTERED_PER_SET, 0, 100, 'CHORD_RULES.MAX_ALTERED_PER_SET');
+  num(cfg.CHORD_RULES?.ALTERED_CHANCE, 0, 1, 'CHORD_RULES.ALTERED_CHANCE');
+  for (const id of Object.keys(cfg.CHORD_RULES?.MAIN_WEIGHTS || {})) {
+    if (TYPE_BY_ID[id]?.kind !== 'chord') errs.push(`CHORD_RULES.MAIN_WEIGHTS: bilinmeyen akor "${id}"`);
+  }
+  for (const id of cfg.CHORD_RULES?.ALTERED_TYPES || []) {
+    if (TYPE_BY_ID[id]?.kind !== 'chord') errs.push(`CHORD_RULES.ALTERED_TYPES: bilinmeyen akor "${id}"`);
+  }
+  for (const id of cfg.INTERVAL_RULES?.POOL || []) {
+    if (TYPE_BY_ID[id]?.kind !== 'interval') errs.push(`INTERVAL_RULES.POOL: bilinmeyen aralık "${id}"`);
+  }
+  num(cfg.SCORING?.REPLAY_PENALTY, 0, 1, 'SCORING.REPLAY_PENALTY');
+  oneOf(cfg.PITCH?.ALGORITHM, ['YIN', 'MPM'], 'PITCH.ALGORITHM');
+  if (!(cfg.PITCH?.FFT_SIZE === 'auto' || [1024, 2048, 4096, 8192, 16384].includes(cfg.PITCH?.FFT_SIZE))) {
+    errs.push('PITCH.FFT_SIZE: "auto" ya da 1024 / 2048 / 4096 / 8192 / 16384 olmalı');
+  }
+  num(cfg.PITCH?.YIN_THRESHOLD, 0.01, 0.9, 'PITCH.YIN_THRESHOLD');
+  num(cfg.PITCH?.YIN_ADAPTIVE_K, 0, 0.99, 'PITCH.YIN_ADAPTIVE_K');
+  num(cfg.PITCH?.MIN_CLARITY, 0, 1, 'PITCH.MIN_CLARITY');
+  num(cfg.PITCH?.MEDIAN_FRAMES, 1, 15, 'PITCH.MEDIAN_FRAMES');
+  num(cfg.PITCH?.MIN_FREQ, 20, 500, 'PITCH.MIN_FREQ');
+  num(cfg.PITCH?.MAX_FREQ, 200, 4000, 'PITCH.MAX_FREQ');
+  if (!(cfg.PITCH?.MAX_FREQ > cfg.PITCH?.MIN_FREQ)) errs.push('PITCH: MAX_FREQ, MIN_FREQ değerinden büyük olmalı');
+  num(cfg.PITCH?.NOISE_GATE_DB, -100, 0, 'PITCH.NOISE_GATE_DB');
+  oneOf(cfg.AUDIO?.INSTRUMENT, ['piano', 'synth'], 'AUDIO.INSTRUMENT');
+  num(cfg.AUDIO?.CHORD_DURATION_S, 0.2, 10, 'AUDIO.CHORD_DURATION_S');
+  num(cfg.AUDIO?.PIANO?.SAMPLE_EVERY, 1, 12, 'AUDIO.PIANO.SAMPLE_EVERY');
+  num(cfg.UI?.CONTOUR_SECONDS, 1, 30, 'UI.CONTOUR_SECONDS');
+  num(cfg.UI?.CONTOUR_RANGE_CENTS, 20, 1200, 'UI.CONTOUR_RANGE_CENTS');
+  num(cfg.HISTORY?.MAX_ENTRIES, 1, 1000, 'HISTORY.MAX_ENTRIES');
+  // Uygulanabilirlik: bu ayarlarla bir oturum gerçekten üretilebiliyor mu? (dar register vb. burada yakalanır)
+  if (!errs.length) {
+    try { generateSession(cfg, mulberry32(1)); }
+    catch (err) { errs.push(err.message); }
+  }
+  return errs;
+}
+
+/* <<< PURE:END */
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 2) KÜTÜPHANE YÜKLEYİCİ — klasik <script> (UMD global) ve ES modülü (CDN, sırayla)
+// ───────────────────────────────────────────────────────────────────────
+const libCache = new Map();
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+function injectScript(url, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const s = document.createElement('script');
+    const done = (fn, arg) => { clearTimeout(t); s.onload = s.onerror = null; fn(arg); };
+    const t = setTimeout(() => { s.remove(); done(reject, new Error(`zaman aşımı: ${url}`)); }, timeoutMs);
+    s.src = url;
+    s.async = true;
+    s.onload = () => done(resolve);
+    s.onerror = () => { s.remove(); done(reject, new Error(`yüklenemedi: ${url}`)); };
+    document.head.append(s);
+  });
+}
+
+/** UMD betiğini (Tone.js, VexFlow) yükler; getGlobal() hazır nesneyi döndürene kadar adresleri sırayla dener */
+function loadScriptGlobal(urls, getGlobal, name) {
+  const ready = getGlobal();
+  if (ready) return Promise.resolve(ready);
+  if (!libCache.has(name)) {
+    const p = (async () => {
+      let lastErr = null;
+      for (const url of urls) {
+        try {
+          await injectScript(url, CONFIG.LIBS.TIMEOUT_MS);
+          const g = getGlobal();
+          if (g) return g;
+          lastErr = new Error(`${name} yüklendi ama beklenen nesne bulunamadı (${url})`);
+        } catch (err) {
+          lastErr = err;
+          console.warn(`[${name}]`, err.message);
+        }
+      }
+      throw Object.assign(new Error(`${name} yüklenemedi`), { code: 'LIB_LOAD', lib: name, cause: lastErr });
+    })();
+    libCache.set(name, p);
+    p.catch(() => libCache.delete(name));            // başarısızlıkta yeniden denemeye izin ver
+  }
+  return libCache.get(name);
+}
+
+// pitchy (yalnızca PITCH.ALGORITHM = 'MPM' iken). Not: pitchy McLeod Pitch Method (MPM) uygular, YIN değil.
+let pitchyPromise = null;
+function loadPitchy() {
+  if (!pitchyPromise) {
+    pitchyPromise = (async () => {
+      for (const url of CONFIG.LIBS.PITCHY) {
+        try {
+          const mod = await Promise.race([import(url), sleep(CONFIG.LIBS.TIMEOUT_MS).then(() => { throw new Error('zaman aşımı'); })]);
+          if (mod.PitchDetector) return mod;
+        } catch (err) {
+          console.warn('[pitchy] yüklenemedi:', url, err);
+        }
+      }
+      throw Object.assign(new Error('pitchy yüklenemedi'), { code: 'PITCHY_LOAD' });
+    })().catch((err) => { pitchyPromise = null; throw err; });
+  }
+  return pitchyPromise;
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 3) SES MOTORU — tek AudioContext · Tone.js piyano · yedek sentez
+// ───────────────────────────────────────────────────────────────────────
+let audioCtx = null;                    // tek AudioContext: piyano, sentez ve mikrofon analizi aynı saatte
+let masterGain = null;
+let voiceWave = null;
+const activeVoices = new Set();         // susturma için çalan sentez sesleri
+const piano = { state: 'off', sampler: null, promise: null, error: null };   // off · loading · ready · failed
+let toneContextSet = false;
+
+function createVoiceWave(ctx) {
+  // Yedek tını: sinüs temel + hızla sönen birkaç harmonik (yumuşak, net bir referans)
+  const amps = [1, 0.30, 0.10, 0.04, 0.015];
+  const real = new Float32Array(amps.length + 1);
+  const imag = new Float32Array(amps.length + 1);
+  amps.forEach((a, i) => { imag[i + 1] = a; });
+  return ctx.createPeriodicWave(real, imag);
+}
+
+/**
+ * AudioContext'i oluşturur. Sayfa açılışında çağrılır (tarayıcı "askıda" başlatır, piyano örnekleri
+ * bu sırada çözülür); ilk tıklamada ensureAudio() ile başlatılır.
+ */
+function createAudioContext() {
+  if (audioCtx) return audioCtx;
+  const Ctx = window.AudioContext || window.webkitAudioContext;
+  if (!Ctx) throw Object.assign(new Error('Web Audio API yok'), { code: 'NO_WEBAUDIO' });
+  audioCtx = new Ctx({ latencyHint: 'interactive' });
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = CONFIG.AUDIO.MASTER_GAIN;
+  masterGain.connect(audioCtx.destination);
+  voiceWave = createVoiceWave(audioCtx);
+  return audioCtx;
+}
+
+async function ensureAudio() {
+  createAudioContext();
+  if (audioCtx.state !== 'running') await audioCtx.resume();   // kullanıcı jesti içinde çağrılır
+}
+
+/** Tone.js + Salamander piyano örneklerini hazırlar. Başarısızlıkta false döner (yedek sentez kullanılır). */
+function preparePiano() {
+  if (CONFIG.AUDIO.INSTRUMENT !== 'piano') return Promise.resolve(false);
+  if (piano.promise) return piano.promise;
+  const P = CONFIG.AUDIO.PIANO;
+  piano.state = 'loading';
+  piano.error = null;
+  renderEngineChip();
+  piano.promise = (async () => {
+    window.TONE_SILENCE_LOGGING = true;
+    const Tone = await loadScriptGlobal(CONFIG.LIBS.TONE, () => (window.Tone?.Sampler ? window.Tone : null), 'Tone.js');
+    createAudioContext();
+    if (!toneContextSet) { Tone.setContext(audioCtx); toneContextSet = true; }   // Tone aynı AudioContext'i kullanır
+    const urls = pianoSampleMap(CONFIG.REGISTER, P.SAMPLE_EVERY, P.FILE_PATTERN);
+    const sampler = await new Promise((resolve, reject) => {
+      let s = null;
+      const timer = setTimeout(() => reject(new Error('piyano örnekleri zaman aşımına uğradı')), P.LOAD_TIMEOUT_MS);
+      s = new Tone.Sampler({
+        urls,
+        baseUrl: P.BASE_URL,
+        release: P.RELEASE_S,
+        onload: () => { clearTimeout(timer); setTimeout(() => resolve(s), 0); },
+        onerror: (e) => { clearTimeout(timer); reject(e instanceof Error ? e : new Error(String(e))); },
+      });
+      s.toDestination();
+      s.volume.value = P.VOLUME_DB;
+    });
+    piano.sampler = sampler;
+    piano.state = 'ready';
+    renderEngineChip();
+    return true;
+  })().catch((err) => {
+    console.warn('[piyano] kullanılamıyor, dahili sentez kullanılacak:', err);
+    piano.state = 'failed';
+    piano.error = err;
+    renderEngineChip();
+    showNotice('Piyano örnekleri yüklenemedi (internet / CDN); dahili sentez sesi kullanılıyor.');
+    return false;
+  });
+  return piano.promise;
+}
+
+function resetPiano() {
+  try { piano.sampler?.dispose?.(); } catch { /* yoksay */ }
+  Object.assign(piano, { state: 'off', sampler: null, promise: null, error: null });
+}
+
+/** Yedek sentez: tek ses, ADSR benzeri zarf (AudioParam zamanlaması, örnek-hassasiyetinde) */
+function playVoice(freq, when, holdSec, peak) {
+  const osc = audioCtx.createOscillator();
+  const env = audioCtx.createGain();
+  osc.setPeriodicWave(voiceWave);
+  osc.frequency.value = freq;
+
+  const attack = 0.03, decayTau = 0.35, sustain = 0.72, tau = CONFIG.AUDIO.SYNTH_RELEASE_TAU;
+  const releaseAt = when + holdSec;
+  env.gain.value = 0;
+  env.gain.setValueAtTime(0, when);
+  env.gain.linearRampToValueAtTime(peak, when + attack);             // atak (tıkırtısız)
+  env.gain.setTargetAtTime(peak * sustain, when + attack, decayTau);   // yumuşak sönüm
+  env.gain.setTargetAtTime(0, releaseAt, tau);                         // bırakma
+
+  osc.connect(env).connect(masterGain);
+  osc.start(when);
+  osc.stop(releaseAt + tau * 8);
+
+  const voice = { osc, env };
+  activeVoices.add(voice);
+  osc.onended = () => { osc.disconnect(); env.disconnect(); activeVoices.delete(voice); };
+}
+
+/** Sesleri AYNI ANDA (armonik) çalar: piyano hazırsa piyano, değilse yedek sentez */
+function playHarmonic(notes, durationSec, when) {
+  if (!notes.length) return 'none';
+  if (CONFIG.AUDIO.INSTRUMENT === 'piano' && piano.state === 'ready') {
+    try {
+      piano.sampler.triggerAttackRelease(notes.map((n) => n.freq), durationSec, when, CONFIG.AUDIO.PIANO.VELOCITY);
+      return 'piano';
+    } catch (err) {
+      console.warn('[piyano] çalınamadı → sentez', err);
+    }
+  }
+  const peak = 0.6 / Math.sqrt(notes.length);                        // ses sayısına göre seviye → kırpılma yok
+  for (const n of notes) playVoice(n.freq, when, durationSec, peak);
+  return 'synth';
+}
+
+/** Serbest çalışmada tamamlanma ödülü: kısa arpej + son akor */
+function playReward(notes) {
+  const t0 = audioCtx.currentTime + 0.1, step = 0.16;
+  notes.forEach((n, i) => playHarmonic([n], 0.28, t0 + i * step));
+  playHarmonic(notes, 1.4, t0 + notes.length * step + 0.05);
+}
+
+function stopAllVoices() {
+  if (!audioCtx) return;
+  const now = audioCtx.currentTime;
+  for (const { osc, env } of activeVoices) {
+    try {
+      env.gain.cancelScheduledValues(now);
+      env.gain.setTargetAtTime(0, now, 0.015);
+      osc.stop(now + 0.12);
+    } catch { /* zaten durmuş olabilir */ }
+  }
+}
+function stopAllSound() {
+  stopAllVoices();
+  try { piano.sampler?.releaseAll?.(); } catch { /* yoksay */ }
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 4) MİKROFON & PERDE ALGILAMA
+// ───────────────────────────────────────────────────────────────────────
+const settings = { fold: true, rmsDb: CONFIG.PITCH.NOISE_GATE_DB, deviceId: null };
+let rmsLinear = dbToLin(settings.rmsDb);
+
+let micStream = null, micSource = null, analyser = null;
+let detector = null, detectorKey = '';
+let timeBuf = new Float32Array(2048);
+let medianFilter = new MedianFilter(CONFIG.PITCH.MEDIAN_FRAMES);
+
+/** Analiz penceresi: 'auto' → 48 kHz'de 2048 örnek (≈ 43 ms); 96 kHz'de 4096 (aynı süre) */
+function analysisSize(sampleRate) {
+  const c = CONFIG.PITCH.FFT_SIZE;
+  return c === 'auto' ? 2048 * Math.max(1, Math.round(sampleRate / 48000)) : c;
+}
+
+/** Algılayıcıyı gerçek çıktısıyla sınar: 220 Hz temiz sinüs → ≈ 220 Hz ve yüksek netlik beklenir */
+function probeDetector(det, sampleRate) {
+  const probe = new Float32Array(det.size);
+  for (let i = 0; i < probe.length; i++) probe[i] = 0.5 * Math.sin((2 * Math.PI * 220 * i) / sampleRate);
+  const [pitch, clarity] = det.findPitch(probe, sampleRate);
+  if (!(Math.abs(pitch - 220) < 2.2 && clarity > 0.9)) throw new Error(`beklenmeyen çıktı: ${pitch} Hz / netlik ${clarity}`);
+  return det;
+}
+
+/** YIN; 88,2/96 kHz gibi yüksek örnekleme hızlarında 48 kHz eşdeğerine indirgenir (CPU yükü sabit kalır) */
+function createYinDetector(size, sampleRate) {
+  const factor = Math.max(1, Math.round(sampleRate / 48000));
+  const n = Math.floor(size / factor);
+  const P = CONFIG.PITCH;
+  const yin = new YinDetector(n, { threshold: P.YIN_THRESHOLD, adaptiveK: P.YIN_ADAPTIVE_K, minFreq: P.MIN_FREQ, maxFreq: P.MAX_FREQ });
+  const tmp = factor > 1 ? new Float32Array(n) : null;
+  return probeDetector({
+    name: 'YIN',
+    size,
+    findPitch(buf, sr) {
+      if (!tmp) return yin.findPitch(buf, sr);
+      for (let i = 0; i < n; i++) {
+        let s = 0;
+        for (let k = 0; k < factor; k++) s += buf[i * factor + k];
+        tmp[i] = s / factor;
+      }
+      return yin.findPitch(tmp, sr / factor);
+    },
+  }, sampleRate);
+}
+
+function createMpmDetector(pitchy, size, sampleRate) {
+  try {
+    const det = pitchy.PitchDetector.forFloat32Array(size);
+    return probeDetector({ name: 'MPM', size, findPitch: (buf, sr) => det.findPitch(buf, sr) }, sampleRate);
+  } catch (err) {
+    throw Object.assign(new Error(`pitchy uyumsuz: ${err?.message || err}`), { code: 'PITCHY_API' });
+  }
+}
+
+/** CONFIG.PITCH'e göre algılayıcıyı (yeniden) kurar. MPM yüklenemezse YIN'e düşer. */
+async function setupDetector() {
+  const sr = audioCtx.sampleRate, size = analysisSize(sr), P = CONFIG.PITCH;
+  const key = [P.ALGORITHM, size, P.YIN_THRESHOLD, P.YIN_ADAPTIVE_K, P.MIN_FREQ, P.MAX_FREQ].join('|');
+  if (detector && key === detectorKey) return detector;
+  let det = null;
+  if (P.ALGORITHM === 'MPM') {
+    try { det = createMpmDetector(await loadPitchy(), size, sr); }
+    catch (err) {
+      console.warn('[MPM] kullanılamıyor, YIN ile devam ediliyor:', err);
+      showNotice('pitchy (MPM) yüklenemedi; dahili YIN algılayıcı kullanılıyor.');
+    }
+  }
+  if (!det) det = createYinDetector(size, sr);
+  detector = det;
+  detectorKey = key;
+  if (timeBuf.length !== size) timeBuf = new Float32Array(size);
+  if (analyser && analyser.fftSize !== size) analyser.fftSize = size;
+  medianFilter = new MedianFilter(P.MEDIAN_FRAMES);
+  renderDetectorChip();
+  return det;
+}
+
+async function startMic(deviceId) {
+  if (!navigator.mediaDevices?.getUserMedia) {
+    throw Object.assign(new Error('getUserMedia yok'), { code: 'INSECURE' });
+  }
+  stopMic();
+
+  const audio = {
+    echoCancellation: false,    // tarayıcının "ses iyileştirmeleri" perdeyi bozar ve gecikme ekler
+    noiseSuppression: false,
+    autoGainControl: false,
+    channelCount: 1,
+    latency: { ideal: 0 },      // mümkün olan en küçük giriş tamponu (ipucu)
+  };
+  if (deviceId) audio.deviceId = { exact: deviceId };
+
+  let stream;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio });
+  } catch (err) {
+    if (err.name === 'OverconstrainedError' && deviceId) {          // seçili cihaz artık yok → varsayılana dön
+      settings.deviceId = null;
+      return startMic(null);
+    }
+    throw err;
+  }
+
+  const track = stream.getAudioTracks()[0];
+  track?.addEventListener('ended', onMicLost);
+  micStream = stream;
+  micSource = audioCtx.createMediaStreamSource(stream);
+  analyser = audioCtx.createAnalyser();
+  analyser.fftSize = analysisSize(audioCtx.sampleRate);
+  analyser.smoothingTimeConstant = 0;
+  micSource.connect(analyser);                                       // hoparlöre BAĞLANMAZ → geri besleme yok
+
+  setMicChip(true, 'Mikrofon açık');
+  if (track) updateLatencyChip(track);
+  refreshDevices();
+  if (!rafId) rafId = requestAnimationFrame(frame);
+}
+
+function stopMic() {
+  if (micStream) micStream.getTracks().forEach((t) => { t.onended = null; t.stop(); });
+  if (micSource) micSource.disconnect();
+  micStream = null; micSource = null; analyser = null;
+  setMicChip(false, 'Mikrofon kapalı');
+}
+
+async function ensureMic() {
+  if (analyser && micStream?.active) return;
+  await startMic(settings.deviceId);
+}
+
+function onMicLost() {
+  stopMic();
+  setMicChip(false, 'Giriş koptu');
+  hardReset();
+  showAlert('Ses girişi kesildi (cihaz çıkarılmış olabilir). Girişi kontrol edip yeniden başlayın.');
+}
+
+async function refreshDevices() {
+  if (!navigator.mediaDevices?.enumerateDevices) return;
+  const list = (await navigator.mediaDevices.enumerateDevices()).filter((d) => d.kind === 'audioinput');
+  ui.device.replaceChildren();
+  list.forEach((d, i) => ui.device.add(new Option(d.label || `Giriş ${i + 1}`, d.deviceId)));
+  const current = micStream?.getAudioTracks()[0]?.getSettings().deviceId;
+  if (current && [...ui.device.options].some((o) => o.value === current)) ui.device.value = current;
+  ui.device.disabled = list.length === 0 || examActive();      // sınav sürerken giriş değiştirilemez
+}
+
+function explainError(err) {
+  if (err?.code === 'PITCHY_LOAD') return 'Perde algılama kütüphanesi (pitchy) yüklenemedi. İnternet bağlantınızı kontrol edin ya da Ayarlar\'dan YIN\'i seçin.';
+  if (err?.code === 'PITCHY_API')  return 'pitchy beklenen biçimde çalışmadı (sürüm / API uyumsuzluğu olabilir). Ayrıntı için tarayıcı konsoluna bakın.';
+  if (err?.code === 'NO_WEBAUDIO') return 'Bu tarayıcı Web Audio API desteklemiyor.';
+  if (err?.code === 'INSECURE' || err?.name === 'SecurityError') return 'Mikrofon için sayfa https veya http://localhost üzerinden açılmalıdır.';
+  switch (err?.name) {
+    case 'NotAllowedError':  return 'Mikrofon izni verilmedi. Adres çubuğundaki izin simgesinden mikrofona izin verip tekrar deneyin.';
+    case 'NotFoundError':    return 'Ses girişi bulunamadı. Ses kartınızın bağlı ve işletim sisteminde etkin olduğundan emin olun.';
+    case 'NotReadableError': return 'Ses girişi açılamadı; başka bir uygulama (ör. ASIO/özel mod) kullanıyor olabilir.';
+    default:                 return `Beklenmeyen hata: ${err?.message || err}`;
+  }
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 5) ARAYÜZ
+// ───────────────────────────────────────────────────────────────────────
+const $ = (id) => document.getElementById(id);
+const ui = {
+  sub: $('subLine'), micChip: $('micChip'), micChipText: $('micChipText'), engineChip: $('engineChip'), engineChipText: $('engineChipText'),
+  detChip: $('detChip'), latChip: $('latChip'), cfgChip: $('cfgChip'), alert: $('alert'), notice: $('notice'),
+  tabExam: $('tabExam'), tabPractice: $('tabPractice'), examControls: $('examControls'), practiceControls: $('practiceControls'),
+  examInfo: $('examInfo'), startBtn: $('startBtn'), examReplay: $('examReplayBtn'), skipBtn: $('skipBtn'), endBtn: $('endBtn'),
+  root: $('rootSelect'), octave: $('octaveSelect'), type: $('typeSelect'), play: $('playBtn'), replay: $('replayBtn'), reset: $('resetBtn'),
+  device: $('deviceSelect'), fold: $('foldToggle'), foldHint: $('foldHint'), staffToggle: $('staffToggle'),
+  summaryPanel: $('summaryPanel'), sumMeta: $('sumMeta'), sumScore: $('sumScore'), sumScoreSub: $('sumScoreSub'), sumTendency: $('sumTendency'),
+  sumBiasMark: $('sumBiasMark'), sumBiasMin: $('sumBiasMin'), sumBiasMax: $('sumBiasMax'), sumHardest: $('sumHardest'), sumHardestWhy: $('sumHardestWhy'),
+  sumRows: $('sumRows'), sumRoles: $('sumRoles'), sumAdvice: $('sumAdvice'), sumNew: $('sumNewBtn'), sumClose: $('sumCloseBtn'),
+  exTitle: $('exTitle'), stateLabel: $('stateLabel'), progress: $('examProgress'), progressText: $('progressText'), progressTimer: $('progressTimer'),
+  segments: $('segments'), notes: $('notes'), status: $('statusLine'), hint: $('hintLine'),
+  staffPanel: $('staffPanel'), staff: $('staff'), staffMsg: $('staffMsg'),
+  tuner: $('tuner'), targetName: $('targetName'), targetFreq: $('targetFreq'), centsVal: $('centsVal'), zoneLabel: $('zoneLabel'),
+  heardFreq: $('heardFreq'), heardNote: $('heardNote'), gauge: $('gauge'), ticks: $('ticks'), needle: $('needle'),
+  sustainFill: $('sustainFill'), sustainText: $('sustainText'), contour: $('contour'), contourSpan: $('contourSpan'), contourTol: $('contourTol'),
+  levelFill: $('levelFill'), levelThr: $('levelThr'), thr: $('thrRange'), thrText: $('thrText'), clarityText: $('clarityText'),
+  historyEmpty: $('historyEmpty'), historyChart: $('historyChart'), historyList: $('historyList'), historyClear: $('historyClear'),
+  settingsPanel: $('settingsPanel'), presetSelect: $('presetSelect'), settingsForm: $('settingsForm'), applySettings: $('applySettings'),
+  resetSettings: $('resetSettings'), settingsMsg: $('settingsMsg'), jsonArea: $('jsonArea'), jsonApply: $('jsonApply'),
+  jsonExport: $('jsonExport'), jsonImportBtn: $('jsonImportBtn'), jsonImport: $('jsonImport'), jsonCopyAll: $('jsonCopyAll'),
+};
+
+const nf0 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+const nf2 = new Intl.NumberFormat('tr-TR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+const nfMax1 = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 1 });
+const dateFmt  = new Intl.DateTimeFormat('tr-TR', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' });
+const shortDay = new Intl.DateTimeFormat('tr-TR', { day: '2-digit', month: '2-digit' });
+const fmtCents = (c) => `${c < 0 ? MINUS : '+'}${nf0.format(Math.abs(c))} sent`;
+const fmtClock = (ms) => { const s = Math.max(0, Math.floor(ms / 1000)); return `${String(Math.floor(s / 60)).padStart(2, '0')}:${String(s % 60).padStart(2, '0')}`; };
+const fmtDuration = (ms) => { const s = Math.round(ms / 1000), m = Math.floor(s / 60); return m ? `${m} dk ${s % 60} sn` : `${s} sn`; };
+const prefersReducedMotion = () => window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+
+const STATE_TEXT  = { IDLE: 'Hazır', PLAYING: 'Çalıyor', LISTENING: 'Dinliyor', VERIFIED: 'Doğrulandı', COMPLETE: 'Soru bitti', SUMMARY: 'Test bitti' };
+const ZONE_TEXT   = { perfect: 'Tolerans içinde', ok: 'Sınırda', bad: 'Detone' };
+const STATUS_TEXT = { pending: 'sırada', current: 'şu an', done: 'tam', partial: 'kısmi', skipped: 'geçildi', timeout: 'süre doldu', unanswered: 'cevaplanmadı' };
+const HINTS = {
+  quiet:     'Ses algılanmıyor — biraz daha güçlü söyleyin ya da gürültü eşiğini düşürün.',
+  unclear:   'Perde net değil — vibratosuz, açık bir “na” ile söyleyin.',
+  hold:      'Tam yerinde — kaydırmadan sabit tutun.',
+  low:       'Biraz pes kalıyorsunuz — sesi hafifçe yükseltin.',
+  high:      'Biraz tiz kalıyorsunuz — sesi hafifçe alçaltın.',
+  octave:    'Oktav farkı — ilk sesi söylediğiniz oktavda kalın.',
+  octaveOff: 'Oktav farkı — sesi yazıldığı oktavda söyleyin (oktav toleransı kapalı).',
+  blind:     'Canlı geri bildirim kapalı (sınav provası): ses doğrulanınca kutu yeşile döner.',
+};
+
+const ICON_ATTR = 'viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"';
+const BADGE = {
+  locked: `<svg ${ICON_ATTR}><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg>`,
+  ready:  '',
+  active: `<svg ${ICON_ATTR}><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>`,
+  done:   `<svg ${ICON_ATTR}><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>`,
+  missed: `<svg ${ICON_ATTR}><path d="M7 7l10 10M17 7L7 17"/></svg>`,
+};
+
+function el(tag, cls, text) {
+  const node = document.createElement(tag);
+  if (cls) node.className = cls;
+  if (text !== undefined) node.textContent = text;
+  return node;
+}
+/** DOM yazımını azaltmak için: yalnızca metin değiştiyse yazar */
+function setText(node, text) {
+  if (node.__t !== text) { node.textContent = text; node.__t = text; }
+}
+
+// ── Durum ──
+let mode = 'exam';                      // 'exam' | 'practice'
+let session = null;                     // ExamSession (sınav modunda)
+let lastDiag = null;                    // son teşhis
+let exercise = new Exercise([]);
+let practiceTitle = '';
+const tracker = new SustainTracker(CONFIG);
+const fsm = createMachine(ALLOWED, S.IDLE, onStateChange);
+let noteEls = [];
+let starting = false;                   // başlat'a basıldı, mikrofon izni / yükleme bekleniyor
+let uiReady = false;
+
+// Akış jetonu: sıfırlama / yeni test sonrası eski zamanlayıcılar etkisiz kalır
+let flowToken = 0, flowTimer = 0;
+function after(ms, fn) {
+  clearTimeout(flowTimer);
+  const token = flowToken;
+  flowTimer = setTimeout(() => { if (token === flowToken) fn(); }, ms);
+}
+function cancelFlow() { flowToken++; clearTimeout(flowTimer); }
+
+const examActive = () => !!session && fsm.state !== S.IDLE && fsm.state !== S.SUMMARY;
+const gaugeRange = () => Math.max(CONFIG.UI.GAUGE_RANGE_CENTS, CONFIG.WARNING_CENTS + 5);
+const biasRange  = () => Math.max(30, Math.round(CONFIG.TOLERANCE_CENTS * 1.5));
+
+/** Nota adı görünür mü? (serbest çalışmada her zaman; sınavda REVEAL_NOTE_NAMES'e göre) */
+function isNoteRevealed(i) {
+  if (!session) return true;
+  const rv = CONFIG.EXAM.REVEAL_NOTE_NAMES;
+  if (rv === 'always') return true;
+  if (rv === 'never') return false;
+  const ended = session.result && session.result.status !== 'pending';
+  if (rv === 'end') return !!ended;
+  return !!exercise.verified[i] || !!ended;                           // 'after'
+}
+function answerVisible() {
+  if (!session) return true;
+  const rv = CONFIG.EXAM.REVEAL_NOTE_NAMES;
+  if (rv === 'never') return false;
+  if (rv === 'always') return true;
+  return !!(session.result && session.result.status !== 'pending');
+}
+
+// ── Seçim kutuları (serbest çalışma) ──
+function fillSelects() {
+  ROOTS.forEach((r, i) => ui.root.add(new Option(`${spell(r.letter, r.acc)} · ${solfege(r.letter, r.acc)}`, String(i))));
+  ui.root.value = '0';
+  [2, 3, 4, 5].forEach((o) => ui.octave.add(new Option(`Oktav ${o}`, String(o))));
+  ui.octave.value = '4';
+  let group = null, lastGroup = '';
+  for (const t of CHORD_TYPES) {
+    if (t.group !== lastGroup) {
+      group = document.createElement('optgroup');
+      group.label = t.group;
+      ui.type.append(group);
+      lastGroup = t.group;
+    }
+    group.append(new Option(t.label, t.id));
+  }
+  ui.type.value = 'major';
+}
+
+/** Kök / oktav / tip değişince: yeni egzersiz kur, her şeyi sıfırla */
+function selectionChanged() {
+  const root = ROOTS[+ui.root.value] ?? ROOTS[0];
+  const octave = +ui.octave.value || 4;
+  const type = TYPE_BY_ID[ui.type.value] ?? TYPE_BY_ID.major;
+  exercise = new Exercise(buildNotes(root, octave, type));
+  const rootName = spell(root.letter, root.acc);
+  practiceTitle = type.kind === 'chord' ? `${rootName} ${type.label}`
+    : type.kind === 'single' ? `${rootName}${octave}` : `${rootName} · ${type.label}`;
+  buildNoteBoxes();
+  hardReset();
+  savePrefs();
+}
+
+function updateFoldUi() {
+  ui.fold.checked = settings.fold;
+  ui.foldHint.textContent = !settings.fold
+    ? 'Kapalı: sesleri yazıldıkları oktavda söyleyin.'
+    : CONFIG.OCTAVE_MODE === 'anchored'
+      ? 'Açık: sesinize uygun oktavda söyleyin; ilk sesin oktavı soru boyunca korunur.'
+      : CONFIG.OCTAVE_MODE === 'free'
+        ? 'Açık: sesinize uygun oktavda söyleyin (oktav aralığında ilk sesin oktavı korunur).'
+        : 'Ayarlarda oktav modu "yok": mutlak oktav.';
+}
+
+function buildNoteBoxes() {
+  ui.notes.replaceChildren();
+  if (!exercise.notes.length) {
+    const msg = el('p', 'empty-notes', mode === 'exam' ? 'Soru başlayınca okunacak sesler burada görünür.' : 'Bir ses, aralık ya da akor seçin.');
+    ui.notes.append(msg);
+    noteEls = [];
+    return;
+  }
+  noteEls = exercise.notes.map((n, i) => {
+    const box = el('div', 'note');
+    box.setAttribute('role', 'listitem');
+    const name = el('span', 'name', n.name), sub = el('span', 'sub', ''), badge = el('span', 'badge');
+    box.append(el('span', 'step', `${i + 1} · ${n.role}`), name, sub, badge);
+    ui.notes.append(box);
+    return { box, name, sub, badge };
+  });
+}
+
+function noteState(i) {
+  if (exercise.verified[i]) return 'done';
+  const r = session?.result;
+  if (exercise.abandoned || (r && ['partial', 'skipped', 'timeout'].includes(r.status))) return 'missed';
+  if (i === exercise.index) return fsm.state === S.LISTENING ? 'active' : 'ready';
+  return 'locked';
+}
+
+// ── Durum değişiminde çizim (yalnızca geçişlerde; kare başına değil) ──
+function renderNotes() {
+  const st = fsm.state;
+  noteEls.forEach((ref, i) => {
+    const s = noteState(i), n = exercise.notes[i], rev = isNoteRevealed(i);
+    if (ref.box.dataset.state !== s) {
+      ref.box.dataset.state = s;
+      ref.badge.innerHTML = BADGE[s] ?? '';                                    // sabit, güvenli SVG dizeleri
+    }
+    setText(ref.name, rev ? n.name : '?');
+    ref.name.classList.toggle('hidden-name', !rev);
+    setText(ref.sub, rev ? `${n.solfege} · ${n.fullName} · ${nf1.format(n.freq)} Hz` : s === 'active' ? 'şimdi söyleyin' : 'dinleyip söyleyin');
+    ref.box.classList.toggle('flash', st === S.VERIFIED && i === exercise.index);
+  });
+}
+
+function renderExTitle() {
+  if (session && session.current) {
+    const q = session.current;
+    setText(ui.exTitle, `Soru ${session.index + 1}/${session.questions.length} · ${KIND_LABEL[q.kind]}${answerVisible() ? ` · ${q.title}` : ''}`);
+  } else setText(ui.exTitle, mode === 'practice' ? practiceTitle : '');
+}
+
+function renderStatus() {
+  const st = fsm.state, cur = exercise.current;
+  const sec = nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000);
+  let msg = '';
+  if (session && session.current) {
+    const q = session.current, N = session.questions.length, n = session.index + 1, res = session.result;
+    switch (st) {
+      case S.PLAYING:
+        msg = `Soru ${n}/${N} · ${KIND_LABEL[q.kind]}: ${q.notes.length > 1 ? 'sesler aynı anda çalınıyor' : 'ses çalınıyor'} — dikkatle dinleyin…`;
+        break;
+      case S.LISTENING: {
+        const rev = isNoteRevealed(exercise.index);
+        const who = q.notes.length === 1
+          ? (rev ? `${cur.name} (${cur.solfege})` : 'Sesi')
+          : rev ? `${cur.role}: ${cur.name} (${cur.solfege})` : `${exercise.index + 1}. ses (${cur.role.toLocaleLowerCase('tr')})`;
+        msg = q.notes.length > 1
+          ? `${who} — kökten başlayarak sırayla, “na” hecesiyle söyleyin ve ${sec} sn sabit tutun.`
+          : `${who} “na” hecesiyle söyleyin ve ${sec} sn sabit tutun.`;
+        break;
+      }
+      case S.VERIFIED:
+        msg = exercise.index + 1 < exercise.notes.length ? 'Doğrulandı ✓ — sıradaki sesin kilidi açılıyor…' : 'Doğrulandı ✓';
+        break;
+      case S.COMPLETE: {
+        const answer = answerVisible() ? q.title : '';
+        if (res.status === 'done') msg = `Soru tamamlandı ✓${answer ? ` · ${answer}` : ''}`;
+        else {
+          const what = res.endReason === 'timeout' ? 'Süre doldu' : res.status === 'partial' ? 'Soru kısmen tamamlandı' : 'Soru geçildi';
+          msg = `${what}${answer ? ` · doğru cevap: ${answer}` : ''}`;
+        }
+        if (!session.isLast) msg += ' — sıradaki soruya geçiliyor…';
+        break;
+      }
+      case S.SUMMARY: msg = 'Test bitti — teşhis ekranı yukarıda.'; break;
+      default: msg = '';
+    }
+  } else if (mode === 'exam') {
+    msg = starting ? 'Hazırlanıyor… (ilk kullanımda mikrofon izni istenir)'
+      : '“Teste Başla”ya basın. Her soruda sesler aynı anda çalınır; ardından kökten başlayarak “na” hecesiyle sırayla söylersiniz.';
+  } else {
+    switch (st) {
+      case S.IDLE:      msg = 'Bir ses, aralık ya da akor seçip ▶ düğmesine basın. İlk kullanımda mikrofon izni istenir.'; break;
+      case S.PLAYING:   msg = 'Çalıyor — kök sesten başlayarak sesleri ayırt etmeye çalışın…'; break;
+      case S.LISTENING: msg = `${cur.role}: ${cur.name} (${cur.solfege}) sesini “na” ile söyleyin ve yeşil bölgede ${sec} sn sabit tutun.`; break;
+      case S.VERIFIED:  msg = 'Doğrulandı ✓ — sıradaki sese geçiliyor…'; break;
+      default:          msg = 'Tebrikler! Tüm sesleri sırayla ve sabit biçimde okudunuz.';
+    }
+  }
+  setText(ui.status, msg);
+  setText(ui.stateLabel, STATE_TEXT[st]);
+  ui.stateLabel.dataset.s = st;
+}
+
+// ── Sınav ilerleme şeridi ──
+let segEls = [], segSession = null;
+function renderProgress() {
+  ui.progress.hidden = !session;
+  if (!session) { segSession = null; return; }
+  if (segSession !== session) {
+    segSession = session;
+    ui.segments.replaceChildren();
+    segEls = session.questions.map((q, i) => {
+      const s = el('span', 'seg');
+      if (i > 0 && session.questions[i - 1].kind !== q.kind) s.classList.add('gap');
+      s.setAttribute('role', 'listitem');
+      ui.segments.append(s);
+      return s;
+    });
+  }
+  const st = fsm.state;
+  session.results.forEach((r, i) => {
+    let s = r.status;
+    if (s === 'pending') s = i === session.index && st !== S.SUMMARY ? 'current' : 'pending';
+    if (segEls[i].dataset.s !== s) {
+      segEls[i].dataset.s = s;
+      const label = `Soru ${i + 1} · ${KIND_LABEL[session.questions[i].kind]} · ${STATUS_TEXT[s] ?? s}`;
+      segEls[i].title = label;
+      segEls[i].setAttribute('aria-label', label);
+    }
+  });
+  setText(ui.progressText, st === S.SUMMARY
+    ? `Test bitti · ${session.attempted.length}/${session.questions.length} soru cevaplandı`
+    : `Soru ${session.index + 1} / ${session.questions.length} · ${KIND_LABEL[session.current.kind]}`);
+  renderTimer();
+}
+function renderTimer() {
+  if (!session) return;
+  const limit = CONFIG.EXAM.QUESTION_TIME_LIMIT_S;
+  if (limit > 0 && fsm.state !== S.SUMMARY) {
+    const left = Math.max(0, limit - (session.result?.listenMs ?? 0) / 1000);
+    setText(ui.progressTimer, `kalan ${nf0.format(Math.ceil(left))} sn`);
+  } else {
+    setText(ui.progressTimer, fmtClock((session.finishedAt ?? Date.now()) - session.startedAt));
+  }
+}
+
+function renderAll() {
+  const st = fsm.state, active = examActive();
+  ui.tabExam.disabled = ui.tabPractice.disabled = active || starting;
+  ui.device.disabled = !micStream || !ui.device.options.length || active || starting;
+  // Sınav düğmeleri
+  ui.startBtn.disabled = starting || active;
+  setText(ui.startBtn, st === S.SUMMARY ? '▶ Yeni Test' : '▶ Teste Başla');
+  ui.examReplay.disabled = !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_REPLAY);
+  ui.skipBtn.disabled = !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_SKIP);
+  ui.endBtn.disabled = !active;
+  // Serbest çalışma düğmeleri
+  ui.play.disabled = starting || !!session || !(st === S.IDLE || st === S.COMPLETE) || !exercise.notes.length;
+  ui.replay.disabled = !!session || st !== S.LISTENING;
+  ui.reset.disabled = !!session || st === S.IDLE;
+  setText(ui.play, st === S.COMPLETE ? '▶ Baştan Başla' : '▶ Çal & Başla');
+  // Hedef göstergesi
+  const cur = exercise.current;
+  const showTarget = cur && (st === S.LISTENING || st === S.VERIFIED);
+  const rev = cur && isNoteRevealed(exercise.index);
+  setText(ui.targetName, showTarget ? (rev ? cur.name : `${exercise.index + 1}. ses`) : '—');
+  setText(ui.targetFreq, showTarget ? (rev ? `${cur.fullName} · ${nf1.format(cur.freq)} Hz` : `${cur.role} · gizli`) : '— Hz');
+
+  renderNotes();
+  renderExTitle();
+  renderStatus();
+  renderProgress();
+  scheduleStaffDraw();
+}
+
+function showAlert(msg) { ui.alert.textContent = msg; ui.alert.hidden = false; }
+function hideAlert()    { ui.alert.hidden = true; }
+let noticeTimer = 0;
+function showNotice(msg, ms = 12000) {
+  ui.notice.textContent = msg;
+  ui.notice.hidden = false;
+  clearTimeout(noticeTimer);
+  if (ms) noticeTimer = setTimeout(() => { ui.notice.hidden = true; }, ms);
+}
+
+function setMicChip(on, label) {
+  ui.micChip.classList.toggle('on', on);
+  setText(ui.micChipText, label);
+  if (!on) ui.latChip.hidden = true;
+}
+function updateLatencyChip(track) {
+  const parts = [`${+(audioCtx.sampleRate / 1000).toFixed(1)} kHz`];
+  const outMs = ((audioCtx.baseLatency || 0) + (audioCtx.outputLatency || 0)) * 1000;
+  if (outMs > 0) parts.push(`çıkış ≈${nf0.format(outMs)} ms`);
+  const inLat = track.getSettings?.().latency;
+  if (inLat > 0) parts.push(`giriş ≈${nf0.format(inLat * 1000)} ms`);
+  ui.latChip.textContent = parts.join(' · ');
+  ui.latChip.title = 'Tarayıcının bildirdiği gecikmeler (gerçek uçtan uca gecikme sürücüye/karta göre değişir)';
+  ui.latChip.hidden = false;
+}
+function renderEngineChip() {
+  if (!uiReady) return;
+  let txt, on = false, warn = false;
+  if (CONFIG.AUDIO.INSTRUMENT !== 'piano') { txt = 'Ses: sentez'; on = true; }
+  else if (piano.state === 'ready') { txt = 'Ses: piyano'; on = true; }
+  else if (piano.state === 'loading') txt = 'Piyano yükleniyor…';
+  else if (piano.state === 'failed') { txt = 'Piyano yok · sentez'; warn = true; }
+  else txt = 'Ses: piyano';
+  setText(ui.engineChipText, txt);
+  ui.engineChip.classList.toggle('on', on);
+  ui.engineChip.classList.toggle('warn', warn);
+  ui.engineChip.title = warn ? `Piyano örnekleri yüklenemedi: ${piano.error?.message || ''}` : 'Soruların çalındığı ses';
+}
+function renderDetectorChip() {
+  const name = detector?.name ?? CONFIG.PITCH.ALGORITHM;
+  setText(ui.detChip, `Algılama: ${name}`);
+  ui.detChip.title = name === 'YIN' ? 'YIN (de Cheveigné & Kawahara, 2002) — dahili' : 'MPM (McLeod Pitch Method) — pitchy';
+}
+function renderConfigChip() {
+  ui.cfgChip.hidden = !Object.keys(configOverrides).length;
+}
+
+/** Başlık ve sınav bilgi satırı (CONFIG'ten) */
+function updateHeaderText() {
+  const sec = nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000);
+  setText(ui.sub, `Sesleri dinleyin; kökten başlayarak “na” hecesiyle sırayla söyleyin. Her ses ±${CONFIG.TOLERANCE_CENTS} sent içinde ${sec} saniye kesintisiz tutulmadan bir sonrakine geçilmez.`);
+  const c = CONFIG.QUESTION_COUNTS, total = KINDS.reduce((s, k) => s + (c[k] || 0), 0);
+  const parts = KINDS.filter((k) => c[k] > 0).map((k) => `${c[k]} ${KIND_LABEL[k].toLocaleLowerCase('tr')}`);
+  const lim = CONFIG.EXAM.QUESTION_TIME_LIMIT_S;
+  ui.examInfo.replaceChildren(
+    el('b', null, `${total} soru`),
+    document.createTextNode(` · ${parts.join(', ')} · ${CONFIG.QUESTION_ORDER === 'grouped' ? 'sıra: tek → iki → üç' : 'karışık sıra'}`
+      + ` · ±${CONFIG.TOLERANCE_CENTS} sent · ${sec} sn tutma · register ${midiName(CONFIG.REGISTER.minMidi)}–${midiName(CONFIG.REGISTER.maxMidi)}`
+      + (lim > 0 ? ` · soru başına ${lim} sn` : '')),
+  );
+  setText(ui.contourSpan, nf0.format(CONFIG.UI.CONTOUR_SECONDS));
+  setText(ui.contourTol, String(CONFIG.TOLERANCE_CENTS));
+}
+
+// ── İbre / göstergeler ──
+let gaugeHalf = 0;
+let needleX = 0, needleTargetX = 0;
+let curZone = 'none';
+let hintKey = '';
+let lastSustainFrac = -1;
+let lastReadoutTs = 0;
+
+function paintGaugeBackground() {
+  const R = gaugeRange(), g = CONFIG.TOLERANCE_CENTS, y = CONFIG.WARNING_CENTS;
+  const p = (c) => `${(50 + (clamp(c, -R, R) / R) * 50).toFixed(2)}%`;
+  const RED = 'rgba(248,113,113,.30)', YEL = 'rgba(251,191,36,.30)', GRN = 'rgba(52,211,153,.36)';
+  ui.gauge.style.background =
+    `linear-gradient(90deg, ${RED} 0 ${p(-y)}, ${YEL} ${p(-y)} ${p(-g)}, ${GRN} ${p(-g)} ${p(g)}, ${YEL} ${p(g)} ${p(y)}, ${RED} ${p(y)} 100%)`;
+}
+function buildTicks() {
+  const R = gaugeRange();
+  ui.ticks.replaceChildren();
+  const values = [...new Set([-R, -CONFIG.WARNING_CENTS, -CONFIG.TOLERANCE_CENTS, 0, CONFIG.TOLERANCE_CENTS, CONFIG.WARNING_CENTS, R])];
+  for (const c of values) {
+    const tick = el('span', 'tick', `${c > 0 ? '+' : c < 0 ? MINUS : ''}${Math.abs(c)}`);
+    tick.style.left = `${50 + (c / R) * 50}%`;
+    ui.ticks.append(tick);
+  }
+}
+function observeGauge() {
+  const measure = () => { gaugeHalf = ui.gauge.clientWidth / 2; };
+  measure();
+  if ('ResizeObserver' in window) new ResizeObserver(measure).observe(ui.gauge);
+  else window.addEventListener('resize', measure);
+}
+function setZone(zone) {
+  if (zone !== curZone) { curZone = zone; ui.tuner.dataset.zone = zone; }
+}
+/** İbreyi hedefe doğru yumuşakça kaydırır (yalnızca transform → GPU bileşimi) */
+function easeNeedle(dtMs) {
+  const k = 1 - Math.exp(-dtMs / CONFIG.UI.NEEDLE_SMOOTHING_MS);
+  const delta = needleTargetX - needleX;
+  const next = Math.abs(delta) < 0.02 ? needleTargetX : needleX + delta * k;
+  if (next !== needleX) {
+    needleX = next;
+    ui.needle.style.transform = `translate3d(${needleX.toFixed(2)}px,0,0)`;
+  }
+}
+function paintSustain(frac) {
+  if (frac !== lastSustainFrac) {
+    lastSustainFrac = frac;
+    ui.sustainFill.style.transform = `scaleX(${frac.toFixed(4)})`;
+  }
+}
+function setHint(key) {
+  if (key === 'octave' && !settings.fold) key = 'octaveOff';
+  if (key === hintKey) return;
+  hintKey = key;
+  ui.hint.textContent = HINTS[key] ?? '';
+}
+function clearReadouts() {
+  setText(ui.centsVal, '—');
+  setText(ui.zoneLabel, 'Ses bekleniyor');
+  setText(ui.heardFreq, '— Hz');
+  setText(ui.heardNote, ' ');
+  setText(ui.clarityText, 'netlik —');
+  setText(ui.sustainText, `${nf2.format(0)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
+  ui.sustainFill.classList.remove('full');
+  paintSustain(0);
+  setZone('none');
+  setHint('');
+  needleTargetX = 0;
+}
+
+// Mikrofon seviye göstergesi (hızlı atak, yavaş bırakma)
+const METER_MIN_DB = -80;
+let level = 0, lastLevelWritten = -1;
+function paintLevel(rms) {
+  const db = rms > 1e-5 ? 20 * Math.log10(rms) : -100;
+  const frac = clamp((db - METER_MIN_DB) / Math.abs(METER_MIN_DB), 0, 1);
+  level = frac > level ? frac : level + (frac - level) * 0.12;
+  if (Math.abs(level - lastLevelWritten) > 0.003) {
+    lastLevelWritten = level;
+    ui.levelFill.style.transform = `scaleX(${level.toFixed(3)})`;
+  }
+}
+function updateThresholdUi() {
+  ui.thr.min = String(CONFIG.PITCH.NOISE_GATE_MIN_DB);
+  ui.thr.max = String(CONFIG.PITCH.NOISE_GATE_MAX_DB);
+  ui.thr.value = String(settings.rmsDb);
+  ui.thrText.textContent = `${settings.rmsDb < 0 ? MINUS : ''}${Math.abs(settings.rmsDb)} dBFS`;
+  ui.levelThr.style.left = `${clamp((settings.rmsDb - METER_MIN_DB) / Math.abs(METER_MIN_DB), 0, 1) * 100}%`;
+}
+
+
+// ── Perde grafiği (zaman içinde hedefe göre sapma) — canvas ──
+const contour = { pts: [], marks: [], w: 0, h: 0, dpr: 1, ctx: null, colors: null, mono: 'monospace' };
+function setupContour() {
+  const cv = ui.contour;
+  contour.ctx = cv.getContext('2d');
+  const cs = getComputedStyle(document.documentElement);
+  const v = (name, fb) => cs.getPropertyValue(name).trim() || fb;
+  contour.colors = {
+    accent: v('--accent', '#8aa4ff'), green: v('--green', '#34d399'), red: v('--red', '#f87171'),
+    muted: v('--muted', '#8894ab'), grid: 'rgba(148,163,184,.14)', zero: 'rgba(255,255,255,.30)',
+    band: 'rgba(52,211,153,.12)', mark: 'rgba(148,163,184,.40)',
+  };
+  contour.mono = v('--mono', 'monospace');
+  const measure = () => {
+    const r = cv.getBoundingClientRect();
+    contour.w = Math.max(1, Math.round(r.width));
+    contour.h = Math.max(1, Math.round(r.height));
+    contour.dpr = Math.min(2, window.devicePixelRatio || 1);
+    cv.width = Math.round(contour.w * contour.dpr);
+    cv.height = Math.round(contour.h * contour.dpr);
+    drawContour(performance.now());
+  };
+  measure();
+  if ('ResizeObserver' in window) new ResizeObserver(measure).observe(cv);
+  else window.addEventListener('resize', measure);
+}
+function pushContour(t, cents, held) {
+  contour.pts.push({ t, c: cents, h: held });
+  const cutoff = t - CONFIG.UI.CONTOUR_SECONDS * 1000 - 500;
+  while (contour.pts.length && contour.pts[0].t < cutoff) contour.pts.shift();
+}
+function markContour(t, label) {
+  contour.marks.push({ t, label });
+  const cutoff = t - CONFIG.UI.CONTOUR_SECONDS * 1000 - 500;
+  while (contour.marks.length && contour.marks[0].t < cutoff) contour.marks.shift();
+}
+function drawContour(now) {
+  const { ctx, w: W, h: H, dpr, colors: C } = contour;
+  if (!ctx || !C) return;
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, W, H);
+  const span = CONFIG.UI.CONTOUR_SECONDS * 1000, R = CONFIG.UI.CONTOUR_RANGE_CENTS;
+  const L = 42, RM = 10, T = 10, B = 10, pw = Math.max(1, W - L - RM), ph = Math.max(1, H - T - B);
+  const X = (t) => L + ((t - (now - span)) / span) * pw;
+  const Y = (c) => T + ph / 2 - (clamp(c, -R, R) / R) * (ph / 2);
+
+  const tol = Math.min(CONFIG.TOLERANCE_CENTS, R);              // tolerans bandı (hafif yeşil yıkama)
+  ctx.fillStyle = C.band;
+  ctx.fillRect(L, Y(tol), pw, Y(-tol) - Y(tol));
+
+  ctx.font = `11px ${contour.mono}`;                             // ızgara: ince, düz çizgiler
+  ctx.textAlign = 'right';
+  ctx.textBaseline = 'middle';
+  for (const c of [R, R / 2, 0, -R / 2, -R]) {
+    const y = Math.round(Y(c)) + 0.5;
+    ctx.strokeStyle = c === 0 ? C.zero : C.grid;
+    ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(L, y); ctx.lineTo(L + pw, y); ctx.stroke();
+    ctx.fillStyle = C.muted;
+    ctx.fillText(c === 0 ? '0' : `${c > 0 ? '+' : MINUS}${Math.round(Math.abs(c))}`, L - 6, y);
+  }
+
+  ctx.textAlign = 'left';                                        // olay işaretleri (▶ soru, ✓ doğrulama)
+  ctx.textBaseline = 'top';
+  for (const m of contour.marks) {
+    const x = Math.round(X(m.t)) + 0.5;
+    if (x < L || x > L + pw) continue;
+    ctx.strokeStyle = C.mark;
+    ctx.beginPath(); ctx.moveTo(x, T); ctx.lineTo(x, T + ph); ctx.stroke();
+    ctx.fillStyle = C.muted;
+    ctx.fillText(m.label, x + 3, T + 1);
+  }
+
+  const pts = contour.pts;                                       // okunan perde: 2 px çizgi
+  const stroke = (pick, color, width) => {
+    ctx.strokeStyle = color;
+    ctx.lineWidth = width;
+    ctx.lineJoin = 'round';
+    ctx.lineCap = 'round';
+    ctx.beginPath();
+    let open = false, prevT = -Infinity;
+    for (const p of pts) {
+      const ok = Number.isFinite(p.c) && pick(p) && p.t - prevT < 120;
+      const x = X(p.t), y = Y(p.c);
+      if (!Number.isFinite(p.c) || !pick(p)) { open = false; prevT = p.t; continue; }
+      if (!open || !ok) ctx.moveTo(x, y); else ctx.lineTo(x, y);
+      open = true;
+      prevT = p.t;
+    }
+    ctx.stroke();
+  };
+  stroke(() => true, C.accent, 2);
+  stroke((p) => p.h, C.green, 3);
+  ctx.fillStyle = C.red;                                         // aralık dışına taşan kareler: kenarda kırmızı çentik
+  for (const p of pts) {
+    if (!Number.isFinite(p.c) || Math.abs(p.c) <= R) continue;
+    const x = X(p.t);
+    if (x < L) continue;
+    ctx.fillRect(x - 1, p.c > 0 ? T : T + ph - 3, 2, 3);
+  }
+}
+
+
+// ── Porte (VexFlow) ──
+const staffView = { on: false, VF: null, loading: null, error: null, key: '' };
+const VEX_ACC = { '-2': 'bb', '-1': 'b', '1': '#', '2': '##' };
+const vexKey = (n) => `${LETTERS[n.letter].toLowerCase()}${VEX_ACC[n.acc] ?? ''}/${n.octave}`;
+let staffRaf = 0;
+
+function setStaffEnabled(on, { persist = true } = {}) {
+  staffView.on = on;
+  ui.staffToggle.checked = on;
+  ui.staffPanel.hidden = !on;
+  if (persist) savePrefs();
+  if (!on) return;
+  if (!staffView.VF && !staffView.loading) {
+    setText(ui.staffMsg, 'Porte kütüphanesi (VexFlow) yükleniyor…');
+    staffView.error = null;
+    staffView.loading = loadScriptGlobal(
+      CONFIG.LIBS.VEXFLOW,
+      () => (window.VexFlow?.Renderer ? window.VexFlow : window.Vex?.Flow?.Renderer ? window.Vex.Flow : null),
+      'VexFlow',
+    )
+      .then((VF) => { staffView.VF = VF; })
+      .catch((err) => { staffView.error = err; console.warn('[VexFlow]', err); })
+      .finally(() => { staffView.loading = null; staffView.key = ''; drawStaff(); });
+  }
+  staffView.key = '';
+  scheduleStaffDraw();
+}
+function scheduleStaffDraw() {
+  if (!staffView.on || staffRaf) return;
+  staffRaf = requestAnimationFrame(() => { staffRaf = 0; drawStaff(); });
+}
+function staffStates() {
+  return exercise.notes.map((_, i) => {
+    const s = noteState(i);
+    return s === 'done' ? 'done' : s === 'missed' ? 'missed' : s === 'active' || s === 'ready' ? 'active' : 'pending';
+  });
+}
+function drawStaff() {
+  if (!staffView.on) return;
+  const host = ui.staff;
+  if (staffView.error) {
+    host.replaceChildren();
+    setText(ui.staffMsg, 'Porte kütüphanesi (VexFlow) yüklenemedi — internet bağlantısını kontrol edin. Uygulamanın geri kalanı etkilenmez.');
+    return;
+  }
+  if (!staffView.VF) return;
+  const states = staffStates();
+  const width = Math.max(240, Math.floor(host.clientWidth || 320));
+  const key = `${exercise.notes.map((n) => n.fullName).join(',')}|${states.join(',')}|${width}`;
+  if (key === staffView.key) return;
+  staffView.key = key;
+  try {
+    renderGrandStaff(staffView.VF, host, exercise.notes, states, width);
+    const q = session?.current;
+    setText(ui.staffMsg, q ? `Soru ${session.index + 1} · ${q.title}` : exercise.notes.length ? practiceTitle : 'Soru başlayınca sesler burada görünür.');
+  } catch (err) {
+    console.error('[porte]', err);
+    host.replaceChildren();
+    staffView.key = '';
+    setText(ui.staffMsg, `Porte çizilemedi: ${err.message}`);
+  }
+}
+/** Büyük porte (sol + fa anahtarı) üzerinde armonik (aynı anda) nota yığını */
+function renderGrandStaff(VF, host, notes, states, hostW) {
+  const { Renderer, Stave, StaveNote, Voice, Formatter, Accidental, StaveConnector, GhostNote } = VF;
+  host.replaceChildren();
+  const sysW = Math.min(hostW - 28, 300);
+  const x0 = Math.round((hostW - sysW) / 2) + 14;               // köşeli parantez (brace) için sol pay
+  const renderer = new Renderer(host, Renderer.Backends.SVG);
+  renderer.resize(hostW, 236);
+  const ctx = renderer.getContext();
+  const treble = new Stave(x0, 14, sysW - 14).addClef('treble');
+  const bass = new Stave(x0, 120, sysW - 14).addClef('bass');
+  treble.setContext(ctx).draw();
+  bass.setContext(ctx).draw();
+  const TYPE = StaveConnector.type || {};
+  for (const [k, s] of [['BRACE', 'brace'], ['SINGLE_LEFT', 'singleLeft'], ['SINGLE_RIGHT', 'singleRight']]) {
+    new StaveConnector(treble, bass).setType(TYPE[k] ?? s).setContext(ctx).draw();
+  }
+  const COLOR = { done: '#047857', active: '#4338ca', missed: '#b91c1c' };
+  const items = notes.map((n, i) => ({ n, i }));
+  const build = (list, clef) => {
+    if (!list.length) return new GhostNote({ duration: 'w' });
+    const sn = new StaveNote({ clef, keys: list.map(({ n }) => vexKey(n)), duration: 'w' });
+    list.forEach(({ n, i }, k) => {
+      const color = COLOR[states[i]];
+      const style = color ? { fillStyle: color, strokeStyle: color } : null;
+      if (n.acc) {
+        const acc = new Accidental(VEX_ACC[n.acc]);
+        if (style && acc.setStyle) acc.setStyle(style);
+        if (typeof sn.addAccidental === 'function') sn.addAccidental(k, acc);   // VexFlow 3 imzası
+        else sn.addModifier(acc, k);                                           // VexFlow 4/5 imzası
+      }
+      if (style && sn.setKeyStyle) sn.setKeyStyle(k, style);
+    });
+    return sn;
+  };
+  const isTreble = ({ n }) => n.octave * 7 + n.letter >= 28;                    // yazılı C4 ve üstü → sol anahtarı
+  const voice = (note) => {
+    const v = new Voice({ num_beats: 4, beat_value: 4, numBeats: 4, beatValue: 4 });
+    if (Voice.Mode && v.setMode) v.setMode(Voice.Mode.SOFT);
+    v.addTickables([note]);
+    return v;
+  };
+  const tv = voice(build(items.filter(isTreble), 'treble'));
+  const bv = voice(build(items.filter((x) => !isTreble(x)), 'bass'));
+  new Formatter().joinVoices([tv]).joinVoices([bv]).format([tv, bv], Math.max(60, sysW - 100));
+  tv.draw(ctx, treble);
+  bv.draw(ctx, bass);
+  const svg = host.querySelector('svg');
+  if (svg) {
+    svg.setAttribute('role', 'img');
+    svg.setAttribute('aria-label', `Porte: ${notes.map((n) => n.fullName).join(', ') || 'boş'}`);
+  }
+}
+
+
+// ── Teşhis ekranı ──
+function renderSummary(d, sess) {
+  const N = sess.questions.length, A = sess.attempted.length;
+  setText(ui.sumMeta, `${A}/${N} soru · ${fmtDuration((sess.finishedAt ?? Date.now()) - sess.startedAt)}${sess.aborted ? ' · yarıda bitirildi' : ''} · set #${sess.seed}`);
+  if (!d) {
+    setText(ui.sumScore, '—');
+    setText(ui.sumTendency, '—');
+    ui.sumBiasMark.hidden = true;
+    setText(ui.sumHardest, '—');
+    setText(ui.sumHardestWhy, '');
+    ui.sumRows.replaceChildren();
+    ui.sumRoles.replaceChildren();
+    ui.sumAdvice.replaceChildren(el('li', null, 'Cevaplanmış soru yok; teşhis için en az bir soru denenmeli.'));
+    return;
+  }
+  setText(ui.sumScore, nfMax1.format(d.score));
+  const o = d.overall, R = biasRange();
+  setText(ui.sumTendency, o.biasCents == null ? 'Belirsiz' : `${TENDENCY_LABEL[o.tendency]} · ${fmtSigned(o.biasCents, 1)} sent`);
+  setText(ui.sumBiasMin, `${MINUS}${R}`);
+  setText(ui.sumBiasMax, `+${R}`);
+  ui.sumBiasMark.hidden = o.biasCents == null;
+  if (o.biasCents != null) ui.sumBiasMark.style.left = `${50 + clamp(o.biasCents / R, -1, 1) * 50}%`;
+
+  const h = d.hardest ? d.byType[d.hardest] : null;
+  const typeCount = Object.keys(d.byType).length;
+  const notable = !!h && typeCount > 1 && h.difficulty >= CONFIG.ANALYSIS.NOTABLE_DIFFICULTY;
+  if (!h) { setText(ui.sumHardest, '—'); setText(ui.sumHardestWhy, ''); }
+  else if (notable) {
+    setText(ui.sumHardest, `${KIND_LABEL[h.kind]} · ${KIND_DETAIL[h.kind]}`);
+    setText(ui.sumHardestWhy, `zorlanma %${nf0.format(h.difficulty * 100)} · seslerin %${nf0.format(h.accuracy * 100)} doğrulandı`);
+  } else {
+    setText(ui.sumHardest, typeCount > 1 ? 'Belirgin fark yok' : KIND_LABEL[h.kind]);
+    setText(ui.sumHardestWhy, `en yüksek zorlanma: ${KIND_LABEL[h.kind].toLocaleLowerCase('tr')} · %${nf0.format(h.difficulty * 100)}`);
+  }
+
+  ui.sumRows.replaceChildren();
+  for (const kind of KINDS) {
+    const t = d.byType[kind];
+    if (!t) continue;
+    const tr = el('tr');
+    const c1 = el('td');
+    c1.append(document.createTextNode(KIND_LABEL[kind]));
+    if (kind === d.hardest && typeCount > 1 && t.difficulty >= CONFIG.ANALYSIS.NOTABLE_DIFFICULTY) c1.append(el('span', 'tag', 'en zor'));
+    c1.append(el('small', null, `${KIND_DETAIL[kind]} · ${t.questions} soru · puan ${nfMax1.format(t.score)}`));
+    const c2 = el('td', null, `${t.verified}/${t.notes} · %${nf0.format(t.accuracy * 100)}`);
+    const c3 = el('td', null, t.meanTimeMs == null ? '—' : `${nf1.format(t.meanTimeMs / 1000)} sn`);
+    const c4 = el('td', null, nf1.format(t.replaysPerQuestion));
+    const c5 = el('td', null, t.meanAbsCents == null ? '—' : `±${nf1.format(t.meanAbsCents)} sent`);
+    const c6 = el('td', null, t.biasCents == null ? '—' : `${fmtSigned(t.biasCents, 1)} sent · ${TENDENCY_LABEL[tendencyOf(t.biasCents)]}`);
+    const c7 = el('td');
+    const diff = el('div', 'diff'), bar = el('div', 'diff-bar'), fill = el('div', 'diff-fill');
+    fill.style.width = `${clamp(t.difficulty, 0, 1) * 100}%`;
+    bar.append(fill);
+    diff.append(bar, el('span', null, `%${nf0.format(t.difficulty * 100)}`));
+    c7.append(diff);
+    tr.append(c1, c2, c3, c4, c5, c6, c7);
+    ui.sumRows.append(tr);
+  }
+
+  ui.sumRoles.replaceChildren();
+  for (const [role, r] of Object.entries(d.byRole)) {
+    if (r.biasCents == null) continue;
+    const chip = el('span', 'chip', `${role === 'Ses' ? 'Tek ses' : role}: ${fmtSigned(r.biasCents, 1)} sent`);
+    chip.title = `${r.frames} kare`;
+    ui.sumRoles.append(chip);
+  }
+  ui.sumAdvice.replaceChildren(...d.messages.map((m) => el('li', null, m)));
+}
+function showSummary() {
+  renderSummary(lastDiag, session);
+  ui.summaryPanel.hidden = false;
+  renderHistory();
+  ui.summaryPanel.scrollIntoView({ behavior: prefersReducedMotion() ? 'auto' : 'smooth', block: 'start' });
+}
+function hideSummary() { ui.summaryPanel.hidden = true; }
+
+
+// ── Önceki testlerim (localStorage) ──
+function loadHistory() { return normalizeHistory(storageGet(CONFIG.HISTORY.STORAGE_KEY, []), CONFIG.HISTORY.MAX_ENTRIES); }
+function addHistory(entry) {
+  const list = loadHistory();
+  list.push(entry);
+  if (!storageSet(CONFIG.HISTORY.STORAGE_KEY, list.slice(-CONFIG.HISTORY.MAX_ENTRIES))) {
+    showNotice('Sonuç kaydedilemedi (tarayıcı depolaması kapalı ya da dolu).');
+  }
+}
+function clearHistory() { storageRemove(CONFIG.HISTORY.STORAGE_KEY); renderHistory(); }
+
+const SVG_NS = 'http://www.w3.org/2000/svg';
+function svgEl(tag, attrs = {}, text) {
+  const n = document.createElementNS(SVG_NS, tag);
+  for (const [k, v] of Object.entries(attrs)) n.setAttribute(k, String(v));
+  if (text != null) n.textContent = text;
+  return n;
+}
+function renderHistory() {
+  const list = CONFIG.HISTORY.ENABLED ? loadHistory() : [];
+  ui.historyEmpty.hidden = list.length > 0;
+  ui.historyClear.disabled = !list.length;
+  drawHistoryChart(list.slice(-CONFIG.HISTORY.CHART_LAST_N));
+  ui.historyList.replaceChildren(...list.slice(-CONFIG.HISTORY.LIST_LAST_N).reverse().map(historyItem));
+}
+/** Tek seri sütun grafiği: test başına puan (0–100). Değerlerin tamamı aşağıdaki listede de yazılı. */
+function drawHistoryChart(entries) {
+  const host = ui.historyChart;
+  host.replaceChildren();
+  if (!entries.length) return;
+  const W = Math.max(260, Math.floor(host.clientWidth || 600)), H = 168;
+  const m = { l: 34, r: 12, t: 20, b: 26 };
+  const pw = W - m.l - m.r, ph = H - m.t - m.b;
+  const y = (v) => m.t + ph - (clamp(v, 0, 100) / 100) * ph;
+  const svg = svgEl('svg', { width: W, height: H, viewBox: `0 0 ${W} ${H}`, role: 'img', 'aria-label': `Son ${entries.length} testin puanları` });
+  for (const v of [0, 50, 100]) {
+    svg.append(svgEl('line', { x1: m.l, x2: W - m.r, y1: y(v) + 0.5, y2: y(v) + 0.5, class: v === 0 ? 'hc-base' : 'hc-grid', 'shape-rendering': 'crispEdges' }));
+    svg.append(svgEl('text', { x: m.l - 8, y: y(v) + 4, 'text-anchor': 'end', class: 'hc-tick' }, String(v)));
+  }
+  const band = pw / entries.length, cw = Math.min(24, band * 0.62);
+  const best = Math.max(...entries.map((e) => e.score));
+  const bestIdx = entries.map((e) => e.score).lastIndexOf(best);
+  const labelEvery = entries.length > 8 ? 2 : 1;
+  entries.forEach((e, i) => {
+    const x = m.l + i * band + (band - cw) / 2, top = y(e.score), base = y(0);
+    const h = base - top, r = Math.min(4, h, cw / 2);
+    const label = `${dateFmt.format(new Date(e.at))} · ${nfMax1.format(e.score)} puan${e.complete ? '' : ' (yarım test)'}`;
+    const g = svgEl('g', { class: 'hc-col', tabindex: 0, role: 'img', 'aria-label': label });
+    g.append(svgEl('rect', { class: 'hc-hit', x: m.l + i * band + 1, y: m.t, width: Math.max(1, band - 2), height: ph, fill: 'transparent', rx: 4 }));
+    if (h > 0.5) {
+      const d = `M${x},${base}V${top + r}Q${x},${top} ${x + r},${top}H${x + cw - r}Q${x + cw},${top} ${x + cw},${top + r}V${base}Z`;
+      g.append(svgEl('path', { d, class: `hc-bar${e.complete ? '' : ' partial'}` }));
+    }
+    g.append(svgEl('title', {}, label));
+    svg.append(g);
+    if (i % labelEvery === (entries.length - 1) % labelEvery) {
+      svg.append(svgEl('text', { x: x + cw / 2, y: H - 8, 'text-anchor': 'middle', class: 'hc-tick' }, shortDay.format(new Date(e.at))));
+    }
+    if (i === entries.length - 1 || i === bestIdx) {            // seçici doğrudan etiket: son ve en iyi
+      svg.append(svgEl('text', { x: x + cw / 2, y: top - 6, 'text-anchor': 'middle', class: 'hc-label' }, nfMax1.format(e.score)));
+    }
+  });
+  host.append(svg);
+}
+function historyItem(e) {
+  const li = el('li', 'h-item');
+  const meta = el('div', 'h-meta');
+  const tags = [
+    e.biasCents != null ? `${TENDENCY_LABEL[e.tendency] ?? '—'} ${fmtSigned(e.biasCents, 1)} sent` : 'eğilim belirsiz',
+    e.hardest ? `en zor: ${KIND_LABEL[e.hardest] ?? e.hardest}` : null,
+    e.settings ? `±${e.settings.tol} sent · ${nf2.format((e.settings.sustainMs ?? 0) / 1000)} sn` : null,
+    e.complete ? `${e.answered} soru` : `yarım · ${e.answered}/${e.total}`,
+  ].filter(Boolean);
+  meta.append(...tags.map((t) => el('span', null, t)));
+  const score = el('div', 'h-score');
+  score.append(el('b', null, nfMax1.format(e.score)), el('span', 'muted', ' puan'));
+  li.append(el('div', 'h-date', dateFmt.format(new Date(e.at))), meta, score);
+  return li;
+}
+
+
+// ── Ayarlar paneli (şema ile üretilir: yeni ayar eklemek için SETTINGS_SCHEMA'ya bir satır yeter) ──
+const MIDI_OPTIONS = Array.from({ length: 61 }, (_, i) => 36 + i);   // C2 – C7
+const SETTINGS_SCHEMA = [
+  { title: 'Sınav standardı', fields: [
+    { path: 'TOLERANCE_CENTS', label: 'Tolerans (± sent)', type: 'number', min: 1, max: 100, step: 1 },
+    { path: 'WARNING_CENTS', label: 'Sarı bant sınırı (± sent)', type: 'number', min: 1, max: 200, step: 1 },
+    { path: 'SUSTAIN_TIME_MS', label: 'Tutma süresi (ms)', type: 'number', min: 20, max: 5000, step: 10 },
+    { path: 'SUSTAIN_DROPOUT_GRACE_MS', label: 'Algılama kopması toleransı (ms)', type: 'number', min: 0, max: 500, step: 5 },
+    { path: 'A4_HZ', label: 'Diyapazon A4 (Hz)', type: 'number', min: 400, max: 480, step: 0.5 },
+    { path: 'OCTAVE_MODE', label: 'Oktav toleransı türü', type: 'select', options: [['free', 'Serbest (her ses ayrı)'], ['anchored', 'Sabit (ilk ses)'], ['off', 'Yok (yazılı oktav)']] },
+  ] },
+  { title: 'Sınav yapısı', fields: [
+    { path: 'QUESTION_COUNTS.single', label: 'Tek ses · soru sayısı', type: 'number', min: 0, max: 50, step: 1 },
+    { path: 'QUESTION_COUNTS.double', label: 'İki ses · soru sayısı', type: 'number', min: 0, max: 50, step: 1 },
+    { path: 'QUESTION_COUNTS.triple', label: 'Üç ses · soru sayısı', type: 'number', min: 0, max: 50, step: 1 },
+    { path: 'QUESTION_ORDER', label: 'Soru sırası', type: 'select', options: [['grouped', 'Gruplu: tek → iki → üç'], ['shuffled', 'Karışık']] },
+    { path: 'REGISTER.minMidi', label: 'Register alt sınırı', type: 'midi' },
+    { path: 'REGISTER.maxMidi', label: 'Register üst sınırı', type: 'midi' },
+    { path: 'CHORD_RULES.MAX_ALTERED_PER_SET', label: "5'li sette en fazla artmış/eksilmiş", type: 'number', min: 0, max: 10, step: 1 },
+    { path: 'CHORD_RULES.ALTERED_CHANCE', label: 'Artmış/eksilmiş bulunma olasılığı (%)', type: 'percent', min: 0, max: 100, step: 5 },
+    { path: 'INTERVAL_RULES.POOL', label: 'Aralık havuzu (iki ses)', type: 'multi', wide: true, options: INTERVAL_TYPES.map((t) => [t.id, t.label]) },
+  ] },
+  { title: 'Sınav akışı ve puan', fields: [
+    { path: 'EXAM.REVEAL_NOTE_NAMES', label: 'Nota adlarını göster', type: 'select', options: [['after', 'Ses doğrulanınca'], ['end', 'Soru bitince'], ['always', 'Her zaman'], ['never', 'Hiçbir zaman']] },
+    { path: 'EXAM.QUESTION_TIME_LIMIT_S', label: 'Soru süre sınırı (sn · 0 = yok)', type: 'number', min: 0, max: 600, step: 5 },
+    { path: 'SCORING.REPLAY_PENALTY', label: 'Tekrar başına kesinti (%)', type: 'percent', min: 0, max: 100, step: 5 },
+    { path: 'EXAM.LIVE_FEEDBACK', label: 'Canlı geri bildirim (ibre, grafik)', type: 'bool' },
+    { path: 'EXAM.ALLOW_REPLAY', label: 'Tekrar çalmaya izin ver', type: 'bool' },
+    { path: 'EXAM.ALLOW_SKIP', label: 'Soruyu geçmeye izin ver', type: 'bool' },
+    { path: 'SCORING.PARTIAL_CREDIT', label: 'Kısmi puan ver', type: 'bool' },
+  ] },
+  { title: 'Ses ve algılama', fields: [
+    { path: 'AUDIO.INSTRUMENT', label: 'Çalgı', type: 'select', options: [['piano', 'Piyano (Tone.js)'], ['synth', 'Sentez (çevrimdışı)']] },
+    { path: 'AUDIO.CHORD_DURATION_S', label: 'Çalım süresi (sn)', type: 'number', min: 0.3, max: 8, step: 0.1 },
+    { path: 'PITCH.ALGORITHM', label: 'Perde algılama', type: 'select', options: [['YIN', 'YIN (dahili)'], ['MPM', 'MPM (pitchy)']] },
+    { path: 'PITCH.YIN_THRESHOLD', label: 'YIN eşiği', type: 'number', min: 0.02, max: 0.5, step: 0.01 },
+    { path: 'PITCH.YIN_ADAPTIVE_K', label: 'YIN uyarlamalı eşik (0 = klasik)', type: 'number', min: 0, max: 0.99, step: 0.01 },
+    { path: 'PITCH.MIN_CLARITY', label: 'En düşük netlik', type: 'number', min: 0.3, max: 0.99, step: 0.01 },
+    { path: 'PITCH.MEDIAN_FRAMES', label: 'Medyan filtre (kare)', type: 'number', min: 1, max: 9, step: 1 },
+  ] },
+];
+const fieldId = (path) => `set-${path.replace(/\./g, '-')}`;
+
+function buildSettingsForm() {
+  ui.settingsForm.replaceChildren();
+  for (const group of SETTINGS_SCHEMA) {
+    const fs = el('fieldset', 'set-group');
+    fs.append(el('legend', null, group.title));
+    const grid = el('div', 'settings-grid');
+    for (const f of group.fields) grid.append(buildField(f));
+    fs.append(grid);
+    ui.settingsForm.append(fs);
+  }
+}
+function buildField(f) {
+  if (f.type === 'bool') {
+    const wrap = el('label', 'check');
+    const input = el('input');
+    input.type = 'checkbox';
+    input.id = fieldId(f.path);
+    input.dataset.path = f.path;
+    input.dataset.kind = 'bool';
+    wrap.append(input, document.createTextNode(f.label));
+    return wrap;
+  }
+  if (f.type === 'multi') {
+    const wrap = el('div', `field${f.wide ? ' wide' : ''}`);
+    wrap.append(el('span', null, f.label));
+    const box = el('div', 'checks');
+    box.dataset.path = f.path;
+    box.dataset.kind = 'multi';
+    for (const [value, text] of f.options) {
+      const lab = el('label', 'check'), input = el('input');
+      input.type = 'checkbox';
+      input.value = value;
+      lab.append(input, document.createTextNode(text));
+      box.append(lab);
+    }
+    wrap.append(box);
+    return wrap;
+  }
+  const wrap = el('label', `field${f.wide ? ' wide' : ''}`);
+  wrap.append(el('span', null, f.label));
+  let input;
+  if (f.type === 'select' || f.type === 'midi') {
+    input = el('select');
+    const opts = f.type === 'midi' ? MIDI_OPTIONS.map((m) => [String(m), `${midiName(m)} (MIDI ${m})`]) : f.options;
+    for (const [value, text] of opts) input.add(new Option(text, value));
+  } else {
+    input = el('input');
+    input.type = 'number';
+    input.min = String(f.min);
+    input.max = String(f.max);
+    input.step = String(f.step ?? 'any');
+    input.inputMode = 'decimal';
+  }
+  input.id = fieldId(f.path);
+  input.dataset.path = f.path;
+  input.dataset.kind = f.type;
+  wrap.append(input);
+  return wrap;
+}
+function fillSettingsForm(cfg) {
+  for (const node of ui.settingsForm.querySelectorAll('[data-path]')) {
+    const v = getPath(cfg, node.dataset.path);
+    switch (node.dataset.kind) {
+      case 'bool':    node.checked = !!v; break;
+      case 'multi':   for (const cb of node.querySelectorAll('input')) cb.checked = Array.isArray(v) && v.includes(cb.value); break;
+      case 'percent': node.value = String(Math.round((v ?? 0) * 100)); break;
+      default:        node.value = String(v ?? '');
+    }
+  }
+}
+/** Formu draft yapılandırmasına okur; hatalı alanların listesini döner */
+function readSettingsForm(draft) {
+  const bad = [];
+  const labelOf = (path) => SETTINGS_SCHEMA.flatMap((g) => g.fields).find((f) => f.path === path)?.label ?? path;
+  for (const node of ui.settingsForm.querySelectorAll('[data-path]')) {
+    const path = node.dataset.path;
+    switch (node.dataset.kind) {
+      case 'bool':   setPath(draft, path, node.checked); break;
+      case 'multi':  setPath(draft, path, [...node.querySelectorAll('input:checked')].map((cb) => cb.value)); break;
+      case 'select': setPath(draft, path, node.value); break;
+      case 'midi':   setPath(draft, path, parseInt(node.value, 10)); break;
+      default: {
+        const num = parseFloat(String(node.value).replace(',', '.'));
+        if (!Number.isFinite(num)) { bad.push(`${labelOf(path)}: sayı girin`); break; }
+        setPath(draft, path, node.dataset.kind === 'percent' ? num / 100 : num);
+      }
+    }
+  }
+  return bad;
+}
+function showSettingsMsg(text, isError = false) {
+  ui.settingsMsg.textContent = text;
+  ui.settingsMsg.classList.toggle('err', isError);
+}
+function refreshJsonArea() {
+  ui.jsonArea.value = JSON.stringify(configOverrides, null, 2);
+}
+function fillPresetSelect() {
+  ui.presetSelect.replaceChildren(new Option('— hazır standart seçin —', ''));
+  for (const [key, p] of Object.entries(CONFIG.PRESETS)) ui.presetSelect.add(new Option(p.label, key));
+}
+
+function onApplySettings() {
+  const draft = deepClone(CONFIG);
+  const bad = readSettingsForm(draft);
+  if (bad.length) { showSettingsMsg(bad.join(' · '), true); return; }
+  const r = applyOverrides(diffConfig(DEFAULT_CONFIG, draft));
+  reportApply(r);
+}
+function reportApply(r) {
+  if (!r.ok) { showSettingsMsg(`Uygulanmadı: ${r.errors.join(' · ')}`, true); return; }
+  const base = Object.keys(configOverrides).length ? 'Kaydedildi ve uygulandı.' : 'Varsayılan ayarlar kullanılıyor.';
+  showSettingsMsg(base + (examActive() ? ' Soru yapısıyla ilgili değişiklikler bir sonraki testte geçerli olur.' : '') + (r.warnings.length ? ` Uyarı: ${r.warnings.join('; ')}` : ''));
+}
+function onPresetChange() {
+  const p = CONFIG.PRESETS[ui.presetSelect.value];
+  if (!p) return;
+  fillSettingsForm(deepMerge(DEFAULT_CONFIG, p.values));
+  showSettingsMsg(`“${p.label}” forma yüklendi — uygulamak için “Kaydet ve uygula”ya basın.`);
+}
+function onJsonApply() {
+  let parsed;
+  try { parsed = JSON.parse(ui.jsonArea.value || '{}'); }
+  catch (err) { showSettingsMsg(`JSON okunamadı: ${err.message}`, true); return; }
+  if (isPlainObject(parsed) && isPlainObject(parsed.overrides)) parsed = parsed.overrides;   // dışa aktarılmış dosya biçimi
+  reportApply(applyOverrides(parsed));
+}
+function onJsonExport() {
+  const payload = { app: 'Solfej Lab', type: 'settings', version: 1, exportedAt: new Date().toISOString(), overrides: configOverrides };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'solfejlab-ayarlar.json';
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+}
+async function onJsonImportFile() {
+  const file = ui.jsonImport.files?.[0];
+  ui.jsonImport.value = '';
+  if (!file) return;
+  try {
+    ui.jsonArea.value = await file.text();
+    onJsonApply();
+  } catch (err) { showSettingsMsg(`Dosya okunamadı: ${err.message}`, true); }
+}
+async function onCopyAll() {
+  try {
+    await navigator.clipboard.writeText(JSON.stringify(CONFIG, null, 2));
+    showSettingsMsg('Etkin CONFIG panoya kopyalandı.');
+  } catch {
+    ui.jsonArea.value = JSON.stringify(CONFIG, null, 2);
+    showSettingsMsg('Pano kullanılamadı; etkin CONFIG kutuya yazıldı (uygulamadan önce yalnızca değiştirmek istediklerinizi bırakın).', true);
+  }
+}
+
+
+// ── Kalıcılık: tercihler ve özel ayarlar ──
+const PREFS_KEY = 'solfejlab.prefs.v1';
+const CONFIG_KEY = 'solfejlab.config.v1';
+let configOverrides = {};
+
+function storageGet(key, fallback) {
+  try { const raw = localStorage.getItem(key); return raw == null ? fallback : JSON.parse(raw); }
+  catch { return fallback; }
+}
+function storageSet(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); return true; }
+  catch { return false; }
+}
+function storageRemove(key) { try { localStorage.removeItem(key); } catch { /* yoksay */ } }
+
+function savePrefs() {
+  if (!uiReady) return;
+  storageSet(PREFS_KEY, {
+    mode, gateDb: settings.rmsDb, fold: settings.fold, staff: staffView.on,
+    practice: { root: ui.root.value, octave: ui.octave.value, type: ui.type.value },
+  });
+}
+
+/** CONFIG nesnesinin içeriğini yerinde değiştirir (referansı tutan her yer güncel değeri görür) */
+function replaceConfig(next) {
+  for (const k of Object.keys(CONFIG)) delete CONFIG[k];
+  Object.assign(CONFIG, deepClone(next));
+}
+
+/**
+ * Özel ayarları ayıklar, varsayılanlarla birleştirir, doğrular ve uygular.
+ * @returns {{ok:boolean, errors:string[], warnings:string[]}}
+ */
+function applyOverrides(over, { persist = true } = {}) {
+  const { clean, warnings } = sanitizeOverrides(over, DEFAULT_CONFIG);
+  const merged = deepMerge(DEFAULT_CONFIG, clean);
+  const errors = validateConfig(merged);
+  if (errors.length) return { ok: false, errors, warnings };
+  const prev = deepClone(CONFIG);
+  replaceConfig(merged);
+  configOverrides = diffConfig(DEFAULT_CONFIG, merged);
+  if (persist) {
+    if (Object.keys(configOverrides).length) storageSet(CONFIG_KEY, configOverrides);
+    else storageRemove(CONFIG_KEY);
+  }
+  onConfigChanged(prev);
+  return { ok: true, errors: [], warnings };
+}
+
+/** Yapılandırma değişince arayüz ve alt sistemleri günceller */
+function onConfigChanged(prev) {
+  if (!uiReady) return;
+  paintGaugeBackground();
+  buildTicks();
+  updateHeaderText();
+  updateFoldUi();
+  updateThresholdUi();
+  renderConfigChip();
+  tracker.reset();
+  medianFilter = new MedianFilter(CONFIG.PITCH.MEDIAN_FRAMES);
+  if (masterGain) masterGain.gain.value = CONFIG.AUDIO.MASTER_GAIN;
+  if (audioCtx && analyser) setupDetector().catch((err) => console.warn('[algılama]', err));
+  else renderDetectorChip();
+
+  // Piyano yalnızca ilgili ayar değişince yeniden kurulur (başarısız yükleme her kayıtta tekrar denenmez)
+  const pianoChanged = !!prev && (JSON.stringify(prev.REGISTER) !== JSON.stringify(CONFIG.REGISTER)
+    || JSON.stringify(prev.AUDIO.PIANO) !== JSON.stringify(CONFIG.AUDIO.PIANO));
+  const instrumentChanged = !!prev && prev.AUDIO.INSTRUMENT !== CONFIG.AUDIO.INSTRUMENT;
+  if (pianoChanged || (instrumentChanged && piano.state === 'failed')) resetPiano();
+  if (CONFIG.AUDIO.INSTRUMENT === 'piano' && (pianoChanged || instrumentChanged || piano.state === 'off')) preparePiano();
+  if (piano.sampler) piano.sampler.volume.value = CONFIG.AUDIO.PIANO.VOLUME_DB;
+  renderEngineChip();
+
+  if (!session && mode === 'practice' && prev && prev.A4_HZ !== CONFIG.A4_HZ && (fsm.state === S.IDLE || fsm.state === S.COMPLETE)) {
+    selectionChanged();
+  }
+  fillSettingsForm(CONFIG);
+  refreshJsonArea();
+  renderHistory();
+  renderAll();
+  drawContour(performance.now());
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 6) DURUM MAKİNESİ GEÇİŞ EYLEMLERİ
+// ───────────────────────────────────────────────────────────────────────
+let invalidMs = 0, lastOctave = 0;
+const octaveVotes = new Map();          // ilk sesin tolerans içi karelerinde oktav kayması oyları → sağlam çapa
+
+function onStateChange(next, prev, payload) {
+  switch (next) {
+    case S.IDLE:
+      exercise.restart();
+      tracker.reset();
+      medianFilter.reset();
+      clearReadouts();
+      break;
+
+    case S.PLAYING: {                               // sesler çalınır; bu sırada mikrofon yok sayılır
+      if (payload?.fresh) exercise.restart();
+      if (payload?.replay && session?.result) session.result.replays++;
+      tracker.reset();
+      medianFilter.reset();
+      clearReadouts();
+      stopAllSound();
+      const dur = CONFIG.AUDIO.CHORD_DURATION_S;
+      playHarmonic(exercise.notes, dur, audioCtx.currentTime + 0.06);
+      markContour(performance.now(), session ? `▶${session.index + 1}` : '▶');
+      after(dur * 1000 + 60 + CONFIG.AUDIO.LISTEN_DELAY_MS, () => fsm.go(S.LISTENING));
+      break;
+    }
+
+    case S.LISTENING:                               // sıradaki nota için dinleme
+      tracker.reset();
+      medianFilter.reset();
+      octaveVotes.clear();
+      invalidMs = 0;
+      clearReadouts();
+      break;
+
+    case S.VERIFIED: {                              // nota doğrulandı → kısa bekleme → kilit açılır
+      exercise.markVerified();
+      const stats = session?.result?.noteResults[exercise.index];
+      if (stats) stats.verified = true;
+      ui.sustainFill.classList.add('full');
+      paintSustain(1);
+      setText(ui.sustainText, `${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
+      setZone('perfect');
+      markContour(performance.now(), `✓${exercise.index + 1}`);
+      after(CONFIG.AUDIO.VERIFIED_HOLD_MS, () => {
+        const finished = exercise.advance();        // doğrulanmamış notada hata fırlatır (kilit)
+        fsm.go(finished ? S.COMPLETE : S.LISTENING, finished ? { reason: 'done' } : undefined);
+      });
+      break;
+    }
+
+    case S.COMPLETE:                                // soru bitti (tamam / geçildi / süre doldu)
+      clearReadouts();
+      if (session) {
+        const reason = payload?.reason ?? 'done';
+        if (reason !== 'done') exercise.abandon();
+        session.finishQuestion(reason);
+        const last = session.isLast;
+        after(CONFIG.EXAM.NEXT_QUESTION_DELAY_MS, () => {
+          if (last) { finishSession(); return; }
+          session.index++;
+          loadQuestion(session.current);
+          fsm.go(S.PLAYING, { fresh: true });
+        });
+      } else {
+        playReward(exercise.notes);
+      }
+      break;
+
+    case S.SUMMARY:
+      clearReadouts();
+      stopAllSound();
+      showSummary();
+      break;
+  }
+  renderAll();
+}
+
+function loadQuestion(q) {
+  exercise = new Exercise(q.notes);
+  buildNoteBoxes();
+  updateFoldUi();
+}
+
+/** Sınavı kapatır: teşhisi hesaplar, kaydeder, teşhis ekranına geçer */
+function finishSession() {
+  if (!session) return;
+  session.finishedAt = Date.now();
+  const attempted = session.attempted;
+  lastDiag = attempted.length ? computeDiagnostics(attempted, CONFIG) : null;
+  if (lastDiag && CONFIG.HISTORY.ENABLED && (!session.aborted || CONFIG.HISTORY.SAVE_UNFINISHED)) {
+    addHistory(makeHistoryEntry(session, lastDiag, CONFIG));
+  }
+  cancelFlow();
+  fsm.go(S.SUMMARY);
+}
+
+function hardReset() {
+  cancelFlow();
+  stopAllSound();
+  session = null;
+  if (fsm.state !== S.IDLE) fsm.go(S.IDLE);
+  else { exercise.restart(); tracker.reset(); clearReadouts(); renderAll(); }
+}
+
+/** Ses + mikrofon + algılayıcıyı hazırlar (kullanıcı jesti içinde çağrılır). Hata olursa false. */
+async function prepareInput() {
+  try {
+    await ensureAudio();                            // AudioContext kullanıcı jestiyle başlatılır
+    await ensureMic();
+    await setupDetector();
+    return true;
+  } catch (err) {
+    console.error(err);
+    showAlert(explainError(err));
+    return false;
+  }
+}
+
+let urlSeedUsed = false;
+function nextSeed() {
+  const p = new URLSearchParams(location.search).get('seed');
+  if (p && !urlSeedUsed && /^\d+$/.test(p)) { urlSeedUsed = true; return Number(p) >>> 0; }
+  return (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
+}
+
+async function onStartExam() {
+  if (starting || examActive()) return;
+  starting = true;
+  hideAlert();
+  renderAll();
+  const ok = await prepareInput();
+  if (!ok) { starting = false; renderAll(); return; }
+  const seed = nextSeed();
+  let questions;
+  try { questions = generateSession(CONFIG, mulberry32(seed)); }
+  catch (err) { starting = false; showAlert(`Sınav oluşturulamadı: ${err.message}`); renderAll(); return; }
+  if (CONFIG.AUDIO.INSTRUMENT === 'piano') {
+    const p = preparePiano();
+    if (piano.state === 'loading') {
+      setText(ui.status, 'Piyano sesleri yükleniyor…');
+      await Promise.race([p, sleep(CONFIG.AUDIO.PIANO.WAIT_ON_START_MS)]);
+    }
+  }
+  starting = false;
+  hardReset();
+  hideSummary();
+  lastDiag = null;
+  session = new ExamSession(questions, { seed, startedAt: Date.now() });
+  loadQuestion(session.current);
+  fsm.go(S.PLAYING, { fresh: true });
+}
+
+function onExamReplay() {
+  if (session && fsm.state === S.LISTENING && CONFIG.EXAM.ALLOW_REPLAY) fsm.go(S.PLAYING, { replay: true });
+}
+function onSkip() {
+  if (!session || fsm.state !== S.LISTENING || !CONFIG.EXAM.ALLOW_SKIP) return;
+  fsm.go(S.COMPLETE, { reason: 'skipped' });
+}
+function onEndExam() {
+  if (!examActive()) return;
+  cancelFlow();
+  stopAllSound();
+  const r = session.result;
+  if (r && r.status === 'pending' && (r.listenMs > 0 || r.noteResults.some((n) => n.verified))) session.finishQuestion('skipped');
+  session.abort();
+  finishSession();
+}
+
+async function onPlayClick() {                      // serbest çalışma
+  if (starting) return;
+  starting = true;
+  hideAlert();
+  renderAll();
+  const ok = await prepareInput();
+  starting = false;
+  if (!ok) { renderAll(); return; }
+  fsm.go(S.PLAYING, { fresh: true });
+}
+function onReplayClick() {
+  if (!session && fsm.state === S.LISTENING) fsm.go(S.PLAYING, { fresh: false });   // ilerleme korunur
+}
+
+async function onDeviceChange() {
+  settings.deviceId = ui.device.value || null;
+  hardReset();
+  try { await startMic(settings.deviceId); }
+  catch (err) { showAlert(explainError(err)); }
+}
+
+function setMode(next, { persist = true } = {}) {
+  if (examActive()) return;
+  mode = next;
+  ui.tabExam.setAttribute('aria-selected', String(next === 'exam'));
+  ui.tabPractice.setAttribute('aria-selected', String(next === 'practice'));
+  ui.examControls.hidden = next !== 'exam';
+  ui.practiceControls.hidden = next !== 'practice';
+  hideSummary();
+  if (next === 'practice') selectionChanged();      // egzersizi kurar + sıfırlar
+  else { exercise = new Exercise([]); buildNoteBoxes(); hardReset(); }
+  if (persist) savePrefs();
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 7) ANA DÖNGÜ — requestAnimationFrame (≈ 60 kare/sn)
+// ───────────────────────────────────────────────────────────────────────
+let rafId = 0, lastTs = 0, lastTimerTs = 0;
+
+function frame(ts) {
+  rafId = requestAnimationFrame(frame);
+  if (!lastTs) lastTs = ts;
+  let dt = ts - lastTs;
+  lastTs = ts;
+  if (!(dt > 0)) dt = 0;
+
+  drawContour(ts);
+  if (!analyser || !detector) { easeNeedle(Math.min(dt, 100)); return; }
+
+  analyser.getFloatTimeDomainData(timeBuf);         // en güncel pencere (fftSize örnek)
+  const rms = rootMeanSquare(timeBuf);
+  paintLevel(rms);
+  if (session && ts - lastTimerTs > 250) { lastTimerTs = ts; renderTimer(); }
+
+  if (fsm.state !== S.LISTENING) {                  // çalma / bekleme: ölçüm yok, yalnızca ibre süzülür
+    easeNeedle(Math.min(dt, 100));
+    return;
+  }
+  if (dt > CONFIG.PITCH.MAX_FRAME_GAP_MS) { tracker.reset(); medianFilter.reset(); dt = 0; }
+
+  const target = exercise.current;
+  if (!target) return;
+  const res = session?.result ?? null;
+  const stats = res ? res.noteResults[exercise.index] : null;
+  if (res) res.listenMs += dt;                      // süre yalnızca dinlerken işler (çalım hariç)
+  if (stats) stats.timeMs += dt;
+
+  const P = CONFIG.PITCH;
+  const loud = rms >= rmsLinear;                    // RMS gürültü kapısı
+  let valid = false, freq = 0, clarity = 0, cents = 0;
+  if (loud) {                                       // sessizlikte pahalı hesabı atla
+    const [pitch, c] = detector.findPitch(timeBuf, audioCtx.sampleRate);
+    clarity = c;
+    if (c >= P.MIN_CLARITY && pitch >= P.MIN_FREQ && pitch <= P.MAX_FREQ) {
+      freq = midiToFreq(medianFilter.push(freqToMidi(pitch)));
+      const cmp = compareToTarget(freq, target.freq, octaveModeFor(exercise, settings.fold), exercise.anchorK);
+      cents = cmp.cents;
+      lastOctave = cmp.octave;
+      valid = true;
+    }
+  }
+  if (valid) invalidMs = 0;
+  else if ((invalidMs += dt) > CONFIG.SUSTAIN_DROPOUT_GRACE_MS) medianFilter.reset();
+
+  const absCents = Math.abs(cents);
+  const zone = valid ? zoneOf(absCents) : 'none';
+  const passed = tracker.update(dt, valid, absCents);   // puanlama HAM (yumuşatılmamış) değerle
+  if (valid && stats) recordPitchFrame(stats, cents);
+  if (valid && exercise.anchorK === null && absCents <= CONFIG.TOLERANCE_CENTS) {
+    octaveVotes.set(lastOctave, (octaveVotes.get(lastOctave) || 0) + 1);
+  }
+
+  const feedback = !session || CONFIG.EXAM.LIVE_FEEDBACK;
+  if (feedback) {
+    pushContour(ts, valid ? cents : NaN, valid && absCents <= CONFIG.TOLERANCE_CENTS);
+    if (valid) needleTargetX = (clamp(cents, -gaugeRange(), gaugeRange()) / gaugeRange()) * gaugeHalf;
+    setZone(zone);
+    paintSustain(tracker.progress);
+  }
+  easeNeedle(Math.min(dt, 100));
+
+  if (ts - lastReadoutTs >= CONFIG.UI.READOUT_INTERVAL_MS) {    // metinler ≈ 12 Hz'de güncellenir
+    lastReadoutTs = ts;
+    if (feedback) {
+      setText(ui.centsVal, valid ? fmtCents(cents) : '—');
+      setText(ui.zoneLabel, valid ? ZONE_TEXT[zone] : (loud ? 'Perde net değil' : 'Ses bekleniyor'));
+      setText(ui.heardFreq, valid ? `${nf1.format(freq)} Hz` : '— Hz');
+      setText(ui.heardNote, valid ? `≈ ${nearestNoteName(freq)}` : ' ');
+      setText(ui.sustainText, `${nf2.format(tracker.ms / 1000)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
+      setHint(!loud ? 'quiet' : !valid ? 'unclear' : absCents > 600 ? 'octave' : zone === 'perfect' ? 'hold' : cents < 0 ? 'low' : 'high');
+    } else {
+      setText(ui.zoneLabel, loud ? 'Dinleniyor…' : 'Ses bekleniyor');
+      setHint(!loud ? 'quiet' : 'blind');
+    }
+    setText(ui.clarityText, loud ? `netlik ${nf2.format(clarity)}` : 'netlik —');
+  }
+
+  const limit = session ? CONFIG.EXAM.QUESTION_TIME_LIMIT_S : 0;
+  if (passed) {
+    if (exercise.index === 0 && exercise.anchorK === null) {     // oktav çapası: tutma sırasındaki çoğunluk oyu
+      let best = lastOctave, bestN = -1;
+      for (const [k, n] of octaveVotes) if (n > bestN) { best = k; bestN = n; }
+      exercise.anchorK = best;
+    }
+    fsm.go(S.VERIFIED);
+  } else if (limit > 0 && res && res.listenMs >= limit * 1000) {
+    fsm.go(S.COMPLETE, { reason: 'timeout' });
+  }
+}
+
+
+// ───────────────────────────────────────────────────────────────────────
+// 8) BAŞLATMA
+// ───────────────────────────────────────────────────────────────────────
+let historyClearArmed = 0;
+function bindEvents() {
+  ui.tabExam.addEventListener('click', () => setMode('exam'));
+  ui.tabPractice.addEventListener('click', () => setMode('practice'));
+  ui.startBtn.addEventListener('click', onStartExam);
+  ui.examReplay.addEventListener('click', onExamReplay);
+  ui.skipBtn.addEventListener('click', onSkip);
+  ui.endBtn.addEventListener('click', onEndExam);
+  ui.play.addEventListener('click', onPlayClick);
+  ui.replay.addEventListener('click', onReplayClick);
+  ui.reset.addEventListener('click', hardReset);
+  for (const select of [ui.root, ui.octave, ui.type]) select.addEventListener('change', selectionChanged);
+  ui.device.addEventListener('change', onDeviceChange);
+  ui.sumNew.addEventListener('click', onStartExam);
+  ui.sumClose.addEventListener('click', hideSummary);
+
+  ui.fold.addEventListener('change', () => {
+    settings.fold = ui.fold.checked;
+    updateFoldUi();
+    tracker.reset();
+    savePrefs();
+  });
+  ui.staffToggle.addEventListener('change', () => setStaffEnabled(ui.staffToggle.checked));
+  ui.thr.addEventListener('input', () => {
+    settings.rmsDb = +ui.thr.value;
+    rmsLinear = dbToLin(settings.rmsDb);
+    updateThresholdUi();
+  });
+  ui.thr.addEventListener('change', savePrefs);
+
+  ui.historyClear.addEventListener('click', () => {
+    if (!historyClearArmed) {                       // iki adımlı onay (engelleyici diyalog yok)
+      ui.historyClear.textContent = 'Silmek için tekrar tıklayın';
+      historyClearArmed = setTimeout(() => { historyClearArmed = 0; ui.historyClear.textContent = 'Geçmişi temizle'; }, 4000);
+      return;
+    }
+    clearTimeout(historyClearArmed);
+    historyClearArmed = 0;
+    ui.historyClear.textContent = 'Geçmişi temizle';
+    clearHistory();
+  });
+
+  ui.cfgChip.addEventListener('click', () => { ui.settingsPanel.open = true; ui.settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  ui.applySettings.addEventListener('click', onApplySettings);
+  ui.resetSettings.addEventListener('click', () => { ui.presetSelect.value = ''; reportApply(applyOverrides({})); });
+  ui.presetSelect.addEventListener('change', onPresetChange);
+  ui.jsonApply.addEventListener('click', onJsonApply);
+  ui.jsonExport.addEventListener('click', onJsonExport);
+  ui.jsonImportBtn.addEventListener('click', () => ui.jsonImport.click());
+  ui.jsonImport.addEventListener('change', onJsonImportFile);
+  ui.jsonCopyAll.addEventListener('click', onCopyAll);
+
+  document.addEventListener('visibilitychange', () => { if (document.hidden) { tracker.reset(); medianFilter.reset(); } });
+  navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (micStream) refreshDevices(); });
+  if ('ResizeObserver' in window) {
+    let raf = 0;
+    new ResizeObserver(() => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; renderHistory(); }); }).observe(ui.historyChart);
+    new ResizeObserver(() => scheduleStaffDraw()).observe(ui.staff);
+  }
+}
+
+function init() {
+  // 1) Bu tarayıcıda kaydedilmiş özel ayarlar (Ayarlar paneli) → CONFIG'e işlenir
+  const storedCfg = storageGet(CONFIG_KEY, null);
+  let cfgProblem = '';
+  if (storedCfg) {
+    const r = applyOverrides(storedCfg, { persist: false });
+    if (!r.ok) cfgProblem = r.errors[0];
+  }
+  // 2) Tercihler
+  const prefs = storageGet(PREFS_KEY, {}) || {};
+  settings.fold = typeof prefs.fold === 'boolean' ? prefs.fold : true;
+  const gate = Number(prefs.gateDb);
+  settings.rmsDb = Number.isFinite(gate) ? clamp(gate, CONFIG.PITCH.NOISE_GATE_MIN_DB, CONFIG.PITCH.NOISE_GATE_MAX_DB) : CONFIG.PITCH.NOISE_GATE_DB;
+  rmsLinear = dbToLin(settings.rmsDb);
+
+  fillSelects();
+  if (isPlainObject(prefs.practice)) {
+    const { root, octave, type } = prefs.practice;
+    if (ROOTS[+root]) ui.root.value = String(root);
+    if (['2', '3', '4', '5'].includes(String(octave))) ui.octave.value = String(octave);
+    if (TYPE_BY_ID[type]) ui.type.value = type;
+  }
+  buildSettingsForm();
+  fillPresetSelect();
+  paintGaugeBackground();
+  buildTicks();
+  observeGauge();
+  setupContour();
+  updateThresholdUi();
+  bindEvents();
+
+  uiReady = true;
+  fillSettingsForm(CONFIG);
+  refreshJsonArea();
+  updateHeaderText();
+  updateFoldUi();
+  renderConfigChip();
+  renderDetectorChip();
+  renderEngineChip();
+  renderHistory();
+  setMode(prefs.mode === 'practice' ? 'practice' : 'exam', { persist: false });
+  setStaffEnabled(typeof prefs.staff === 'boolean' ? prefs.staff : CONFIG.UI.SHOW_STAFF, { persist: false });
+  if (cfgProblem) showNotice(`Kayıtlı özel ayarlar geçersiz olduğu için varsayılanlar kullanılıyor (${cfgProblem}).`);
+
+  // 3) Ses: AudioContext şimdi "askıda" oluşturulur, piyano örnekleri arka planda yüklenir.
+  //    Tarayıcı sesi ilk tıklamaya kadar başlatmaz (ensureAudio → resume).
+  try { createAudioContext(); } catch (err) { console.warn(err); }
+  if (CONFIG.AUDIO.INSTRUMENT === 'piano') preparePiano();
+  if (CONFIG.PITCH.ALGORITHM === 'MPM') loadPitchy().catch(() => {});   // önceden ısıt; hata başlatınca ele alınır
+
+  if (!window.isSecureContext || !navigator.mediaDevices?.getUserMedia) {
+    showAlert('Mikrofon için sayfa https veya http://localhost üzerinden açılmalıdır (file:// bazı tarayıcılarda çalışmaz).');
+  }
+  drawContour(performance.now());
+}
+init();
+
+// Geliştirici API'si (konsol): ayarları değiştirme, oturum üretme, teşhis hesaplama
+window.solfejLab = Object.freeze({
+  CONFIG,
+  defaults: DEFAULT_CONFIG,
+  get overrides() { return deepClone(configOverrides); },
+  setConfig: (partial, opts) => applyOverrides(deepMerge(configOverrides, partial || {}), opts),
+  resetConfig: () => applyOverrides({}),
+  generateSession: (seed = Date.now()) => generateSession(CONFIG, mulberry32(seed >>> 0)),
+  computeDiagnostics,
+  history: { load: loadHistory, clear: clearHistory },
+});
+if (new URLSearchParams(location.search).has('debug')) {
+  window.__dbg = {
+    get state() { return fsm.state; }, get exercise() { return exercise; }, get session() { return session; },
+    get tracker() { return tracker; }, get detector() { return detector; }, get audioCtx() { return audioCtx; },
+    get piano() { return piano; }, get diag() { return lastDiag; }, get staff() { return staffView; },
+    get overrides() { return configOverrides; }, fsm, CONFIG,
+  };
+}
+</script>
+</body>
+</html>
