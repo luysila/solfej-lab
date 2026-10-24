@@ -414,6 +414,11 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
         <label class="field"><span>Kök ses</span><select id="rootSelect"></select></label>
         <label class="field"><span>Kök oktavı</span><select id="octaveSelect"></select></label>
         <label class="field"><span>Ses / aralık / akor</span><select id="typeSelect"></select></label>
+        <label class="field"><span data-text="labelPlayback">Çalım biçimi</span><select id="playbackSelect">
+          <option value="harmonic" data-text="playbackHarmonic">Birlikte (armonik)</option>
+          <option value="melodic" data-text="playbackMelodic">Ayrı ayrı (kökten yukarı)</option>
+          <option value="both" data-text="playbackBoth">Önce ayrı, sonra birlikte</option>
+        </select></label>
       </div>
       <div class="actions">
         <button class="btn primary" id="playBtn" type="button" data-text="btnPlay">▶ Çal &amp; Başla</button>
@@ -703,6 +708,7 @@ const CONFIG = {
     QUESTION_TIME_LIMIT_S: 0,     // soru başına dinleme süresi sınırı (sn); 0 = sınırsız
     ALLOW_REPLAY: true,
     ALLOW_SKIP: true,
+    PLAYBACK: 'harmonic',         // sınavda çalım biçimi: 'harmonic' → birlikte · 'melodic' → ayrı ayrı (kökten yukarı) · 'both' → önce ayrı, sonra birlikte
   },
 
   // ══ 3. PUANLAMA ═════════════════════════════════════════════════════
@@ -745,6 +751,10 @@ const CONFIG = {
   AUDIO: {
     INSTRUMENT: 'piano',          // 'piano' → Tone.js + gerçek piyano örnekleri · 'synth' → dahili sentez (çevrimdışı)
     CHORD_DURATION_S: 1.8,        // seslerin aynı anda (armonik) çalınma süresi
+    MELODIC_NOTE_S: 0.9,          // ayrı ayrı çalımda her sesin süresi (sn)
+    MELODIC_GAP_S: 0.15,          // ayrı ayrı çalımda sesler arası boşluk (sn)
+    BOTH_PAUSE_S: 0.4,            // "önce ayrı, sonra birlikte"de ayrı seslerden sonra, akordan önceki bekleme (sn)
+    PRACTICE_PLAYBACK: 'harmonic',// serbest çalışmada "Çalım biçimi" varsayılanı (seçim tercihlerde saklanır)
     LISTEN_DELAY_MS: 450,         // çalım bitince dinlemeye başlamadan önce (kuyruk sönsün)
     VERIFIED_HOLD_MS: 650,        // doğrulamadan sonra sıradaki sese geçmeden önce
     MASTER_GAIN: 0.6,             // yedek sentez seviyesi
@@ -842,6 +852,11 @@ const CONFIG = {
     legendHeld: 'Tolerans içinde',
     legendOut: 'Dışında',
     legendGuide: 'Hedef',
+    labelPlayback: 'Çalım biçimi',
+    playbackHarmonic: 'Birlikte (armonik)',
+    playbackMelodic: 'Ayrı ayrı (kökten yukarı)',
+    playbackBoth: 'Önce ayrı, sonra birlikte',
+    notePlayHint: 'Bu sesi çal',
     // Yönlendirme cümleleri: her durum için 2–3 söyleyiş (sırayla kullanılır, aynı cümle üst üste gelmez)
     COACH: {
       idle:      { a: 'Yönlendirme birkaç saniye içinde burada görünür.' },
@@ -1181,6 +1196,34 @@ function planTriads(count, rules = CONFIG.CHORD_RULES, rng = Math.random) {
   }
   return out.map((id) => TYPE_BY_ID[id]);
 }
+
+// ───────────────────────────────────────────────────────────────────────
+// ÇALIM PLANI — hangi ses ne zaman, ne kadar çalınır; toplam süre kadar beklenip dinlemeye geçilir
+//  'harmonic' → hepsi birlikte CHORD_DURATION_S
+//  'melodic'  → kökten yukarı tek tek: her ses MELODIC_NOTE_S, aralarında MELODIC_GAP_S
+//  'both'     → önce ayrı ayrı, BOTH_PAUSE_S bekleme, sonra birlikte
+//  Tek seste 'melodic' ile 'both' aynıdır: ses bir kez, MELODIC_NOTE_S boyunca çalınır.
+// ───────────────────────────────────────────────────────────────────────
+const PLAYBACK_MODES = ['harmonic', 'melodic', 'both'];
+
+/** @returns {{total:number, steps:Array<{start:number, dur:number, indices:number[]}>}}  süreler saniye */
+function playbackPlan(mode, count, audio = CONFIG.AUDIO) {
+  const n = Math.max(0, Math.floor(count || 0));
+  if (!n) return { total: 0, steps: [] };
+  const all = Array.from({ length: n }, (_, i) => i);
+  const chord = (start) => ({ start, dur: audio.CHORD_DURATION_S, indices: all });
+  if (mode !== 'melodic' && mode !== 'both') return { total: audio.CHORD_DURATION_S, steps: [chord(0)] };
+  const step = audio.MELODIC_NOTE_S + audio.MELODIC_GAP_S;
+  const steps = all.map((i) => ({ start: i * step, dur: audio.MELODIC_NOTE_S, indices: [i] }));
+  let total = n * audio.MELODIC_NOTE_S + (n - 1) * audio.MELODIC_GAP_S;
+  if (mode === 'both' && n > 1) {
+    steps.push(chord(total + audio.BOTH_PAUSE_S));
+    total += audio.BOTH_PAUSE_S + audio.CHORD_DURATION_S;
+  }
+  return { total, steps };
+}
+/** Çalım süresi (sn): biçime ve ses sayısına göre */
+const playbackDuration = (mode, count, audio = CONFIG.AUDIO) => playbackPlan(mode, count, audio).total;
 
 function questionTitle(type, notes) {
   if (type.kind === 'single')   return `${notes[0].fullName} · ${notes[0].solfege}`;
@@ -1883,6 +1926,11 @@ function validateConfig(cfg) {
   num(cfg.PITCH?.NOISE_GATE_DB, -100, 0, 'PITCH.NOISE_GATE_DB');
   oneOf(cfg.AUDIO?.INSTRUMENT, ['piano', 'synth'], 'AUDIO.INSTRUMENT');
   num(cfg.AUDIO?.CHORD_DURATION_S, 0.2, 10, 'AUDIO.CHORD_DURATION_S');
+  num(cfg.AUDIO?.MELODIC_NOTE_S, 0.1, 5, 'AUDIO.MELODIC_NOTE_S');
+  num(cfg.AUDIO?.MELODIC_GAP_S, 0, 3, 'AUDIO.MELODIC_GAP_S');
+  num(cfg.AUDIO?.BOTH_PAUSE_S, 0, 5, 'AUDIO.BOTH_PAUSE_S');
+  oneOf(cfg.AUDIO?.PRACTICE_PLAYBACK, PLAYBACK_MODES, 'AUDIO.PRACTICE_PLAYBACK');
+  oneOf(cfg.EXAM?.PLAYBACK, PLAYBACK_MODES, 'EXAM.PLAYBACK');
   num(cfg.AUDIO?.PIANO?.SAMPLE_EVERY, 1, 12, 'AUDIO.PIANO.SAMPLE_EVERY');
   num(cfg.UI?.CONTOUR_SECONDS, 1, 30, 'UI.CONTOUR_SECONDS');
   num(cfg.UI?.CONTOUR_RANGE_CENTS, 20, 1200, 'UI.CONTOUR_RANGE_CENTS');
@@ -2094,6 +2142,16 @@ function playHarmonic(notes, durationSec, when) {
   const peak = 0.6 / Math.sqrt(notes.length);                        // ses sayısına göre seviye → kırpılma yok
   for (const n of notes) playVoice(n.freq, when, durationSec, peak);
   return 'synth';
+}
+
+/**
+ * Çalım planına göre çalar: 'melodic' ayrı ayrı (kökten yukarı) · 'both' önce ayrı, sonra birlikte · 'harmonic' birlikte.
+ * Planı ve süreyi playbackPlan() (PURE) verir. @returns {number} toplam süre (sn)
+ */
+function playMelodic(notes, mode = 'melodic', when = audioCtx.currentTime + 0.06) {
+  const plan = playbackPlan(mode, notes.length, CONFIG.AUDIO);
+  for (const st of plan.steps) playHarmonic(st.indices.map((i) => notes[i]), st.dur, when + st.start);
+  return plan.total;
 }
 
 /** Serbest çalışmada tamamlanma ödülü: kısa arpej + son akor */
@@ -2444,14 +2502,39 @@ function buildNoteBoxes() {
     noteEls = [];
     return;
   }
+  const playable = mode === 'practice' && !session;   // sınavda nota kutuları hiçbir şey çalmaz
   noteEls = exercise.notes.map((n, i) => {
     const box = el('div', 'note');
-    box.setAttribute('role', 'listitem');
+    box.setAttribute('role', playable ? 'button' : 'listitem');
     const name = el('span', 'name', n.name), sub = el('span', 'sub', ''), badge = el('span', 'badge');
     box.append(el('span', 'step', `${i + 1} · ${n.role}`), name, sub, badge);
+    if (playable) {                                   // tıkla / Enter / Boşluk → yalnızca bu ses çalar
+      box.tabIndex = 0;
+      box.title = T('notePlayHint');
+      box.setAttribute('aria-label', `${T('notePlayHint')}: ${n.name} (${n.solfege})`);
+      box.style.cursor = 'pointer';
+      box.addEventListener('click', () => onNoteBoxPlay(i));
+      box.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onNoteBoxPlay(i); }
+      });
+    }
     ui.notes.append(box);
     return { box, name, sub, badge };
   });
+}
+/**
+ * Serbest çalışmada tek sesi çalar.
+ *  Dinlerken → PLAYING'den geçilir (ölçüm durur), çalım bitince aynı seste dinleme sürer; doğrulananlar korunur.
+ *  Hazır / bitmiş → yalnızca ses çalar, dinleme başlamaz. Çalarken ve doğrulama anında yok sayılır.
+ */
+async function onNoteBoxPlay(i) {
+  if (session || mode !== 'practice' || starting || !exercise.notes[i]) return;
+  const st = fsm.state;
+  if (st === S.LISTENING) { fsm.go(S.PLAYING, { single: i }); return; }
+  if (st !== S.IDLE && st !== S.COMPLETE) return;
+  try { await ensureAudio(); } catch (err) { showAlert(explainError(err)); return; }
+  stopAllSound();
+  playMelodic([exercise.notes[i]], 'melodic');
 }
 
 function noteState(i) {
@@ -3644,6 +3727,7 @@ const SETTINGS_SCHEMA = [
     { path: 'INTERVAL_RULES.POOL', label: 'Aralık havuzu (iki ses)', type: 'multi', wide: true, options: INTERVAL_TYPES.map((t) => [t.id, t.label]) },
   ] },
   { title: 'Sınav akışı ve puan', fields: [
+    { path: 'EXAM.PLAYBACK', label: 'Sınavda çalım biçimi', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (kökten yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
     { path: 'EXAM.REVEAL_NOTE_NAMES', label: 'Nota adlarını göster', type: 'select', options: [['after', 'Ses doğrulanınca'], ['end', 'Soru bitince'], ['always', 'Her zaman'], ['never', 'Hiçbir zaman']] },
     { path: 'EXAM.QUESTION_TIME_LIMIT_S', label: 'Soru süre sınırı (sn · 0 = yok)', type: 'number', min: 0, max: 600, step: 5 },
     { path: 'SCORING.REPLAY_PENALTY', label: 'Tekrar başına kesinti (%)', type: 'percent', min: 0, max: 100, step: 5 },
@@ -3656,6 +3740,10 @@ const SETTINGS_SCHEMA = [
   { title: 'Ses ve algılama', fields: [
     { path: 'AUDIO.INSTRUMENT', label: 'Çalgı', type: 'select', options: [['piano', 'Piyano (Tone.js)'], ['synth', 'Sentez (çevrimdışı)']] },
     { path: 'AUDIO.CHORD_DURATION_S', label: 'Çalım süresi (sn)', type: 'number', min: 0.3, max: 8, step: 0.1 },
+    { path: 'AUDIO.PRACTICE_PLAYBACK', label: 'Serbest çalışma çalım biçimi (varsayılan)', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (kökten yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
+    { path: 'AUDIO.MELODIC_NOTE_S', label: 'Ayrı çalımda ses süresi (sn)', type: 'number', min: 0.1, max: 5, step: 0.05 },
+    { path: 'AUDIO.MELODIC_GAP_S', label: 'Ayrı çalımda sesler arası boşluk (sn)', type: 'number', min: 0, max: 3, step: 0.05 },
+    { path: 'AUDIO.BOTH_PAUSE_S', label: 'Akordan önceki bekleme (sn)', type: 'number', min: 0, max: 5, step: 0.05 },
     { path: 'PITCH.ALGORITHM', label: 'Perde algılama', type: 'select', options: [['YIN', 'YIN (dahili)'], ['MPM', 'MPM (pitchy)']] },
     { path: 'PITCH.YIN_THRESHOLD', label: 'YIN eşiği', type: 'number', min: 0.02, max: 0.5, step: 0.01 },
     { path: 'PITCH.YIN_ADAPTIVE_K', label: 'YIN uyarlamalı eşik (0 = klasik)', type: 'number', min: 0, max: 0.99, step: 0.01 },
@@ -3863,6 +3951,7 @@ function savePrefs() {
   storageSet(PREFS_KEY, {
     mode, gateDb: settings.rmsDb, fold: settings.fold, staffView: staffView.on,   // eski "staff" alanı (VexFlow paneli) artık okunmaz
     practice: { root: ui.root.value, octave: ui.octave.value, type: ui.type.value },
+    playback: practicePlayback(),                   // serbest çalışma "Çalım biçimi"
   });
 }
 
@@ -3953,10 +4042,13 @@ function onStateChange(next, prev, payload) {
       clearReadouts();
       resetCoach();
       stopAllSound();
-      const dur = CONFIG.AUDIO.CHORD_DURATION_S;
-      playHarmonic(exercise.notes, dur, audioCtx.currentTime + 0.06);
-      markContour(performance.now(), session ? `▶${session.index + 1}` : '▶');
-      after(dur * 1000 + 60 + CONFIG.AUDIO.LISTEN_DELAY_MS, () => fsm.go(S.LISTENING));
+      // Ne çalınacak: tek ses (kutuya tıklandı) · sınavda EXAM.PLAYBACK · serbest çalışmada "Çalım biçimi"
+      const single = Number.isInteger(payload?.single) ? payload.single : null;
+      const how = single !== null ? 'melodic' : session ? CONFIG.EXAM.PLAYBACK : (payload?.playback ?? 'harmonic');
+      const total = playMelodic(single !== null ? [exercise.notes[single]] : exercise.notes, how, audioCtx.currentTime + 0.06);
+      markContour(performance.now(), single !== null ? `♪${single + 1}` : session ? `▶${session.index + 1}` : '▶');
+      // Dinleme çalım bitince başlar (ilerleme korunur: yalnızca fresh çalımda baştan)
+      after(total * 1000 + 60 + CONFIG.AUDIO.LISTEN_DELAY_MS, () => fsm.go(S.LISTENING));
       break;
     }
 
@@ -4112,10 +4204,15 @@ async function onPlayClick() {                      // serbest çalışma
   const ok = await prepareInput();
   starting = false;
   if (!ok) { renderAll(); return; }
-  fsm.go(S.PLAYING, { fresh: true });
+  fsm.go(S.PLAYING, { fresh: true, playback: practicePlayback() });
 }
 function onReplayClick() {
-  if (!session && fsm.state === S.LISTENING) fsm.go(S.PLAYING, { fresh: false });   // ilerleme korunur
+  if (!session && fsm.state === S.LISTENING) fsm.go(S.PLAYING, { fresh: false, playback: practicePlayback() });   // ilerleme korunur
+}
+/** Serbest çalışmadaki "Çalım biçimi" seçimi */
+function practicePlayback() {
+  const v = document.getElementById('playbackSelect')?.value;
+  return PLAYBACK_MODES.includes(v) ? v : CONFIG.AUDIO.PRACTICE_PLAYBACK;
 }
 
 async function onDeviceChange() {
@@ -4256,6 +4353,7 @@ function bindEvents() {
   ui.replay.addEventListener('click', onReplayClick);
   ui.reset.addEventListener('click', hardReset);
   for (const select of [ui.root, ui.octave, ui.type]) select.addEventListener('change', selectionChanged);
+  document.getElementById('playbackSelect').addEventListener('change', savePrefs);
   ui.device.addEventListener('change', onDeviceChange);
   ui.sumNew.addEventListener('click', onStartExam);
   ui.sumClose.addEventListener('click', hideSummary);
@@ -4332,6 +4430,7 @@ function init() {
     if (['2', '3', '4', '5'].includes(String(octave))) ui.octave.value = String(octave);
     if (TYPE_BY_ID[type]) ui.type.value = type;
   }
+  document.getElementById('playbackSelect').value = PLAYBACK_MODES.includes(prefs.playback) ? prefs.playback : CONFIG.AUDIO.PRACTICE_PLAYBACK;
   buildSettingsForm();
   fillPresetSelect();
   paintGaugeBackground();

@@ -279,6 +279,47 @@ test('Arayüz adları: boş olamaz, en fazla 80 karakter (cümleler 160), dışa
   assert.equal(r.warnings.length, 2);
 });
 
+test('Çalım planı: birlikte / ayrı ayrı / önce ayrı sonra birlikte — süre ve sıra', () => {
+  const A = M.CONFIG.AUDIO;
+  const close = (a, b, msg) => assert.ok(Math.abs(a - b) < 1e-9, `${msg}: ${a} ≠ ${b}`);
+  assert.equal(A.MELODIC_NOTE_S, 0.9);
+  assert.equal(A.MELODIC_GAP_S, 0.15);
+  assert.equal(A.BOTH_PAUSE_S, 0.4);
+  assert.equal(M.CONFIG.EXAM.PLAYBACK, 'harmonic', 'sınav varsayılanı birlikte');
+
+  // Birlikte: ses sayısından bağımsız, tek adım
+  const h = M.playbackPlan('harmonic', 3);
+  close(h.total, 1.8, 'birlikte 3 ses');
+  assert.deepEqual(h.steps, [{ start: 0, dur: 1.8, indices: [0, 1, 2] }]);
+  // Ayrı ayrı: kökten yukarı, 3·0,9 + 2·0,15 = 3,0 sn
+  const m = M.playbackPlan('melodic', 3);
+  close(m.total, 3.0, 'ayrı 3 ses');
+  assert.deepEqual(m.steps.map((s) => s.indices), [[0], [1], [2]]);
+  m.steps.forEach((s, i) => { close(s.start, i * 1.05, `ayrı ${i}. ses başlangıcı`); close(s.dur, 0.9, 'ses süresi'); });
+  // Önce ayrı, sonra birlikte: 3,0 + 0,4 + 1,8 = 5,2 sn; akor 3,4. sn'de
+  const b = M.playbackPlan('both', 3);
+  close(b.total, 5.2, 'önce ayrı sonra birlikte 3 ses');
+  assert.equal(b.steps.length, 4);
+  close(b.steps[3].start, 3.4, 'akor başlangıcı');
+  assert.deepEqual(b.steps[3].indices, [0, 1, 2]);
+  close(M.playbackDuration('both', 2), 2 * 0.9 + 0.15 + 0.4 + 1.8, 'iki ses');
+  // Tek ses: ayrı ve "önce ayrı sonra birlikte" aynı (bir kez); birlikte → akor süresi
+  close(M.playbackDuration('melodic', 1), 0.9, 'tek ses ayrı');
+  close(M.playbackDuration('both', 1), 0.9, 'tek ses önce ayrı');
+  assert.equal(M.playbackPlan('both', 1).steps.length, 1);
+  close(M.playbackDuration('harmonic', 1), 1.8, 'tek ses birlikte');
+  // Boş ve bilinmeyen biçim; özel ayarlar
+  assert.deepEqual(M.playbackPlan('melodic', 0), { total: 0, steps: [] });
+  close(M.playbackDuration('bilinmeyen', 3), 1.8, 'bilinmeyen → birlikte');
+  close(M.playbackDuration('both', 3, { ...A, MELODIC_NOTE_S: 0.5, MELODIC_GAP_S: 0, BOTH_PAUSE_S: 1, CHORD_DURATION_S: 2 }), 4.5, 'özel ayar');
+  // Doğrulama: biçim adları ve sınırlar
+  const D = M.DEFAULT_CONFIG;
+  assert.match(M.validateConfig(M.deepMerge(D, { EXAM: { PLAYBACK: 'arpej' } })).join(), /EXAM\.PLAYBACK/);
+  assert.match(M.validateConfig(M.deepMerge(D, { AUDIO: { MELODIC_NOTE_S: 0 } })).join(), /AUDIO\.MELODIC_NOTE_S/);
+  assert.match(M.validateConfig(M.deepMerge(D, { AUDIO: { BOTH_PAUSE_S: -1 } })).join(), /AUDIO\.BOTH_PAUSE_S/);
+  assert.deepEqual(M.validateConfig(M.deepMerge(D, { EXAM: { PLAYBACK: 'both' }, AUDIO: { MELODIC_GAP_S: 0 } })), []);
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {

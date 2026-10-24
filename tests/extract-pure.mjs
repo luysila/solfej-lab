@@ -22,7 +22,7 @@ const EXPORTS = [
   'createMachine', 'ALLOWED', 'S', 'Exercise', 'ExamSession', 'recordPitchFrame',
   'computeDiagnostics', 'buildAdvice', 'tendencyOf', 'makeHistoryEntry', 'normalizeHistory', 'pianoSampleMap', 'fmtSigned',
   'makeStaffMap', 'staffPosition', 'semitoneNeighbors', 'CoachWindow', 'coachKeyFor', 'coachMessage',
-  'textLeaves', 'textMaxLen',
+  'textLeaves', 'textMaxLen', 'playbackPlan', 'playbackDuration', 'PLAYBACK_MODES',
 ];
 
 const outDir = path.join(HERE, '.generated');
