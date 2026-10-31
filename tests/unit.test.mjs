@@ -341,6 +341,94 @@ test('Çalım planı: birlikte / ayrı ayrı / önce ayrı sonra birlikte — s�
   assert.deepEqual(M.validateConfig(M.deepMerge(D, { EXAM: { PLAYBACK: 'both' }, AUDIO: { MELODIC_GAP_S: 0 } })), []);
 });
 
+test('Çevrimler: yazım, alttan yukarı ses sırası, roller, register, söyleme sırası', () => {
+  const T = M.TYPE_BY_ID;
+  const root = (l, a) => M.ROOTS.find((r) => r.letter === l && r.acc === a);
+  const names = (notes) => notes.map((n) => n.fullName).join('–');
+  const C = root(0, 0);
+  assert.equal(names(M.buildNotes(C, 4, T.major, 440, 0)), 'C4–E4–G4');
+  assert.equal(names(M.buildNotes(C, 4, T.major, 440, 1)), 'E4–G4–C5', '1. çevrim: basta 3\'lü');
+  assert.equal(names(M.buildNotes(C, 4, T.major, 440, 2)), 'G4–C5–E5', '2. çevrim: basta 5\'li');
+  assert.equal(M.buildNotes(C, 4, T.major, 440, 1).map((n) => n.role).join(' '), "3'lü 5'li Kök");
+  // Yazım harf adımı + yarım sesle korunur
+  assert.equal(names(M.buildNotes(root(1, -1), 3, T.major, 440, 1)), 'F3–A♭3–D♭4');
+  assert.equal(names(M.buildNotes(root(1, 0), 4, T.minor, 440, 2)), 'A4–D5–F5');
+  assert.equal(names(M.buildNotes(root(6, 0), 3, T.diminished, 440, 1)), 'D4–F4–B4');
+  assert.equal(names(M.buildNotes(root(4, 1), 3, T.major, 440, 2)), 'D♯4–G♯4–B♯4');
+  // Her akor, her kök, her durum: alttan yukarı kesin artan; perde sınıfları temel durumla aynı; genişlik ≤ 6'lı
+  for (const t of M.CHORD_TYPES.filter((x) => x.kind === 'chord')) {
+    for (const r of M.ROOTS) {
+      const base = M.buildNotes(r, 4, t, 440, 0);
+      for (const inv of [1, 2]) {
+        const n = M.buildNotes(r, 4, t, 440, inv);
+        for (let i = 1; i < n.length; i++) assert.ok(n[i].midi > n[i - 1].midi, `${t.id} ${inv}: sıra`);
+        assert.deepEqual(n.map((x) => ((x.midi % 12) + 12) % 12).sort(), base.map((x) => ((x.midi % 12) + 12) % 12).sort());
+        assert.ok(n.at(-1).midi - n[0].midi <= 9, `${t.id} ${inv}: genişlik`);
+        assert.equal(n[0].role, inv === 1 ? "3'lü" : "5'li");
+      }
+    }
+  }
+  // Register: çevrilmiş hâliyle sığar
+  const rng = M.mulberry32(3);
+  for (let k = 0; k < 300; k++) {
+    const v = M.pickVoicing(T.minor, M.CONFIG, rng, null, 1 + (k % 2));
+    assert.ok(v && v.notes[0].midi >= 48 && v.notes.at(-1).midi <= 72, 'çevrim register dışı');
+    assert.match(v.key, /^minor\/[12]:/);
+  }
+  // Söyleme sırası: 'root' → kökten başla (oktavlar korunur)
+  const inv1 = M.buildNotes(C, 4, T.major, 440, 1);
+  assert.equal(names(M.orderForSinging(inv1, 'root')), 'C5–E4–G4');
+  assert.equal(names(M.orderForSinging(inv1, 'bass')), 'E4–G4–C5');
+  assert.equal(M.orderForSinging(inv1, 'root').map((n) => n.index).join(''), '012');
+});
+
+test('Çevrim seçimi: ağırlık 2:1:1, artmış yalnız temel durum (ayarla açılır), tekrar etmeme ve başlık', () => {
+  const rules = M.CONFIG.CHORD_RULES;
+  assert.deepEqual(rules.INVERSIONS, { root: 2, first: 1, second: 1 });
+  const rng = M.mulberry32(11), cnt = [0, 0, 0];
+  for (let i = 0; i < 8000; i++) cnt[M.pickInversion('major', rules, rng)]++;
+  assert.ok(Math.abs(cnt[0] / 8000 - 0.5) < 0.03 && Math.abs(cnt[1] / 8000 - 0.25) < 0.03, `dağılım ${cnt}`);
+  for (let i = 0; i < 300; i++) assert.equal(M.pickInversion('augmented', rules, rng), 0, 'artmış varsayılan: temel durum');
+  const augOn = { ...rules, AUGMENTED_INVERSIONS: true };
+  assert.ok(new Set(Array.from({ length: 300 }, () => M.pickInversion('augmented', augOn, rng))).size === 3);
+  assert.equal(M.pickInversion('minor', { ...rules, INVERSIONS: { root: 0, first: 0, second: 3 } }, rng), 2);
+  // Oturum: üç seste durum karışık, başlık durumu gösterir, aynı soru (tip + durum + kök) tekrar etmez, 5'li kural korunur
+  let seen = [0, 0, 0];
+  for (let seed = 1; seed <= 200; seed++) {
+    const qs = M.generateSession(M.CONFIG, M.mulberry32(seed));
+    const tri = qs.filter((q) => q.kind === 'triple');
+    assert.equal(new Set(qs.map((q) => q.key)).size, qs.length, 'tekrar yok');
+    assert.ok(tri.filter((q) => ['augmented', 'diminished'].includes(q.type.id)).length <= 1);
+    for (const q of tri) {
+      seen[q.inversion]++;
+      if (q.type.id === 'augmented') assert.equal(q.inversion, 0);
+      if (q.inversion) assert.match(q.title, new RegExp(`· ${q.inversion}\\. çevrim \\(${q.inversion === 1 ? '6' : '6/4'}\\) · `));
+      else assert.ok(!/çevrim/.test(q.title));
+      for (let i = 1; i < q.notes.length; i++) assert.ok(q.notes[i].midi > q.notes[i - 1].midi, 'alttan yukarı');
+    }
+  }
+  assert.ok(seen.every((n) => n > 50), `her durum çıkmalı: ${seen}`);
+  const root = M.ROOTS.find((r) => r.letter === 0 && r.acc === 0);
+  assert.equal(M.questionTitle(M.TYPE_BY_ID.major, M.buildNotes(root, 4, M.TYPE_BY_ID.major, 440, 1), 1), 'C Majör · 1. çevrim (6) · E4–G4–C5');
+  assert.match(M.validateConfig(M.deepMerge(M.DEFAULT_CONFIG, { CHORD_RULES: { INVERSIONS: { root: 0, first: 0, second: 0 } } })).join(), /INVERSIONS/);
+  assert.match(M.validateConfig(M.deepMerge(M.DEFAULT_CONFIG, { SING_ORDER: 'top' })).join(), /SING_ORDER/);
+});
+
+test('Teşhis: üç ses soruları duruma göre ayrılır, en zor durum bulunur', () => {
+  const mk = (inv, verified) => ({
+    kind: 'triple', typeId: 'major', inversion: inv, replays: 0, status: verified === 3 ? 'done' : 'partial',
+    notes: [{ role: 'Kök' }, { role: "3'lü" }, { role: "5'li" }],
+    noteResults: [0, 1, 2].map((i) => ({ verified: i < verified, timeMs: 900, valid: 40, far: 0, near: { n: 20, sum: 40, sumAbs: 100 }, held: { n: 20, sum: 40 } })),
+  });
+  const d = M.computeDiagnostics([mk(0, 3), mk(0, 3), mk(1, 3), mk(2, 1), mk(2, 0)], M.CONFIG);
+  assert.deepEqual(Object.keys(d.byInversion), ['0', '1', '2']);
+  assert.equal(d.byInversion[0].accuracy, 1);
+  assert.equal(d.byInversion[2].accuracy, 1 / 6);
+  assert.equal(d.hardestInversion, 2);
+  assert.ok(d.messages.some((m) => /2\. çevrim/.test(m)), d.messages.join(' | '));
+  assert.equal(d.byType.triple.questions, 5);
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {

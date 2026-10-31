@@ -155,10 +155,15 @@ export const SETTINGS_SCHEMA = [
     { path: 'REGISTER.maxMidi', label: 'Register üst sınırı', type: 'midi' },
     { path: 'CHORD_RULES.MAX_ALTERED_PER_SET', label: "5'li sette en fazla artmış/eksilmiş", type: 'number', min: 0, max: 10, step: 1 },
     { path: 'CHORD_RULES.ALTERED_CHANCE', label: 'Artmış/eksilmiş bulunma olasılığı (%)', type: 'percent', min: 0, max: 100, step: 5 },
+    { path: 'CHORD_RULES.INVERSIONS.root', label: 'Akor durumu ağırlığı · temel durum', type: 'number', min: 0, max: 10, step: 1 },
+    { path: 'CHORD_RULES.INVERSIONS.first', label: 'Akor durumu ağırlığı · 1. çevrim (6)', type: 'number', min: 0, max: 10, step: 1 },
+    { path: 'CHORD_RULES.INVERSIONS.second', label: 'Akor durumu ağırlığı · 2. çevrim (6/4)', type: 'number', min: 0, max: 10, step: 1 },
+    { path: 'SING_ORDER', label: 'Söyleme sırası', type: 'select', options: [['bass', 'En alttaki sesten başla'], ['root', 'Kökten başla']] },
+    { path: 'CHORD_RULES.AUGMENTED_INVERSIONS', label: 'Artmış akorun çevrimleri de gelsin', type: 'bool' },
     { path: 'INTERVAL_RULES.POOL', label: 'Aralık havuzu (iki ses)', type: 'multi', wide: true, options: INTERVAL_TYPES.map((t) => [t.id, t.label]) },
   ] },
   { title: 'Sınav akışı ve puan', tab: 'std', fields: [
-    { path: 'EXAM.PLAYBACK', label: 'Sınavda çalım biçimi', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (kökten yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
+    { path: 'EXAM.PLAYBACK', label: 'Sınavda çalım biçimi', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (alttan yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
     { path: 'EXAM.REVEAL_NOTE_NAMES', label: 'Nota adlarını göster', type: 'select', options: [['after', 'Ses doğrulanınca'], ['end', 'Soru bitince'], ['always', 'Her zaman'], ['never', 'Hiçbir zaman']] },
     { path: 'EXAM.QUESTION_TIME_LIMIT_S', label: 'Soru süre sınırı (sn · 0 = yok)', type: 'number', min: 0, max: 600, step: 5 },
     { path: 'SCORING.REPLAY_PENALTY', label: 'Tekrar başına kesinti (%)', type: 'percent', min: 0, max: 100, step: 5 },
@@ -171,7 +176,7 @@ export const SETTINGS_SCHEMA = [
   { title: 'Ses ve algılama', tab: 'audio', fields: [
     { path: 'AUDIO.INSTRUMENT', label: 'Çalgı', type: 'select', options: [['piano', 'Piyano (Tone.js)'], ['synth', 'Sentez (çevrimdışı)']] },
     { path: 'AUDIO.CHORD_DURATION_S', label: 'Çalım süresi (sn)', type: 'number', min: 0.3, max: 8, step: 0.1 },
-    { path: 'AUDIO.PRACTICE_PLAYBACK', label: 'Serbest çalışma çalım biçimi (varsayılan)', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (kökten yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
+    { path: 'AUDIO.PRACTICE_PLAYBACK', label: 'Serbest çalışma çalım biçimi (varsayılan)', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (alttan yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
     { path: 'AUDIO.MELODIC_NOTE_S', label: 'Ayrı çalımda ses süresi (sn)', type: 'number', min: 0.1, max: 5, step: 0.05 },
     { path: 'AUDIO.MELODIC_GAP_S', label: 'Ayrı çalımda sesler arası boşluk (sn)', type: 'number', min: 0, max: 3, step: 0.05 },
     { path: 'AUDIO.BOTH_PAUSE_S', label: 'Akordan önceki bekleme (sn)', type: 'number', min: 0, max: 5, step: 0.05 },
@@ -400,7 +405,7 @@ export function savePrefs() {
   if (!uiReady) return;
   storageSet(PREFS_KEY, {
     mode, gateDb: settings.rmsDb, fold: settings.fold,   // görünüm seçimi artık solfejlab.ui.v1'de (eski staffView bir kez çevrilir)
-    practice: { root: ui.root.value, octave: ui.octave.value, type: ui.type.value },
+    practice: { root: ui.root.value, octave: ui.octave.value, type: ui.type.value, inv: ui.inversion.value },
     playback: practicePlayback(),                   // serbest çalışma "Çalım biçimi"
   });
 }

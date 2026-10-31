@@ -186,18 +186,37 @@ export const CHORD_TYPES = [
 export const TYPE_BY_ID     = Object.fromEntries(CHORD_TYPES.map((t) => [t.id, t]));
 export const INTERVAL_TYPES = CHORD_TYPES.filter((t) => t.kind === 'interval');
 
+// Akor durumları: temel durum, 1. çevrim (6; basta 3'lü), 2. çevrim (6/4; basta 5'li)
+export const INVERSIONS = [
+  { id: 0, key: 'root',   label: 'Temel durum', fig: ''    },
+  { id: 1, key: 'first',  label: '1. çevrim',   fig: '6'   },
+  { id: 2, key: 'second', label: '2. çevrim',   fig: '6/4' },
+];
+export const INVERSION_LABEL = (inv) => (inv ? `${INVERSIONS[inv].label} (${INVERSIONS[inv].fig})` : INVERSIONS[0].label);
+/**
+ * Akor seslerini döndürür: alttaki inv ses bir oktav yukarı taşınır (harf adımı +7, yarım ses +12).
+ * Sonuç alttan yukarı sıralıdır; roller (Kök, 3'lü, 5'li) korunur. Do majör 1. çevrim → Mi–Sol–Do.
+ */
+export function invertTones(tones, inv = 0) {
+  const k = ((Math.floor(inv) % tones.length) + tones.length) % tones.length;
+  if (!k) return tones;
+  return [...tones.slice(k), ...tones.slice(0, k).map((t) => ({ ...t, steps: t.steps + 7, semis: t.semis + 12 }))];
+}
+
 // Sınav kategorileri
 export const KINDS       = ['single', 'double', 'triple'];
 export const KIND_LABEL  = { single: 'Tek ses', double: 'İki ses', triple: 'Üç ses' };
 export const KIND_DETAIL = { single: 'tek ses tekrarı', double: 'aralık', triple: "5'li akor" };
 
 /**
- * Kök + oktav + tipten nota listesi üretir (kökten yukarı doğru, sıralı).
+ * Kök + oktav + tipten nota listesi üretir (alttaki sesten yukarı doğru, sıralı).
  * Yazım: hedef harf = kök harfi + diyatonik adım; değiştirici (♭♭…×) = gerçek MIDI − doğal nota MIDI'si.
+ * inversion (yalnız akorlarda): 1 → 1. çevrim, 2 → 2. çevrim (alttaki sesler bir oktav yukarı; kök oktavı korunur).
  */
-export function buildNotes(root, octave, type, a4 = CONFIG.A4_HZ) {
+export function buildNotes(root, octave, type, a4 = CONFIG.A4_HZ, inversion = 0) {
   const rootMidi = 12 * (octave + 1) + NATURAL_PC[root.letter] + root.acc;
-  return type.tones.map((tone, i) => {
+  const tones = type.kind === 'chord' ? invertTones(type.tones, inversion) : type.tones;
+  return tones.map((tone, i) => {
     const absStep    = root.letter + tone.steps;
     const letter     = absStep % 7;
     const noteOctave = octave + Math.floor(absStep / 7);                  // B → C geçişinde oktav artar
@@ -226,16 +245,16 @@ export function buildNotes(root, octave, type, a4 = CONFIG.A4_HZ) {
  *  2) Kök MIDI'sini eşit olasılıkla seç (siyah tuşun iki yazımı var diye 2 kat seçilmesin)
  *  3) O kök için toplam değiştiricisi en az olan yazımı seç (D♭ majör, C♯ majör'e tercih edilir)
  */
-export function pickVoicing(type, cfg = CONFIG, rng = Math.random, avoid = null) {
+export function pickVoicing(type, cfg = CONFIG, rng = Math.random, avoid = null, inversion = 0) {
   const { minMidi, maxMidi } = cfg.REGISTER;
   const byRoot = new Map();
   for (const root of ROOTS) {
     for (let octave = 0; octave <= 8; octave++) {
-      const notes = buildNotes(root, octave, type, cfg.A4_HZ);
-      const lo = notes[0].midi, hi = notes[notes.length - 1].midi;
+      const notes = buildNotes(root, octave, type, cfg.A4_HZ, inversion);
+      const lo = notes[0].midi, hi = notes[notes.length - 1].midi;   // çevrilmiş hâliyle bas … en üst ses register'a sığmalı
       if (lo < minMidi || hi > maxMidi) continue;
       if (!cfg.SPELLING.ALLOW_DOUBLE_ACCIDENTALS && notes.some((n) => Math.abs(n.acc) > 1)) continue;
-      const key = `${type.id}:${lo}`;
+      const key = inversion ? `${type.id}/${inversion}:${lo}` : `${type.id}:${lo}`;   // tekrar etmeme: çevrim ayrı soru
       if (avoid && avoid.has(key)) continue;
       const accCount = notes.reduce((s, n) => s + Math.abs(n.acc), 0);
       if (!byRoot.has(lo)) byRoot.set(lo, []);
@@ -301,6 +320,30 @@ export function planTriads(count, rules = CONFIG.CHORD_RULES, rng = Math.random)
   return out.map((id) => TYPE_BY_ID[id]);
 }
 
+/**
+ * Üç ses sorusunun durumunu ağırlıkla seçer (CHORD_RULES.INVERSIONS: { root, first, second }).
+ * Artmış akor simetrik olduğu için çevrimleri kulakta temel durumdan ayırt edilemez:
+ * AUGMENTED_INVERSIONS kapalıysa (varsayılan) artmış akor yalnız temel durumda gelir.
+ * @returns {0|1|2}
+ */
+export function pickInversion(typeId, rules = CONFIG.CHORD_RULES, rng = Math.random) {
+  const w = rules.INVERSIONS || { root: 1 };
+  const allowed = INVERSIONS.filter((v) => !(typeId === 'augmented' && v.id > 0 && !rules.AUGMENTED_INVERSIONS));
+  const choices = allowed.filter((v) => (w[v.key] ?? 0) > 0);
+  if (!choices.length) return 0;
+  if (choices.length === 1) return choices[0].id;
+  return weightedPick(choices, (v) => w[v.key], rng).id;
+}
+/**
+ * Söyleme sırası: 'bass' → en alttaki sesten yukarı (varsayılan) · 'root' → kökten başla (kök, 3'lü, 5'li; çevrimde
+ * seslerin oktavları korunur). Notalar alttan yukarı sıralı gelir; yalnız 'root' sırası değiştirir.
+ */
+export function orderForSinging(notes, singOrder = 'bass') {
+  if (singOrder !== 'root' || notes.length < 2 || notes[0].role === 'Kök' || !notes.some((n) => n.role === 'Kök')) return notes;
+  const rank = { 'Kök': 0, "3'lü": 1, "5'li": 2 };
+  return [...notes].sort((a, b) => (rank[a.role] ?? 9) - (rank[b.role] ?? 9)).map((n, i) => ({ ...n, index: i }));
+}
+
 // ───────────────────────────────────────────────────────────────────────
 // ÇALIM PLANI — hangi ses ne zaman, ne kadar çalınır; toplam süre kadar beklenip dinlemeye geçilir
 //  'harmonic' → hepsi birlikte CHORD_DURATION_S
@@ -331,10 +374,12 @@ export function playbackPlan(mode, count, audio = CONFIG.AUDIO) {
 /** Çalım süresi (sn): biçime ve ses sayısına göre */
 export const playbackDuration = (mode, count, audio = CONFIG.AUDIO) => playbackPlan(mode, count, audio).total;
 
-export function questionTitle(type, notes) {
+export function questionTitle(type, notes, inversion = 0) {
   if (type.kind === 'single')   return `${notes[0].fullName} · ${notes[0].solfege}`;
   if (type.kind === 'interval') return `${type.label} · ${notes.map((n) => n.fullName).join('–')}`;
-  return `${notes[0].name} ${type.label} · ${notes.map((n) => n.fullName).join('–')}`;
+  const root = notes.find((n) => n.role === 'Kök') ?? notes[0];
+  const bottomUp = [...notes].sort((a, b) => a.midi - b.midi);
+  return `${root.name} ${type.label}${inversion ? ` · ${INVERSION_LABEL(inversion)}` : ''} · ${bottomUp.map((n) => n.fullName).join('–')}`;   // ör. C Majör · 1. çevrim (6) · E4–G4–C5
 }
 
 /**
@@ -349,18 +394,21 @@ export function generateSession(cfg = CONFIG, rng = Math.random) {
     const types = kind === 'single' ? Array.from({ length: n }, () => TYPE_BY_ID.single)
       : kind === 'double' ? planIntervals(n, cfg.INTERVAL_RULES, rng)
       : planTriads(n, cfg.CHORD_RULES, rng);
-    for (const type of types) plan.push({ kind, type });
+    for (const type of types) plan.push({ kind, type, inversion: kind === 'triple' ? pickInversion(type.id, cfg.CHORD_RULES, rng) : 0 });
   }
   if (!plan.length) throw Object.assign(new Error('Soru sayılarının hepsi 0: en az bir soru olmalı'), { code: 'CONFIG' });
   if (cfg.QUESTION_ORDER === 'shuffled') shuffle(plan, rng);
   const used = new Set();
-  return plan.map(({ kind, type }, index) => {
-    const v = pickVoicing(type, cfg, rng, cfg.NO_REPEAT ? used : null) || pickVoicing(type, cfg, rng, null);
+  return plan.map(({ kind, type, inversion }, index) => {
+    let inv = inversion;
+    let v = pickVoicing(type, cfg, rng, cfg.NO_REPEAT ? used : null, inv) || pickVoicing(type, cfg, rng, null, inv);
+    if (!v && inv) { inv = 0; v = pickVoicing(type, cfg, rng, cfg.NO_REPEAT ? used : null, 0) || pickVoicing(type, cfg, rng, null, 0); }   // çevrim sığmazsa temel durum
     if (!v) {
       throw Object.assign(new Error(`Register ${midiName(cfg.REGISTER.minMidi)}–${midiName(cfg.REGISTER.maxMidi)} "${type.label}" için çok dar`), { code: 'REGISTER' });
     }
     used.add(v.key);
-    return { index, kind, type, notes: v.notes, key: v.key, title: questionTitle(type, v.notes) };
+    const notes = orderForSinging(v.notes, cfg.SING_ORDER);
+    return { index, kind, type, inversion: inv, notes, key: v.key, title: questionTitle(type, notes, inv) };
   });
 }
 
@@ -743,7 +791,7 @@ export class ExamSession {
     this.aborted = false;
     this.index = 0;
     this.results = questions.map((q) => ({
-      kind: q.kind, typeId: q.type.id, label: q.type.label, title: q.title,
+      kind: q.kind, typeId: q.type.id, label: q.type.label, title: q.title, inversion: q.inversion ?? 0,
       notes: q.notes.map((n) => ({ midi: n.midi, name: n.fullName, role: n.role })),
       noteResults: q.notes.map(() => newNoteStats()),
       replays: 0, listenMs: 0,
@@ -803,11 +851,8 @@ export function computeDiagnostics(results, cfg = CONFIG) {
   results.forEach((r, i) => { const w = Math.max(0, SC.TYPE_WEIGHTS?.[r.kind] ?? 1); wSum += w; sSum += w * credits[i]; });
   const score = wSum > 0 ? Math.round((1000 * sSum) / wSum) / 10 : 0;
 
-  // 2) Soru tipine göre
-  const byType = {};
-  for (const kind of KINDS) {
-    const idx = results.map((r, i) => (r.kind === kind ? i : -1)).filter((i) => i >= 0);
-    if (!idx.length) continue;
+  // 2) Soru tipine göre (ve üç seste duruma göre: temel / 1. çevrim / 2. çevrim)
+  const groupStats = (idx) => {
     const rs = idx.map((i) => results[i]);
     const notes = rs.flatMap((r) => r.noteResults);
     const verified = notes.filter((n) => n.verified);
@@ -825,13 +870,24 @@ export function computeDiagnostics(results, cfg = CONFIG) {
     };
     let wt = 0, acc = 0;
     for (const [k, v] of Object.entries(components)) { const w = Math.max(0, A.DIFFICULTY_WEIGHTS?.[k] ?? 0); wt += w; acc += w * v; }
-    byType[kind] = {
-      kind, questions: rs.length, notes: notes.length, verified: verified.length,
+    return {
+      questions: rs.length, notes: notes.length, verified: verified.length,
       accuracy, meanTimeMs, replaysPerQuestion, biasCents, meanAbsCents, frames: near.n,
       difficulty: wt > 0 ? acc / wt : 0, components,
       score: Math.round((1000 * idx.reduce((s, i) => s + credits[i], 0)) / idx.length) / 10,
     };
+  };
+  const byType = {};
+  for (const kind of KINDS) {
+    const idx = results.map((r, i) => (r.kind === kind ? i : -1)).filter((i) => i >= 0);
+    if (idx.length) byType[kind] = { kind, ...groupStats(idx) };
   }
+  const byInversion = {};
+  for (const v of INVERSIONS) {
+    const idx = results.map((r, i) => (r.kind === 'triple' && (r.inversion ?? 0) === v.id ? i : -1)).filter((i) => i >= 0);
+    if (idx.length) byInversion[v.id] = { inversion: v.id, label: INVERSION_LABEL(v.id), ...groupStats(idx) };
+  }
+  const invRanked = Object.values(byInversion).sort((a, b) => b.difficulty - a.difficulty);
 
   // 3) Genel eğilim ve ses konumuna göre (kök / 3. ses / 5. ses / üst ses)
   const allNear = pool(results.flatMap((r) => r.noteResults.map((n) => n.near)));
@@ -851,7 +907,8 @@ export function computeDiagnostics(results, cfg = CONFIG) {
   const ranked = Object.values(byType).sort((a, b) => b.difficulty - a.difficulty);
   const allNotes = results.flatMap((r) => r.noteResults);
   const diag = {
-    score, byType, byRole,
+    score, byType, byRole, byInversion,
+    hardestInversion: invRanked.length > 1 ? invRanked[0].inversion : null,
     overall: {
       biasCents: overallBias, tendency: tendencyOf(overallBias, A), frames: allNear.n,
       meanAbsCents: allNear.n >= A.MIN_FRAMES ? allNear.sumAbs / allNear.n : null,
@@ -914,6 +971,13 @@ export function buildAdvice(d, cfg = CONFIG) {
     out.push(`"${role}" konumundaki sesler genel ortalamadan ayrışıyor: ortalama ${fmtSigned(r.biasCents, 1)} sent (${r.biasCents > 0 ? 'tiz' : 'pes'}).`);
   }
 
+  // Üç seste durum (temel / çevrim) belirgin biçimde zorladıysa söyle
+  const hi = d.hardestInversion != null ? d.byInversion?.[d.hardestInversion] : null;
+  const invGroups = Object.values(d.byInversion || {});
+  if (hi && invGroups.length > 1 && hi.difficulty >= A.NOTABLE_DIFFICULTY && hi.difficulty - Math.min(...invGroups.map((g) => g.difficulty)) >= 0.1) {
+    out.push(`Üç ses sorularında en çok ${hi.label.toLocaleLowerCase('tr')} zorladı: seslerin %${NF0.format(hi.accuracy * 100)} kadarı doğrulandı.`);
+  }
+
   const rep = KINDS.map((k) => d.byType[k]).filter((bt) => bt && bt.replaysPerQuestion >= 1)
     .sort((a, b) => b.replaysPerQuestion - a.replaysPerQuestion)[0];
   if (rep) out.push(`${KIND_LABEL[rep.kind]} sorularında soru başına ortalama ${NF1.format(rep.replaysPerQuestion)} kez tekrar dinlediniz; sesleri tek dinleyişte belleğe almayı hedefleyin.`);
@@ -945,6 +1009,7 @@ export function makeHistoryEntry(session, diag, cfg = CONFIG) {
       accuracy: round3(t.accuracy), meanTimeMs: t.meanTimeMs == null ? null : Math.round(t.meanTimeMs),
       biasCents: round1(t.biasCents), difficulty: round3(t.difficulty), score: t.score,
     }])),
+    byInversion: Object.fromEntries(Object.entries(diag.byInversion || {}).map(([k, t]) => [k, { accuracy: round3(t.accuracy), difficulty: round3(t.difficulty) }])),
     settings: {
       tol: cfg.TOLERANCE_CENTS, sustainMs: cfg.SUSTAIN_TIME_MS, counts: { ...cfg.QUESTION_COUNTS },
       algo: cfg.PITCH.ALGORITHM, a4: cfg.A4_HZ,
@@ -1008,6 +1073,9 @@ export function validateConfig(cfg) {
   num(cfg.CHORD_RULES?.SET_SIZE, 1, 100, 'CHORD_RULES.SET_SIZE');
   num(cfg.CHORD_RULES?.MAX_ALTERED_PER_SET, 0, 100, 'CHORD_RULES.MAX_ALTERED_PER_SET');
   num(cfg.CHORD_RULES?.ALTERED_CHANCE, 0, 1, 'CHORD_RULES.ALTERED_CHANCE');
+  for (const v of INVERSIONS) num(cfg.CHORD_RULES?.INVERSIONS?.[v.key], 0, 10, `CHORD_RULES.INVERSIONS.${v.key}`);
+  if (!INVERSIONS.some((v) => cfg.CHORD_RULES?.INVERSIONS?.[v.key] > 0)) errs.push('CHORD_RULES.INVERSIONS: en az bir akor durumunun ağırlığı 0\'dan büyük olmalı');
+  oneOf(cfg.SING_ORDER, ['bass', 'root'], 'SING_ORDER');
   for (const id of Object.keys(cfg.CHORD_RULES?.MAIN_WEIGHTS || {})) {
     if (TYPE_BY_ID[id]?.kind !== 'chord') errs.push(`CHORD_RULES.MAIN_WEIGHTS: bilinmeyen akor "${id}"`);
   }

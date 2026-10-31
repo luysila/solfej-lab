@@ -6,22 +6,22 @@
 <meta name="color-scheme" content="dark">
 <title>Solfej Lab · İşitme Eğitimi</title>
 
-<link rel="stylesheet" href="./css/style.css?v=202610312335">
+<link rel="stylesheet" href="./css/style.css?v=202610312345">
 <!-- Sürüm etiketi (?v=…): yayından sonra tarayıcı önbelleğinde eski ve yeni dosyalar karışmasın.
      Elle değiştirmeyin; dosyaları değiştirdikten sonra: npm run stamp (scripts/stamp.mjs import map'i de yeniden üretir) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=202610312335",
-    "./js/audio.js": "./js/audio.js?v=202610312335",
-    "./js/config.js": "./js/config.js?v=202610312335",
-    "./js/mic.js": "./js/mic.js?v=202610312335",
-    "./js/nav.js": "./js/nav.js?v=202610312335",
-    "./js/pure.js": "./js/pure.js?v=202610312335",
-    "./js/settings.js": "./js/settings.js?v=202610312335",
-    "./js/staff.js": "./js/staff.js?v=202610312335",
-    "./js/summary.js": "./js/summary.js?v=202610312335",
-    "./js/ui.js": "./js/ui.js?v=202610312335"
+    "./js/app.js": "./js/app.js?v=202610312345",
+    "./js/audio.js": "./js/audio.js?v=202610312345",
+    "./js/config.js": "./js/config.js?v=202610312345",
+    "./js/mic.js": "./js/mic.js?v=202610312345",
+    "./js/nav.js": "./js/nav.js?v=202610312345",
+    "./js/pure.js": "./js/pure.js?v=202610312345",
+    "./js/settings.js": "./js/settings.js?v=202610312345",
+    "./js/staff.js": "./js/staff.js?v=202610312345",
+    "./js/summary.js": "./js/summary.js?v=202610312345",
+    "./js/ui.js": "./js/ui.js?v=202610312345"
   }
 }
 </script>
@@ -262,9 +262,15 @@
         <label class="field"><span>Kök ses</span><select id="rootSelect"></select></label>
         <label class="field"><span>Kök oktavı</span><select id="octaveSelect"></select></label>
         <label class="field"><span>Ses / aralık / akor</span><select id="typeSelect"></select></label>
+        <!-- Akor seçilince: temel durum / 1. çevrim (6) / 2. çevrim (6/4) -->
+        <label class="field" id="inversionField" hidden><span data-text="labelInversion">Durum</span><select id="inversionSelect">
+          <option value="0" data-text="invRoot">Temel durum</option>
+          <option value="1" data-text="invFirst">1. çevrim (6)</option>
+          <option value="2" data-text="invSecond">2. çevrim (6/4)</option>
+        </select></label>
         <label class="field"><span data-text="labelPlayback">Çalım biçimi</span><select id="playbackSelect">
           <option value="harmonic" data-text="playbackHarmonic">Birlikte (armonik)</option>
-          <option value="melodic" data-text="playbackMelodic">Ayrı ayrı (kökten yukarı)</option>
+          <option value="melodic" data-text="playbackMelodic">Ayrı ayrı (alttan yukarı)</option>
           <option value="both" data-text="playbackBoth">Önce ayrı, sonra birlikte</option>
         </select></label>
       </div>
@@ -374,6 +380,6 @@
     a.hidden = false;
   }
 </script>
-<script type="module" src="./js/app.js?v=202610312335"></script>
+<script type="module" src="./js/app.js?v=202610312345"></script>
 </body>
 </html>

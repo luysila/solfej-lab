@@ -3,6 +3,7 @@
 // sınav ilerleme şeridi, çipler, dikey akort aleti, yönlendirme satırı.
 
 import { CONFIG } from './config.js';
+import { INVERSION_LABEL, orderForSinging } from './pure.js';
 import { ALLOWED, CHORD_TYPES, CoachWindow, Exercise, KINDS, KIND_LABEL, MINUS, ROOTS, S, SustainTracker, TYPE_BY_ID, buildNotes, clamp, createMachine, getPath, midiName, semitoneNeighbors, solfege, spell } from './pure.js';
 import { audioCtx, ensureAudio, piano, playMelodic, stopAllSound } from './audio.js';
 import { detector, explainError, micStream, settings } from './mic.js';
@@ -21,7 +22,7 @@ export const ui = {
   menuBtn: $('menuBtn'), menuList: $('menuList'), workspace: $('workspace'), examSlot: $('examSlot'), practiceSlot: $('practiceSlot'),
   examPause: $('examPauseBtn'), practicePause: $('practicePauseBtn'), settingsActions: $('settingsActions'),
   examInfo: $('examInfo'), startBtn: $('startBtn'), examReplay: $('examReplayBtn'), skipBtn: $('skipBtn'), endBtn: $('endBtn'),
-  root: $('rootSelect'), octave: $('octaveSelect'), type: $('typeSelect'), play: $('playBtn'), replay: $('replayBtn'), reset: $('resetBtn'),
+  root: $('rootSelect'), octave: $('octaveSelect'), type: $('typeSelect'), inversion: $('inversionSelect'), inversionField: $('inversionField'), play: $('playBtn'), replay: $('replayBtn'), reset: $('resetBtn'),
   device: $('deviceSelect'), fold: $('foldToggle'), foldHint: $('foldHint'),
   examStaffToggle: $('examStaffToggle'), examStaffSwitch: $('examStaffSwitch'), viewSeg: $('viewSeg'),
   summaryPanel: $('summaryPanel'), sumMeta: $('sumMeta'), sumScore: $('sumScore'), sumScoreSub: $('sumScoreSub'), sumTendency: $('sumTendency'),
@@ -152,14 +153,19 @@ export function fillSelects() {
   ui.type.value = 'major';
 }
 
-/** Kök / oktav / tip değişince: yeni egzersiz kur, her şeyi sıfırla */
+/** Söyleme talimatı: "en alttaki sesten başlayarak" (varsayılan) ya da "kökten başlayarak" (CONFIG.SING_ORDER) */
+export const singFrom = () => T(CONFIG.SING_ORDER === 'root' ? 'singFromRoot' : 'singFromBass');
+
+/** Kök / oktav / tip / durum değişince: yeni egzersiz kur, her şeyi sıfırla */
 export function selectionChanged() {
   const root = ROOTS[+ui.root.value] ?? ROOTS[0];
   const octave = +ui.octave.value || 4;
   const type = TYPE_BY_ID[ui.type.value] ?? TYPE_BY_ID.major;
-  exercise = new Exercise(buildNotes(root, octave, type));
+  ui.inversionField.hidden = type.kind !== 'chord';             // "Durum" yalnız akorlarda
+  const inv = type.kind === 'chord' ? (+ui.inversion.value || 0) : 0;
+  exercise = new Exercise(orderForSinging(buildNotes(root, octave, type, CONFIG.A4_HZ, inv), CONFIG.SING_ORDER));
   const rootName = spell(root.letter, root.acc);
-  practiceTitle = type.kind === 'chord' ? `${rootName} ${type.label}`
+  practiceTitle = type.kind === 'chord' ? `${rootName} ${type.label}${inv ? ` · ${INVERSION_LABEL(inv)}` : ''}`
     : type.kind === 'single' ? `${rootName}${octave}` : `${rootName} · ${type.label}`;
   buildNoteBoxes();
   hardReset();
@@ -267,7 +273,7 @@ export function renderStatus() {
           ? (rev ? `${cur.name} (${cur.solfege})` : 'Sesi')
           : rev ? `${cur.role}: ${cur.name} (${cur.solfege})` : `${exercise.index + 1}. ses (${cur.role.toLocaleLowerCase('tr')})`;
         msg = q.notes.length > 1
-          ? `${who} — kökten başlayarak sırayla, “na” hecesiyle söyleyin ve ${sec} sn sabit tutun.`
+          ? `${who} — ${singFrom()} sırayla, “na” hecesiyle söyleyin ve ${sec} sn sabit tutun.`
           : `${who} “na” hecesiyle söyleyin ve ${sec} sn sabit tutun.`;
         break;
       }
@@ -289,11 +295,11 @@ export function renderStatus() {
     }
   } else if (mode === 'exam') {
     msg = starting ? 'Hazırlanıyor… (ilk kullanımda mikrofon izni istenir)'
-      : `“${btnName('btnStart')}” düğmesine basın. Her soruda sesler aynı anda çalınır; ardından kökten başlayarak “na” hecesiyle sırayla söylersiniz.`;
+      : `“${btnName('btnStart')}” düğmesine basın. Her soruda sesler aynı anda çalınır; ardından ${singFrom()} “na” hecesiyle sırayla söylersiniz.`;
   } else {
     switch (st) {
       case S.IDLE:      msg = `Bir ses, aralık ya da akor seçip “${btnName('btnPlay')}” düğmesine basın. İlk kullanımda mikrofon izni istenir.`; break;
-      case S.PLAYING:   msg = 'Çalıyor — kök sesten başlayarak sesleri ayırt etmeye çalışın…'; break;
+      case S.PLAYING:   msg = `Çalıyor — ${singFrom()} sesleri ayırt etmeye çalışın…`; break;
       case S.LISTENING: msg = `${cur.role}: ${cur.name} (${cur.solfege}) sesini “na” ile söyleyin ve yeşil bölgede ${sec} sn sabit tutun.`; break;
       case S.VERIFIED:  msg = 'Doğrulandı ✓ — sıradaki sese geçiliyor…'; break;
       default:          msg = 'Tebrikler! Tüm sesleri sırayla ve sabit biçimde okudunuz.';
@@ -433,7 +439,7 @@ export function renderConfigChip() {
 /** Başlık ve sınav bilgi satırı (CONFIG'ten) */
 export function updateHeaderText() {
   const sec = nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000);
-  setText(ui.sub, `Sesleri dinleyin; kökten başlayarak “na” hecesiyle sırayla söyleyin. Her ses ±${CONFIG.TOLERANCE_CENTS} sent içinde ${sec} saniye kesintisiz tutulmadan bir sonrakine geçilmez.`);
+  setText(ui.sub, `Sesleri dinleyin; ${singFrom()} “na” hecesiyle sırayla söyleyin. Her ses ±${CONFIG.TOLERANCE_CENTS} sent içinde ${sec} saniye kesintisiz tutulmadan bir sonrakine geçilmez.`);
   const c = CONFIG.QUESTION_COUNTS, total = KINDS.reduce((s, k) => s + (c[k] || 0), 0);
   const parts = KINDS.filter((k) => c[k] > 0).map((k) => `${c[k]} ${KIND_LABEL[k].toLocaleLowerCase('tr')}`);
   const lim = CONFIG.EXAM.QUESTION_TIME_LIMIT_S;

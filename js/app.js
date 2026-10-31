@@ -409,7 +409,7 @@ export function bindEvents() {
   ui.play.addEventListener('click', onPlayClick);
   ui.replay.addEventListener('click', onReplayClick);
   ui.reset.addEventListener('click', hardReset);
-  for (const select of [ui.root, ui.octave, ui.type]) select.addEventListener('change', selectionChanged);
+  for (const select of [ui.root, ui.octave, ui.type, ui.inversion]) select.addEventListener('change', selectionChanged);
   document.getElementById('playbackSelect').addEventListener('change', savePrefs);
   ui.device.addEventListener('change', onDeviceChange);
   ui.sumNew.addEventListener('click', onStartExam);
@@ -485,10 +485,11 @@ export function init() {
 
   fillSelects();
   if (isPlainObject(prefs.practice)) {
-    const { root, octave, type } = prefs.practice;
+    const { root, octave, type, inv } = prefs.practice;
     if (ROOTS[+root]) ui.root.value = String(root);
     if (['2', '3', '4', '5'].includes(String(octave))) ui.octave.value = String(octave);
     if (TYPE_BY_ID[type]) ui.type.value = type;
+    if (['0', '1', '2'].includes(String(inv))) ui.inversion.value = String(inv);
   }
   document.getElementById('playbackSelect').value = PLAYBACK_MODES.includes(prefs.playback) ? prefs.playback : CONFIG.AUDIO.PRACTICE_PLAYBACK;
   buildSettingsForm();

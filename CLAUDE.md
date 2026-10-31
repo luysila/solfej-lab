@@ -1,7 +1,7 @@
 # Solfej Lab — proje notu (Claude Code bu dosyayı her oturumun başında okur)
 
 Konservatuvar adayları ve besteciler için web tabanlı işitme eğitimi (solfej) uygulaması.
-Kullanıcı sesleri dinler, kökten başlayarak "na" hecesiyle sırayla söyler; uygulama mikrofondan
+Kullanıcı sesleri dinler, en alttaki sesten başlayarak "na" hecesiyle sırayla söyler; uygulama mikrofondan
 perdeyi ölçer, sesi tolerans içinde yeterince tutunca bir sonrakinin kilidini açar.
 
 ## İletişim
@@ -47,7 +47,7 @@ düzeni olarak anla (PURE = `js/pure.js`); "Yer:" satırlarındaki fonksiyon ve 
 | `index.html` | Yalnızca sayfa iskeleti (HTML, bütün `id`'ler): üst çubuk + menü, bölümler (`main > .section`), çalışma alanı (`#workspace`), lisans satırı; `css/style.css`, import map, `js/app.js`; file:// uyarısı |
 | `css/style.css` | Bütün tasarım; renkler en üstte `:root` değişkenlerinde; bölümler `/* ── … ── */` başlıklarıyla |
 | `js/config.js` | **0)** `CONFIG` (TOLERANCE_CENTS, SUSTAIN_TIME_MS, QUESTION_COUNTS, REGISTER, CHORD_RULES, EXAM, SCORING, ANALYSIS, PITCH, AUDIO, UI, HISTORY, LIBS, TEXTS, PRESETS) ve dondurulmuş `DEFAULT_CONFIG`. En sık değişecek dosya |
-| `js/pure.js` | **1)** Saf mantık (DOM ve Web Audio yok): yardımcılar, nota teorisi (`buildNotes`), soru üreticisi (`generateSession`, `planTriads`, `planIntervals`, `pickVoicing`), çalım planı (`playbackPlan`), porte konumu (`makeStaffMap`, `semitoneNeighbors`), `compareToTarget`, `YinDetector`, `MedianFilter`, `SustainTracker`, yönlendirme (`CoachWindow`, `coachMessage`), durum makinesi (`S`, `ALLOWED`, `createMachine`), `Exercise`, `ExamSession`, `computeDiagnostics` + `buildAdvice`, `makeHistoryEntry`, `validateConfig`, `sanitizeOverrides`, `textLeaves` |
+| `js/pure.js` | **1)** Saf mantık (DOM ve Web Audio yok): yardımcılar, nota teorisi (`buildNotes`, çevrim: `invertTones`, `INVERSIONS`), soru üreticisi (`generateSession`, `planTriads`, `planIntervals`, `pickVoicing`, `pickInversion`, `orderForSinging`), çalım planı (`playbackPlan`), porte konumu (`makeStaffMap`, `semitoneNeighbors`), `compareToTarget`, `YinDetector`, `MedianFilter`, `SustainTracker`, yönlendirme (`CoachWindow`, `coachMessage`), durum makinesi (`S`, `ALLOWED`, `createMachine`), `Exercise`, `ExamSession`, `computeDiagnostics` + `buildAdvice`, `makeHistoryEntry`, `validateConfig`, `sanitizeOverrides`, `textLeaves` |
 | `js/audio.js` | **2)** Kütüphane yükleyici (`loadScriptGlobal`, `loadPitchy`) · **3)** ses motoru: tek AudioContext, Tone.js piyano (`preparePiano`), yedek sentez, `playHarmonic`, `playMelodic` |
 | `js/mic.js` | **4)** Mikrofon (`startMic`, getUserMedia işlemsiz) ve algılayıcı kurulumu (`setupDetector`: YIN / pitchy-MPM); `settings` (oktav toleransı, gürültü eşiği, giriş) |
 | `js/ui.js` | **5)** Arayüz: `ui` (DOM bağlantıları), paylaşılan durum (`mode`, `session`, `exercise`, `fsm`, `tracker`…), nota kutuları (`buildNoteBoxes`, `onNoteBoxPlay`), `renderAll` / `renderStatus`, ilerleme şeridi, çipler, dikey akort aleti, yönlendirme satırı (`setCoach`) |
@@ -91,6 +91,13 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 - Tutma (sustain) bant dışına çıkınca sıfırlanır; yalnızca algılama kopmalarına 60 ms pay var (`SUSTAIN_DROPOUT_GRACE_MS`).
 - Sınavda nota adları ses doğrulanınca açılır (`EXAM.REVEAL_NOTE_NAMES = 'after'`).
 - 5'li akor kuralı: her 5 soruluk sette en fazla 1 artmış/eksilmiş, en az 1 majör + 1 minör.
+- **Çevrim akorları** (Aşama 3): üç ses soruları temel durum, 1. çevrim (6; basta 3'lü), 2. çevrim (6/4; basta 5'li).
+  Çevrim, alttaki sesler bir oktav yukarı taşınarak üretilir (`invertTones`); yazım harf adımı + yarım sesle (Do majör 1. çevrim = Mi–Sol–Do).
+  Ağırlık `CHORD_RULES.INVERSIONS` (varsayılan temel 2 · 1. çevrim 1 · 2. çevrim 1). Artmış akor simetrik olduğu için varsayılan
+  olarak yalnız temel durumda (`AUGMENTED_INVERSIONS`). Akor çevrilmiş hâliyle register'a sığar; tekrar etmeme anahtarı çevrimi içerir.
+  Başlık: "C Majör · 1. çevrim (6) · E4–G4–C5". Teşhiste üç ses duruma göre de ayrılır (`byInversion`).
+- **Söyleme sırası en alttaki (bas) sesten yukarı** (eski "kökten başlayarak" kararının yerine; temel durumda yine kök).
+  `SING_ORDER: 'root'` ile kökten başlanır. Nota kutularında roller (Kök, 3'lü, 5'li) görünmeye devam eder.
 - **Porte + perde grafiği tek görünüm** (canvas, VexFlow'a bağlı değil): sol ve fa anahtarlı çift porte, ortada Do4.
   Perde konumu nota yazımına göre: hedef sesin tam perdesi o notanın nota başının ortasından geçer
   (Re majörde Fa♯ → Fa'nın yeri, ♯ ile); ara perdeler komşu nota konumları arasında orantılı. Dönüşüm `js/pure.js`'te (`makeStaffMap`).

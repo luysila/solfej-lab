@@ -198,7 +198,7 @@ export function playHarmonic(notes, durationSec, when) {
 }
 
 /**
- * Çalım planına göre çalar: 'melodic' ayrı ayrı (kökten yukarı) · 'both' önce ayrı, sonra birlikte · 'harmonic' birlikte.
+ * Çalım planına göre çalar: 'melodic' ayrı ayrı (söyleme sırasıyla; varsayılan alttan yukarı) · 'both' önce ayrı, sonra birlikte · 'harmonic' birlikte.
  * Planı ve süreyi playbackPlan() (PURE) verir. @returns {number} toplam süre (sn)
  */
 export function playMelodic(notes, mode = 'melodic', when = audioCtx.currentTime + 0.06) {

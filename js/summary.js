@@ -42,14 +42,13 @@ export function renderSummary(d, sess) {
   }
 
   ui.sumRows.replaceChildren();
-  for (const kind of KINDS) {
-    const t = d.byType[kind];
-    if (!t) continue;
-    const tr = el('tr');
+  /** Tablo satırı: tip (ya da üç seste durum) için doğrulanan ses, süre, tekrar, sapma, eğilim, zorlanma */
+  const statRow = (label, small, t, { hardest = false, sub = false } = {}) => {
+    const tr = el('tr', sub ? 'sub-row' : null);
     const c1 = el('td');
-    c1.append(document.createTextNode(KIND_LABEL[kind]));
-    if (kind === d.hardest && typeCount > 1 && t.difficulty >= CONFIG.ANALYSIS.NOTABLE_DIFFICULTY) c1.append(el('span', 'tag', 'en zor'));
-    c1.append(el('small', null, `${KIND_DETAIL[kind]} · ${t.questions} soru · puan ${nfMax1.format(t.score)}`));
+    c1.append(document.createTextNode(label));
+    if (hardest) c1.append(el('span', 'tag', 'en zor'));
+    c1.append(el('small', null, small));
     const c2 = el('td', null, `${t.verified}/${t.notes} · %${nf0.format(t.accuracy * 100)}`);
     const c3 = el('td', null, t.meanTimeMs == null ? '—' : `${nf1.format(t.meanTimeMs / 1000)} sn`);
     const c4 = el('td', null, nf1.format(t.replaysPerQuestion));
@@ -63,6 +62,19 @@ export function renderSummary(d, sess) {
     c7.append(diff);
     tr.append(c1, c2, c3, c4, c5, c6, c7);
     ui.sumRows.append(tr);
+  };
+  const notableMin = CONFIG.ANALYSIS.NOTABLE_DIFFICULTY;
+  for (const kind of KINDS) {
+    const t = d.byType[kind];
+    if (!t) continue;
+    statRow(KIND_LABEL[kind], `${KIND_DETAIL[kind]} · ${t.questions} soru · puan ${nfMax1.format(t.score)}`, t,
+      { hardest: kind === d.hardest && typeCount > 1 && t.difficulty >= notableMin });
+    if (kind !== 'triple') continue;
+    // Üç ses: duruma göre (temel durum / 1. çevrim / 2. çevrim) — hangisinde zorlanıldığı görünür (alt satır)
+    for (const g of Object.values(d.byInversion || {})) {
+      statRow(`› ${g.label}`, `${g.questions} soru · puan ${nfMax1.format(g.score)}`, g,
+        { sub: true, hardest: g.inversion === d.hardestInversion && g.difficulty >= notableMin });
+    }
   }
 
   ui.sumRoles.replaceChildren();

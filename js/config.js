@@ -31,6 +31,8 @@ export const CONFIG = {
     ALTERED_TYPES: ['augmented', 'diminished'],
     MAIN_WEIGHTS: { major: 1, minor: 1 },                  // geri kalanlar: majör / minör (ağırlıklı seçim)
     MIN_EACH_MAIN: 1,             // her sette en az 1 majör ve 1 minör (yer varsa)
+    INVERSIONS: { root: 2, first: 1, second: 1 },   // akor durumlarının ağırlığı: temel durum · 1. çevrim (6) · 2. çevrim (6/4)
+    AUGMENTED_INVERSIONS: false,  // artmış akor çevrimleri (simetrik olduğu için kulakta temel durumdan ayırt edilemez) → kapalı: yalnız temel durum
   },
   INTERVAL_RULES: {               // İki ses soruları: aralıklar (alttaki ses kök)
     POOL: ['m2', 'M2', 'm3', 'M3', 'P4', 'A4', 'P5', 'm6', 'M6', 'm7', 'M7', 'P8'],   // 'd5' de eklenebilir
@@ -40,7 +42,8 @@ export const CONFIG = {
     ALLOW_DOUBLE_ACCIDENTALS: false,   // çift diyez / çift bemol gerektiren köklerden kaçın
     SINGLE_NOTE_ACCIDENTALS: 'mixed',  // tek seste siyah tuş yazımı: 'mixed' | 'sharp' | 'flat'
   },
-  NO_REPEAT: true,                // aynı oturumda aynı soru (aynı tip + aynı kök) tekrar etmez
+  NO_REPEAT: true,                // aynı oturumda aynı soru (aynı tip + aynı durum + aynı kök) tekrar etmez
+  SING_ORDER: 'bass',             // söyleme sırası: 'bass' → en alttaki sesten yukarı (çevrimde basta 3'lü / 5'li) · 'root' → kökten başla
 
   // ══ 2. SINAV AKIŞI ══════════════════════════════════════════════════
   EXAM: {
@@ -196,9 +199,16 @@ export const CONFIG = {
     legendGuide: 'Hedef',
     labelPlayback: 'Çalım biçimi',
     playbackHarmonic: 'Birlikte (armonik)',
-    playbackMelodic: 'Ayrı ayrı (kökten yukarı)',
+    playbackMelodic: 'Ayrı ayrı (alttan yukarı)',
     playbackBoth: 'Önce ayrı, sonra birlikte',
     notePlayHint: 'Bu sesi çal',
+    // Söyleme talimatı ve akor durumu (Aşama 3)
+    singFromBass: 'en alttaki sesten başlayarak',
+    singFromRoot: 'kökten başlayarak',
+    labelInversion: 'Durum',
+    invRoot: 'Temel durum',
+    invFirst: '1. çevrim (6)',
+    invSecond: '2. çevrim (6/4)',
     // Bölümler ve menü (Aşama 1)
     btnMenu: 'Menü',
     chipCustomConfig: 'Özel ayarlar etkin',

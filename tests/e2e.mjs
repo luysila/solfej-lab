@@ -214,7 +214,8 @@ if (run('A')) {
       messages: diag.messages,
       history: JSON.parse(localStorage.getItem('solfejlab.history.v1') || '[]'),
       summaryVisible: !document.getElementById('summaryPanel').hidden,
-      rows: document.querySelectorAll('#sumRows tr').length,
+      rows: document.querySelectorAll('#sumRows tr:not(.sub-row)').length, subRows: document.querySelectorAll('#sumRows tr.sub-row').length,
+      inversions: sess.questions.filter((q) => q.kind === 'triple').map((q) => q.inversion),
       sumScore: document.getElementById('sumScore').textContent, sumTendency: document.getElementById('sumTendency').textContent,
       sumHardest: document.getElementById('sumHardest').textContent, segs: [...document.querySelectorAll('.seg')].map((x) => x.dataset.s).join(','),
       historyItems: document.querySelectorAll('#historyList li').length, chartBars: document.querySelectorAll('#historyChart .hc-bar').length,
@@ -236,7 +237,10 @@ if (run('A')) {
   assert.equal(R.history.length, 1);
   assert.equal(R.history[0].score, 93.3);
   assert.equal(R.history[0].seed, 4242);
-  assert.ok(R.summaryVisible && R.rows === 3, 'teşhis ekranı 3 satır');
+  assert.ok(R.summaryVisible && R.rows === 3, 'teşhis ekranı 3 ana satır');
+  log('üç ses durumları:', R.inversions.join(' '), '· alt satır', R.subRows);
+  assert.equal(R.subRows, new Set(R.inversions).size, 'üç ses: her durum için bir alt satır');
+  assert.ok(R.titles.filter((t, i) => R.kinds[i] === 'triple').some((t) => /çevrim/.test(t)), 'seed 4242: en az bir çevrim');
   assert.equal(R.historyItems, 1);
   assert.equal(R.chartBars, 1);
   log('teşhis ekranı:', R.sumScore, '|', R.sumTendency, '|', R.sumHardest, '| şerit:', R.segs);
@@ -318,6 +322,12 @@ if (run('A')) {
   await page.selectOption('#rootSelect', '5');           // E♭
   await page.selectOption('#octaveSelect', '4');
   await page.selectOption('#typeSelect', 'major');
+  // Akor seçilince "Durum" görünür: Mi♭ majör 1. çevrim → Sol–Si♭–Mi♭ (alttan yukarı); sonra temel duruma dön
+  assert.equal(await page.isVisible('#inversionField'), true);
+  await page.selectOption('#inversionSelect', '1');
+  assert.equal((await snap(page)).names, 'G B♭ E♭');
+  assert.match(await page.textContent('#exTitle'), /1\. çevrim \(6\)/);
+  await page.selectOption('#inversionSelect', '0');
   await page.evaluate(() => { window.__singer.practiceOctave = -1; });
   await page.click('#playBtn');
   await waitFor(page, () => window.__dbg.state === 'COMPLETE', null, 20000);
