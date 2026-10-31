@@ -23,8 +23,8 @@ perdeyi ölçer, sesi tolerans içinde yeterince tutunca bir sonrakinin kilidini
 - `npm test` → birim testleri (Node 18+, ek paket gerekmez). Her değişiklikten sonra çalıştır; hepsi geçmeli.
 - `npm run e2e` → gerçek Chromium + "sanal şarkıcı" (hedefi +9 sent tiz söyleyen osilatör) ile uçtan uca test.
   Önce bir kez `npm install` ve `npx playwright install chromium`. Ekran görüntüleri `tests/.screenshots/`.
-- `tests/extract-pure.mjs`, index.html'deki `PURE:BEGIN … PURE:END` bölümünü çıkarıp Node'da test edilebilir yapar.
-  PURE bölümüne yeni bir fonksiyon eklersen ve testte kullanacaksan `EXPORTS` listesine ekle.
+- Birim testleri `js/pure.js` ve `js/config.js`'i doğrudan içe aktarır (ayrı bir çıkarma adımı yok).
+  Ayrıca `index.html`'deki sürüm etiketinin ve import map'in (içe aktarma haritası) tutarlı olduğunu denetler.
 - Uçtan uca test `?seed=4242` ile sabit bir soru seti kullanır; soru üreticisini bilerek değiştirirsen
   beklenen değerleri (puan, soru tipleri) de güncelle.
 
@@ -38,21 +38,31 @@ perdeyi ölçer, sesi tolerans içinde yeterince tutunca bir sonrakinin kilidini
   `luysila` · `347091712+luysila@users.noreply.github.com`. Yeni bir bilgisayarda depoyu klonlayınca
   `git config user.name` / `git config user.email` ile bunu ayarla (ya da kullanıcıya hatırlat).
 
-## Mimari (tek dosya: index.html — derleme adımı yok, vanilla JS / ES modülleri, çerçeve yok)
-0. `CONFIG`: tüm ayarlar betiğin en üstünde (TOLERANCE_CENTS, SUSTAIN_TIME_MS, QUESTION_COUNTS, REGISTER,
-   CHORD_RULES, EXAM, SCORING, ANALYSIS, PITCH, AUDIO, UI, HISTORY, LIBS, PRESETS). `DEFAULT_CONFIG` dondurulmuş kopyası.
-1. PURE bölümü (DOM ve Web Audio yok): yardımcılar, nota teorisi (`buildNotes`, doğru enharmonik yazım),
-   soru üreticisi (`generateSession`, `planTriads`, `planIntervals`, `pickVoicing`), `compareToTarget` (oktav modları),
-   `YinDetector`, `MedianFilter`, `SustainTracker`, durum makinesi (`S`, `ALLOWED`, `createMachine`),
-   `Exercise` (kilitli ilerleme), `ExamSession`, `computeDiagnostics` + `buildAdvice` (teşhis ekranı),
-   `makeHistoryEntry`, `validateConfig`, `sanitizeOverrides`.
-2. Kütüphane yükleyici: CDN adreslerini sırayla dener (`CONFIG.LIBS`), zaman aşımı uygular.
-3. Ses motoru: tek AudioContext; Tone.js + Salamander piyano örnekleri, yüklenemezse dahili sentez.
-4. Mikrofon ve algılama: getUserMedia (yankı / gürültü / kazanç işlemleri kapalı) → AnalyserNode →
-   YIN (varsayılan) ya da pitchy (MPM).
-5. Arayüz: nota kutuları, sınav ilerleme şeridi, yatay ibre, perde grafiği (canvas), porte (VexFlow, isteğe bağlı),
-   teşhis ekranı, "Önceki testlerim" (localStorage), ayarlar paneli (`SETTINGS_SCHEMA` ile üretilir).
-6. Durum makinesi eylemleri (`onStateChange`) · 7. ana döngü (`frame`, requestAnimationFrame) · 8. kalıcılık ve `init`.
+## Mimari (derleme adımı yok, çerçeve yok: tarayıcı ES modüllerini doğrudan yükler)
+**Eski istemlerde ve docs/ içindeki belgelerde "tek dosya (index.html)" ya da "PURE bölümü" geçiyorsa bunu bu dosya
+düzeni olarak anla (PURE = `js/pure.js`); "Yer:" satırlarındaki fonksiyon ve bölüm adlarını ilgili dosyalarda ara.**
+
+| Dosya | İçerik |
+|---|---|
+| `index.html` | Yalnızca sayfa iskeleti (HTML, bütün `id`'ler), `css/style.css` bağlantısı, import map, `js/app.js`; file:// uyarısı |
+| `css/style.css` | Bütün tasarım; renkler en üstte `:root` değişkenlerinde; bölümler `/* ── … ── */` başlıklarıyla |
+| `js/config.js` | **0)** `CONFIG` (TOLERANCE_CENTS, SUSTAIN_TIME_MS, QUESTION_COUNTS, REGISTER, CHORD_RULES, EXAM, SCORING, ANALYSIS, PITCH, AUDIO, UI, HISTORY, LIBS, TEXTS, PRESETS) ve dondurulmuş `DEFAULT_CONFIG`. En sık değişecek dosya |
+| `js/pure.js` | **1)** Saf mantık (DOM ve Web Audio yok): yardımcılar, nota teorisi (`buildNotes`), soru üreticisi (`generateSession`, `planTriads`, `planIntervals`, `pickVoicing`), çalım planı (`playbackPlan`), porte konumu (`makeStaffMap`, `semitoneNeighbors`), `compareToTarget`, `YinDetector`, `MedianFilter`, `SustainTracker`, yönlendirme (`CoachWindow`, `coachMessage`), durum makinesi (`S`, `ALLOWED`, `createMachine`), `Exercise`, `ExamSession`, `computeDiagnostics` + `buildAdvice`, `makeHistoryEntry`, `validateConfig`, `sanitizeOverrides`, `textLeaves` |
+| `js/audio.js` | **2)** Kütüphane yükleyici (`loadScriptGlobal`, `loadPitchy`) · **3)** ses motoru: tek AudioContext, Tone.js piyano (`preparePiano`), yedek sentez, `playHarmonic`, `playMelodic` |
+| `js/mic.js` | **4)** Mikrofon (`startMic`, getUserMedia işlemsiz) ve algılayıcı kurulumu (`setupDetector`: YIN / pitchy-MPM); `settings` (oktav toleransı, gürültü eşiği, giriş) |
+| `js/ui.js` | **5)** Arayüz: `ui` (DOM bağlantıları), paylaşılan durum (`mode`, `session`, `exercise`, `fsm`, `tracker`…), nota kutuları (`buildNoteBoxes`, `onNoteBoxPlay`), `renderAll` / `renderStatus`, ilerleme şeridi, çipler, dikey akort aleti, yönlendirme satırı (`setCoach`) |
+| `js/staff.js` | Perde grafiği (`setupContour`, `pushContour`, `drawContour`), porte görünümü (`drawStaffContour`, anahtar/nota başı çizimi), VexFlow paneli (`setStaffEnabled`, `drawStaff`) |
+| `js/summary.js` | Teşhis ekranı (`renderSummary`) ve "Önceki testlerim" (`renderHistory`, localStorage) |
+| `js/settings.js` | Arayüz adları (`T`, `applyTexts`, sayfada düzenleme), ayarlar paneli (`SETTINGS_SCHEMA`, `buildField`), kalıcılık (`savePrefs`, `applyOverrides`, `onConfigChanged`) |
+| `js/app.js` | Giriş noktası: **6)** `onStateChange` · **7)** ana döngü `frame` · **8)** `bindEvents`, `init`, `window.solfejLab`, `?debug` → `window.__dbg` |
+
+- Modüller birbirini adla içe aktarır (`import { … } from './ui.js'`); okunan değişken her zaman günceldir.
+  Başka modülün `let` değişkenine doğrudan atama yapılamaz: sahibi modül bir atayıcı açar
+  (ör. `assignSession(x)`, `assignExercise(x)`; dosyaların sonunda "Başka modüllerin değiştirdiği paylaşılan değişkenler").
+- Yükleme sırası: `config.js` ve `pure.js` en önce değerlendirilir; diğer modüllerin üst düzeyinde (fonksiyon dışında)
+  yalnızca bu ikisinden gelen değerler kullanılır, başlatma `app.js`'teki `init()` ile yapılır.
+- Sürüm etiketi: `index.html`'deki `?v=…` etiketleri ve import map tek yerden `npm run stamp` ile yenilenir
+  (`scripts/stamp.mjs`). `css/` ya da `js/` değiştiyse göndermeden önce çalıştır; yeni modül eklersen de çalıştır.
 
 Akış: IDLE → PLAYING → LISTENING → VERIFIED → (LISTENING …) → COMPLETE → sıradaki soru PLAYING … → SUMMARY.
 Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
@@ -60,9 +70,10 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 ## Kurallar
 - **Dosyayı baştan yazma. Yalnızca gereken yerleri düzenle; iş bitince değiştirdiğin fonksiyonları ve satır aralıklarını listele.**
 - Mevcut davranışı bozma; yeni özellikleri var olan yapının üzerine ekle.
-  Kullanıcı istemedikçe dosyayı bölme ya da bir çerçeveye (React vb.) taşıma.
+  Kod yukarıdaki dosya düzeninde durur: yeni kodu ilgili dosyaya koy, yalnızca o dosyayı oku ve değiştir.
+  Kullanıcı istemedikçe dosyaları yeniden düzenleme, derleme adımı ekleme ya da bir çerçeveye (React vb.) taşıma.
 - Yeni her ayar: `CONFIG`'e (açıklayıcı yorumla), gerekiyorsa `SETTINGS_SCHEMA`'ya (panel) ve `validateConfig`'e (sınırlar).
-- PURE bölümü DOM'a ve Web Audio'ya dokunmaz.
+- `js/pure.js` (ve `js/config.js`) DOM'a ve Web Audio'ya dokunmaz; Node'da test edilebilir kalır.
 - Puanlama ham (yumuşatılmamış) perdeyle yapılır; ibre yumuşatması yalnızca görseldir.
 - Dış kütüphaneler sürümü sabitlenmiş CDN adresleriyle ve yedek adresle yüklenir; yüklenemezse uygulama çalışmaya devam etmeli.
 - Kullanıcı verisi yalnızca tarayıcıda: `solfejlab.history.v1`, `solfejlab.config.v1`, `solfejlab.prefs.v1`.
@@ -80,7 +91,7 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 - 5'li akor kuralı: her 5 soruluk sette en fazla 1 artmış/eksilmiş, en az 1 majör + 1 minör.
 - **Porte + perde grafiği tek görünüm** (canvas, VexFlow'a bağlı değil): sol ve fa anahtarlı çift porte, ortada Do4.
   Perde konumu nota yazımına göre: hedef sesin tam perdesi o notanın nota başının ortasından geçer
-  (Re majörde Fa♯ → Fa'nın yeri, ♯ ile); ara perdeler komşu nota konumları arasında orantılı. Dönüşüm PURE bölümünde.
+  (Re majörde Fa♯ → Fa'nın yeri, ♯ ile); ara perdeler komşu nota konumları arasında orantılı. Dönüşüm `js/pure.js`'te (`makeStaffMap`).
   Oktav toleransı açıkken çizgi, puanlamadaki gibi hedefin oktavına katlanmış perdeyle çizilir.
   "Portede göster" açık → porte görünümü (varsayılan), kapalı → eski sent grafiği. Ayrı VexFlow paneli varsayılan gizli (`CONFIG.UI`).
   Sınavda nota başları ve hedef kılavuz çizgisi `EXAM.REVEAL_NOTE_NAMES`'e uyar; `EXAM.LIVE_FEEDBACK` kapalıysa canlı çizgi yok.

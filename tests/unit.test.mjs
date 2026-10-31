@@ -1,8 +1,12 @@
 // Solfej Lab — saf mantık birim testleri. Çalıştırma: npm test
-// (önce tests/extract-pure.mjs, index.html'deki PURE bölümünü tests/.generated/pure.mjs olarak çıkarır)
+// js/pure.js (saf mantık) ve js/config.js (ayarlar) doğrudan içe aktarılır; DOM ve Web Audio gerekmez.
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import * as M from './.generated/pure.mjs';
+import fs from 'node:fs';
+import * as P from '../js/pure.js';
+import * as C from '../js/config.js';
+
+const M = { ...P, ...C };
 
 const cents = (f, ref) => 1200 * Math.log2(f / ref);
 
@@ -535,4 +539,19 @@ test('Biçim: işaretli sayı ve nota adı', () => {
   assert.equal(M.fmtSigned(0.02, 1), '0,0');
   assert.equal(M.midiName(48), 'C3');
   assert.equal(M.nearestNoteName(440), 'A4');
+});
+
+test("index.html: sürüm etiketi tek ve tutarlı, her modül import map'te (npm run stamp)", () => {
+  const html = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
+  const tags = new Set([...html.matchAll(/\?v=([\w.-]+)/g)].map((m) => m[1]));
+  assert.equal(tags.size, 1, `tek etiket olmalı: ${[...tags].join(', ')}`);
+  const [tag] = tags;
+  const map = JSON.parse(html.match(/<script type="importmap">\n([\s\S]*?)\n<\/script>/)[1]).imports;
+  const mods = fs.readdirSync(new URL('../js/', import.meta.url)).filter((f) => f.endsWith('.js')).sort();
+  assert.deepEqual(Object.keys(map).sort(), mods.map((f) => `./js/${f}`), "js/ klasöründeki her modül import map'te olmalı");
+  for (const [k, v] of Object.entries(map)) assert.equal(v, `${k}?v=${tag}`);
+  // Giriş betiğinin adresi import map'teki adresle birebir aynı olmalı (yoksa app.js iki kez yüklenir)
+  assert.ok(html.includes(`<script type="module" src="./js/app.js?v=${tag}"></script>`));
+  assert.ok(html.includes(`<link rel="stylesheet" href="./css/style.css?v=${tag}">`));
+  assert.ok(!/<style>/.test(html) && !/<script type="module">/.test(html), 'index.html yalnızca iskelet ve bağlantılar');
 });

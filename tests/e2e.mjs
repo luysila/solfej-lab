@@ -19,9 +19,18 @@ const HTML = fs.readFileSync(process.argv[2] || path.join(HERE, '..', 'index.htm
 const T0 = Date.now();
 const log = (...a) => console.log(`[${((Date.now() - T0) / 1000).toFixed(1).padStart(5)}s]`, ...a);
 
+// index.html + proje dosyaları (css/, js/) — ES modülleri doğru içerik türüyle sunulmalı
+const ROOT = path.resolve(HERE, '..');
+const TYPES = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.css': 'text/css; charset=utf-8', '.json': 'application/json' };
+const served = [];
 const server = http.createServer((req, res) => {
-  if (req.url.startsWith('/index.html') || req.url === '/') { res.writeHead(200, { 'content-type': 'text/html; charset=utf-8' }); res.end(HTML); }
-  else { res.writeHead(404); res.end(); }
+  const p = decodeURIComponent(new URL(req.url, 'http://x').pathname);
+  served.push(req.url);
+  if (p === '/' || p === '/index.html') { res.writeHead(200, { 'content-type': TYPES['.html'] }); res.end(HTML); return; }
+  const file = path.resolve(ROOT, '.' + p);
+  if (!file.startsWith(ROOT + path.sep) || !fs.existsSync(file) || fs.statSync(file).isDirectory()) { res.writeHead(404); res.end(); return; }
+  res.writeHead(200, { 'content-type': TYPES[path.extname(file)] || 'application/octet-stream' });
+  fs.createReadStream(file).pipe(res);
 });
 await new Promise((r) => server.listen(0, '127.0.0.1', r));
 const BASE = `http://127.0.0.1:${server.address().port}/index.html`;
@@ -395,7 +404,23 @@ if (run('D')) {
   const overflow2 = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow2 <= 0, `ayarlar açıkken yatay taşma ${overflow2}px`);
   await page.screenshot({ path: `${OUT}/e2e-7-mobile.png`, fullPage: true });
+  // Modüller: her dosya bir kez yüklenir (giriş betiği ile import map adresi aynı → app.js iki kez çalışmaz)
+  const mods = await page.evaluate(() => performance.getEntriesByType('resource').map((r) => new URL(r.name).pathname + new URL(r.name).search).filter((u) => /\/(js|css)\//.test(u)));
+  const names = mods.map((u) => u.split('/').pop());
+  log('yüklenen modüller:', names.join(' '));
+  assert.equal(new Set(names).size, names.length, 'her dosya bir kez yüklenmeli');
+  assert.equal(names.length, 10, '9 modül + style.css');
+  assert.ok(names.every((n) => /\?v=[\w.-]+$/.test(n)), 'her adreste sürüm etiketi olmalı');
   await context.close();
+  // file:// ile açılırsa modüller yüklenemez → "npm run serve" uyarısı
+  const fctx = await browser.newContext();
+  const fpage = await fctx.newPage();
+  await fpage.goto(new URL('../index.html', import.meta.url).href);
+  await fpage.waitForTimeout(300);
+  const warn = await fpage.evaluate(() => ({ hidden: document.getElementById('alert').hidden, text: document.getElementById('alert').textContent }));
+  log('file:// uyarısı:', warn.text.slice(0, 70) + '…');
+  assert.ok(!warn.hidden && /npm run serve/.test(warn.text));
+  await fctx.close();
 }
 
 

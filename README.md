@@ -18,6 +18,27 @@ Windows'ta ve Linux'ta aynı şekilde çalışır; yalnızca Node.js 18+ gerekir
    PowerShell'de `$env:PORT=9000; npm run serve`.
    Mikrofon yalnızca localhost ya da https üzerinden çalışır; dosyayı çift tıklayarak açmayın.
 
+## Dosya düzeni
+Derleme adımı yok: tarayıcı ES modüllerini doğrudan yükler (bu yüzden sayfa `npm run serve` ya da yayın adresi
+üzerinden açılmalı; dosyaya çift tıklamak çalışmaz).
+
+| Dosya | İçerik |
+|---|---|
+| `index.html` | Sayfa iskeleti (HTML) ve dosya bağlantıları |
+| `css/style.css` | Bütün tasarım (renkler en üstte) |
+| `js/config.js` | Ayarlar (`CONFIG`), arayüz metinleri, hazır standartlar — en sık değişen dosya |
+| `js/pure.js` | Saf mantık: nota teorisi, soru üretici, perde algılama (YIN), puanlama, teşhis |
+| `js/audio.js` | Ses motoru (piyano, yedek sentez) ve kütüphane yükleyici |
+| `js/mic.js` | Mikrofon ve perde algılama kurulumu |
+| `js/ui.js` | Arayüz: nota kutuları, durum metni, akort aleti, yönlendirme |
+| `js/staff.js` | Porte ve perde grafiği çizimi |
+| `js/summary.js` | Teşhis ekranı ve "Önceki testlerim" |
+| `js/settings.js` | Ayarlar paneli, arayüz adları, kalıcılık |
+| `js/app.js` | Durum makinesi, ana döngü, başlatma |
+
+`css/` ya da `js/` altında bir dosyayı değiştirdikten sonra, göndermeden önce `npm run stamp` çalıştırın:
+dosya adreslerindeki sürüm etiketini yeniler, böylece ziyaretçilerin tarayıcısı eski ve yeni dosyaları karıştırmaz.
+
 ## Testler
 - Birim testleri: `npm test` (yalnızca Node.js gerekir)
 - Uçtan uca test (isteğe bağlı): `npm install` → `npx playwright install chromium` → `npm run e2e`
