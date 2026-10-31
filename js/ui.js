@@ -17,7 +17,9 @@ export const $ = (id) => document.getElementById(id);
 export const ui = {
   sub: $('subLine'), micChip: $('micChip'), micChipText: $('micChipText'), engineChip: $('engineChip'), engineChipText: $('engineChipText'),
   detChip: $('detChip'), latChip: $('latChip'), cfgChip: $('cfgChip'), alert: $('alert'), notice: $('notice'),
-  tabExam: $('tabExam'), tabPractice: $('tabPractice'), examControls: $('examControls'), practiceControls: $('practiceControls'),
+  examControls: $('examControls'), practiceControls: $('practiceControls'), practiceBusy: $('practiceBusy'),
+  menuBtn: $('menuBtn'), menuList: $('menuList'), workspace: $('workspace'), examSlot: $('examSlot'), practiceSlot: $('practiceSlot'),
+  examPause: $('examPauseBtn'), practicePause: $('practicePauseBtn'), settingsActions: $('settingsActions'),
   examInfo: $('examInfo'), startBtn: $('startBtn'), examReplay: $('examReplayBtn'), skipBtn: $('skipBtn'), endBtn: $('endBtn'),
   root: $('rootSelect'), octave: $('octaveSelect'), type: $('typeSelect'), play: $('playBtn'), replay: $('replayBtn'), reset: $('resetBtn'),
   device: $('deviceSelect'), fold: $('foldToggle'), foldHint: $('foldHint'), staffToggle: $('staffToggle'),
@@ -86,6 +88,16 @@ export const fsm = createMachine(ALLOWED, S.IDLE, onStateChange);
 export let noteEls = [];
 export let starting = false;                   // başlat'a basıldı, mikrofon izni / yükleme bekleniyor
 export let uiReady = false;
+export let paused = false;                     // "Duraklat": dinleme ve soru süresi durur (durum makinesi olduğu yerde bekler)
+export let pausedSince = 0;                    // duraklatmanın başladığı an (Date.now) → sınav saatinden düşülür
+
+/** Duraklatma durumunu değiştirir; sınav oturumunda duraklı geçen süreyi biriktirir (renderTimer bunu düşer) */
+export function setPausedState(on) {
+  if (on === paused) return;
+  if (!on && session && pausedSince) session.pausedMs = (session.pausedMs || 0) + (Date.now() - pausedSince);
+  paused = on;
+  pausedSince = on ? Date.now() : 0;
+}
 
 // Akış jetonu: sıfırlama / yeni test sonrası eski zamanlayıcılar etkisiz kalır
 export let flowToken = 0, flowTimer = 0;
@@ -97,6 +109,8 @@ export function after(ms, fn) {
 export function cancelFlow() { flowToken++; clearTimeout(flowTimer); }
 
 export const examActive = () => !!session && fsm.state !== S.IDLE && fsm.state !== S.SUMMARY;
+/** Şu an duraklatılabilir mi? Sınav sürerken ya da serbest çalışmada çalım / dinleme / doğrulama sırasında */
+export const canPauseNow = () => !paused && (examActive() || (mode === 'practice' && !session && [S.PLAYING, S.LISTENING, S.VERIFIED].includes(fsm.state)));
 export const gaugeRange = () => Math.max(CONFIG.UI.GAUGE_RANGE_CENTS, CONFIG.WARNING_CENTS + 5);
 export const biasRange  = () => Math.max(30, Math.round(CONFIG.TOLERANCE_CENTS * 1.5));
 
@@ -284,9 +298,10 @@ export function renderStatus() {
       default:          msg = 'Tebrikler! Tüm sesleri sırayla ve sabit biçimde okudunuz.';
     }
   }
+  if (paused) msg = `${T('statePaused')} — sürdürmek için “${btnName('btnResume')}” düğmesine basın.`;
   setText(ui.status, msg);
-  setText(ui.stateLabel, STATE_TEXT[st]);
-  ui.stateLabel.dataset.s = st;
+  setText(ui.stateLabel, paused ? T('statePaused') : STATE_TEXT[st]);
+  ui.stateLabel.dataset.s = paused ? 'PAUSED' : st;
 }
 
 // ── Sınav ilerleme şeridi ──
@@ -328,23 +343,26 @@ export function renderTimer() {
     const left = Math.max(0, limit - (session.result?.listenMs ?? 0) / 1000);
     setText(ui.progressTimer, `kalan ${nf0.format(Math.ceil(left))} sn`);
   } else {
-    setText(ui.progressTimer, fmtClock((session.finishedAt ?? Date.now()) - session.startedAt));
+    const pausedMs = (session.pausedMs || 0) + (paused && pausedSince ? Date.now() - pausedSince : 0);
+    setText(ui.progressTimer, fmtClock((session.finishedAt ?? Date.now()) - session.startedAt - pausedMs));
   }
 }
 
 export function renderAll() {
   const st = fsm.state, active = examActive();
-  ui.tabExam.disabled = ui.tabPractice.disabled = active || starting;
   ui.device.disabled = !micStream || !ui.device.options.length || active || starting;
+  // Duraklat / Devam (sınav ve serbest çalışma kontrollerinde)
+  const pausable = paused || canPauseNow();
+  for (const b of [ui.examPause, ui.practicePause]) { b.disabled = !pausable; setTextKey(b, paused ? 'btnResume' : 'btnPause'); }
   // Sınav düğmeleri
   ui.startBtn.disabled = starting || active;
   setTextKey(ui.startBtn, st === S.SUMMARY ? 'btnNewTest' : 'btnStart');
-  ui.examReplay.disabled = !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_REPLAY);
-  ui.skipBtn.disabled = !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_SKIP);
+  ui.examReplay.disabled = paused || !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_REPLAY);
+  ui.skipBtn.disabled = paused || !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_SKIP);
   ui.endBtn.disabled = !active;
   // Serbest çalışma düğmeleri
   ui.play.disabled = starting || !!session || !(st === S.IDLE || st === S.COMPLETE) || !exercise.notes.length;
-  ui.replay.disabled = !!session || st !== S.LISTENING;
+  ui.replay.disabled = paused || !!session || st !== S.LISTENING;
   ui.reset.disabled = !!session || st === S.IDLE;
   setTextKey(ui.play, st === S.COMPLETE ? 'btnRestart' : 'btnPlay');
   // Hedef göstergesi
@@ -376,6 +394,7 @@ export function showNotice(msg, ms = 12000) {
 export function setMicChip(on, label) {
   ui.micChip.classList.toggle('on', on);
   setText(ui.micChipText, label);
+  ui.micChip.title = label;
   if (!on) ui.latChip.hidden = true;
 }
 export function updateLatencyChip(track) {
@@ -399,7 +418,7 @@ export function renderEngineChip() {
   setText(ui.engineChipText, txt);
   ui.engineChip.classList.toggle('on', on);
   ui.engineChip.classList.toggle('warn', warn);
-  ui.engineChip.title = warn ? `Piyano örnekleri yüklenemedi: ${piano.error?.message || ''}` : 'Soruların çalındığı ses';
+  ui.engineChip.title = warn ? `${txt} — piyano örnekleri yüklenemedi: ${piano.error?.message || ''}` : `${txt} (soruların çalındığı ses)`;
 }
 export function renderDetectorChip() {
   const name = detector?.name ?? CONFIG.PITCH.ALGORITHM;
@@ -441,7 +460,8 @@ export let lastReadoutTs = 0;
 export function paintGaugeBackground() {
   const R = gaugeRange(), g = CONFIG.TOLERANCE_CENTS, y = CONFIG.WARNING_CENTS;
   const p = (c) => `${(50 + (clamp(c, -R, R) / R) * 50).toFixed(2)}%`;   // alttan yüzde (0deg = aşağıdan yukarı)
-  const RED = 'rgba(248,113,113,.30)', YEL = 'rgba(251,191,36,.30)', GRN = 'rgba(52,211,153,.36)';
+  const cs = getComputedStyle(document.documentElement), v = (n, fb) => cs.getPropertyValue(n).trim() || fb;   // renkler :root'tan
+  const RED = v('--gauge-red', 'rgba(248,113,113,.30)'), YEL = v('--gauge-yellow', 'rgba(251,191,36,.30)'), GRN = v('--gauge-green', 'rgba(52,211,153,.36)');
   ui.gauge.style.background =
     `linear-gradient(0deg, ${RED} 0 ${p(-y)}, ${YEL} ${p(-y)} ${p(-g)}, ${GRN} ${p(-g)} ${p(g)}, ${YEL} ${p(g)} ${p(y)}, ${RED} ${p(y)} 100%)`;
 }

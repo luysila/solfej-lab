@@ -138,7 +138,7 @@ export function buildNamesIntro() {
 
 export const MIDI_OPTIONS = Array.from({ length: 61 }, (_, i) => 36 + i);   // C2 – C7
 export const SETTINGS_SCHEMA = [
-  { title: 'Sınav standardı', fields: [
+  { title: 'Sınav standardı', tab: 'std', fields: [
     { path: 'TOLERANCE_CENTS', label: 'Tolerans (± sent)', type: 'number', min: 1, max: 100, step: 1 },
     { path: 'WARNING_CENTS', label: 'Sarı bant sınırı (± sent)', type: 'number', min: 1, max: 200, step: 1 },
     { path: 'SUSTAIN_TIME_MS', label: 'Tutma süresi (ms)', type: 'number', min: 20, max: 5000, step: 10 },
@@ -146,7 +146,7 @@ export const SETTINGS_SCHEMA = [
     { path: 'A4_HZ', label: 'Diyapazon A4 (Hz)', type: 'number', min: 400, max: 480, step: 0.5 },
     { path: 'OCTAVE_MODE', label: 'Oktav toleransı türü', type: 'select', options: [['free', 'Serbest (her ses ayrı)'], ['anchored', 'Sabit (ilk ses)'], ['off', 'Yok (yazılı oktav)']] },
   ] },
-  { title: 'Sınav yapısı', fields: [
+  { title: 'Sınav yapısı', tab: 'std', fields: [
     { path: 'QUESTION_COUNTS.single', label: 'Tek ses · soru sayısı', type: 'number', min: 0, max: 50, step: 1 },
     { path: 'QUESTION_COUNTS.double', label: 'İki ses · soru sayısı', type: 'number', min: 0, max: 50, step: 1 },
     { path: 'QUESTION_COUNTS.triple', label: 'Üç ses · soru sayısı', type: 'number', min: 0, max: 50, step: 1 },
@@ -157,7 +157,7 @@ export const SETTINGS_SCHEMA = [
     { path: 'CHORD_RULES.ALTERED_CHANCE', label: 'Artmış/eksilmiş bulunma olasılığı (%)', type: 'percent', min: 0, max: 100, step: 5 },
     { path: 'INTERVAL_RULES.POOL', label: 'Aralık havuzu (iki ses)', type: 'multi', wide: true, options: INTERVAL_TYPES.map((t) => [t.id, t.label]) },
   ] },
-  { title: 'Sınav akışı ve puan', fields: [
+  { title: 'Sınav akışı ve puan', tab: 'std', fields: [
     { path: 'EXAM.PLAYBACK', label: 'Sınavda çalım biçimi', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (kökten yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
     { path: 'EXAM.REVEAL_NOTE_NAMES', label: 'Nota adlarını göster', type: 'select', options: [['after', 'Ses doğrulanınca'], ['end', 'Soru bitince'], ['always', 'Her zaman'], ['never', 'Hiçbir zaman']] },
     { path: 'EXAM.QUESTION_TIME_LIMIT_S', label: 'Soru süre sınırı (sn · 0 = yok)', type: 'number', min: 0, max: 600, step: 5 },
@@ -168,7 +168,7 @@ export const SETTINGS_SCHEMA = [
     { path: 'EXAM.ALLOW_SKIP', label: 'Soruyu geçmeye izin ver', type: 'bool' },
     { path: 'SCORING.PARTIAL_CREDIT', label: 'Kısmi puan ver', type: 'bool' },
   ] },
-  { title: 'Ses ve algılama', fields: [
+  { title: 'Ses ve algılama', tab: 'audio', fields: [
     { path: 'AUDIO.INSTRUMENT', label: 'Çalgı', type: 'select', options: [['piano', 'Piyano (Tone.js)'], ['synth', 'Sentez (çevrimdışı)']] },
     { path: 'AUDIO.CHORD_DURATION_S', label: 'Çalım süresi (sn)', type: 'number', min: 0.3, max: 8, step: 0.1 },
     { path: 'AUDIO.PRACTICE_PLAYBACK', label: 'Serbest çalışma çalım biçimi (varsayılan)', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (kökten yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
@@ -180,12 +180,14 @@ export const SETTINGS_SCHEMA = [
     { path: 'PITCH.YIN_ADAPTIVE_K', label: 'YIN uyarlamalı eşik (0 = klasik)', type: 'number', min: 0, max: 0.99, step: 0.01 },
     { path: 'PITCH.MIN_CLARITY', label: 'En düşük netlik', type: 'number', min: 0.3, max: 0.99, step: 0.01 },
     { path: 'PITCH.MEDIAN_FRAMES', label: 'Medyan filtre (kare)', type: 'number', min: 1, max: 9, step: 1 },
+  ] },
+  { title: 'Görünüm', tab: 'view', fields: [
     { path: 'UI.VEXFLOW_PANEL', label: 'Ayrı VexFlow porte paneli', type: 'bool' },
     { path: 'UI.STAFF_WARN_YELLOW', label: 'Portede sınırdayken sarı', type: 'bool' },
   ] },
   // Arayüz adları: CONFIG.TEXTS'teki her ad kendiliğinden listelenir (yeni ad için TEXTS'e eklemek yeter)
-  { title: 'Arayüz adları', intro: () => buildNamesIntro(), fields: textFields((p) => !p.startsWith('COACH.')) },
-  { title: 'Yönlendirme cümleleri', fields: textFields((p) => p.startsWith('COACH.')) },
+  { title: 'Arayüz adları', tab: 'names', intro: () => buildNamesIntro(), fields: textFields((p) => !p.startsWith('COACH.')) },
+  { title: 'Yönlendirme cümleleri', tab: 'names', fields: textFields((p) => p.startsWith('COACH.')) },
 ];
 export const fieldId = (path) => `set-${path.replace(/\./g, '-')}`;
 
@@ -193,6 +195,7 @@ export function buildSettingsForm() {
   ui.settingsForm.replaceChildren();
   for (const group of SETTINGS_SCHEMA) {
     const fs = el('fieldset', 'set-group');
+    fs.dataset.tab = group.tab;
     fs.append(el('legend', null, group.title));
     if (group.intro) fs.append(group.intro());
     const grid = el('div', 'settings-grid');
@@ -294,6 +297,20 @@ export function readSettingsForm(draft) {
   }
   return bad;
 }
+// ── Ayarlar sekmeleri: Standart sınav · Ses ve algılama · Görünüm · Arayüz adları · Gelişmiş (JSON) ──
+// Form tek parça kalır ("Kaydet ve uygula" bütün sekmelerdeki alanları okur); sekme yalnızca görünürlüğü değiştirir.
+export let settingsTab = 'std';
+export function showSettingsTab(tab) {
+  settingsTab = tab;
+  for (const b of ui.settingsPanel.querySelectorAll('.set-tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
+  for (const n of ui.settingsPanel.querySelectorAll('[data-tab]:not(.tab)')) n.hidden = n.dataset.tab !== tab;
+  ui.settingsActions.hidden = tab === 'adv';
+}
+export function bindSettingsTabs() {
+  for (const b of ui.settingsPanel.querySelectorAll('.set-tabs [data-tab]')) b.addEventListener('click', () => showSettingsTab(b.dataset.tab));
+  showSettingsTab(settingsTab);
+}
+
 export function showSettingsMsg(text, isError = false) {
   ui.settingsMsg.textContent = text;
   ui.settingsMsg.classList.toggle('err', isError);

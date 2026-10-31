@@ -44,7 +44,7 @@ düzeni olarak anla (PURE = `js/pure.js`); "Yer:" satırlarındaki fonksiyon ve 
 
 | Dosya | İçerik |
 |---|---|
-| `index.html` | Yalnızca sayfa iskeleti (HTML, bütün `id`'ler), `css/style.css` bağlantısı, import map, `js/app.js`; file:// uyarısı |
+| `index.html` | Yalnızca sayfa iskeleti (HTML, bütün `id`'ler): üst çubuk + menü, bölümler (`main > .section`), çalışma alanı (`#workspace`), lisans satırı; `css/style.css`, import map, `js/app.js`; file:// uyarısı |
 | `css/style.css` | Bütün tasarım; renkler en üstte `:root` değişkenlerinde; bölümler `/* ── … ── */` başlıklarıyla |
 | `js/config.js` | **0)** `CONFIG` (TOLERANCE_CENTS, SUSTAIN_TIME_MS, QUESTION_COUNTS, REGISTER, CHORD_RULES, EXAM, SCORING, ANALYSIS, PITCH, AUDIO, UI, HISTORY, LIBS, TEXTS, PRESETS) ve dondurulmuş `DEFAULT_CONFIG`. En sık değişecek dosya |
 | `js/pure.js` | **1)** Saf mantık (DOM ve Web Audio yok): yardımcılar, nota teorisi (`buildNotes`), soru üreticisi (`generateSession`, `planTriads`, `planIntervals`, `pickVoicing`), çalım planı (`playbackPlan`), porte konumu (`makeStaffMap`, `semitoneNeighbors`), `compareToTarget`, `YinDetector`, `MedianFilter`, `SustainTracker`, yönlendirme (`CoachWindow`, `coachMessage`), durum makinesi (`S`, `ALLOWED`, `createMachine`), `Exercise`, `ExamSession`, `computeDiagnostics` + `buildAdvice`, `makeHistoryEntry`, `validateConfig`, `sanitizeOverrides`, `textLeaves` |
@@ -54,6 +54,7 @@ düzeni olarak anla (PURE = `js/pure.js`); "Yer:" satırlarındaki fonksiyon ve 
 | `js/staff.js` | Perde grafiği (`setupContour`, `pushContour`, `drawContour`), porte görünümü (`drawStaffContour`, anahtar/nota başı çizimi), VexFlow paneli (`setStaffEnabled`, `drawStaff`) |
 | `js/summary.js` | Teşhis ekranı (`renderSummary`) ve "Önceki testlerim" (`renderHistory`, localStorage) |
 | `js/settings.js` | Arayüz adları (`T`, `applyTexts`, sayfada düzenleme), ayarlar paneli (`SETTINGS_SCHEMA`, `buildField`), kalıcılık (`savePrefs`, `applyOverrides`, `onConfigChanged`) |
+| `js/nav.js` | Bölümler ve menü: `showSection`, `goSection`, adres çubuğu (`SECTIONS`), geri tuşu, son bölüm (`solfejlab.ui.v1`), menü aç/kapa; bölüm değişince `pauseFlow` |
 | `js/app.js` | Giriş noktası: **6)** `onStateChange` · **7)** ana döngü `frame` · **8)** `bindEvents`, `init`, `window.solfejLab`, `?debug` → `window.__dbg` |
 
 - Modüller birbirini adla içe aktarır (`import { … } from './ui.js'`); okunan değişken her zaman günceldir.
@@ -76,7 +77,8 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 - `js/pure.js` (ve `js/config.js`) DOM'a ve Web Audio'ya dokunmaz; Node'da test edilebilir kalır.
 - Puanlama ham (yumuşatılmamış) perdeyle yapılır; ibre yumuşatması yalnızca görseldir.
 - Dış kütüphaneler sürümü sabitlenmiş CDN adresleriyle ve yedek adresle yüklenir; yüklenemezse uygulama çalışmaya devam etmeli.
-- Kullanıcı verisi yalnızca tarayıcıda: `solfejlab.history.v1`, `solfejlab.config.v1`, `solfejlab.prefs.v1`.
+- Kullanıcı verisi yalnızca tarayıcıda: `solfejlab.history.v1`, `solfejlab.config.v1`, `solfejlab.prefs.v1`,
+  `solfejlab.ui.v1` (arayüz durumu: son bölüm, görünüm seçimleri).
   Kayıt biçimini değiştirirsen anahtarın sürüm numarasını artır.
 - Nota yazımı harf adımı + yarım sesle yapılır (D♭ majör = D♭–F–A♭); çift diyez/bemolden kaçınılır.
 - Dışarıdan gelen metinler (içe aktarılan JSON vb.) DOM'a `textContent` ile yazılır, `innerHTML` ile değil.
@@ -106,6 +108,16 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 - **Arayüz adları `CONFIG.TEXTS`'te**: panel başlıkları, sekmeler, düğmeler, gösterge etiketleri, yönlendirme cümleleri.
   Ayarlarda "Arayüz adları" grubu kendiliğinden üretilir; "Adları sayfada düzenle" ile yerinde düzenlenir;
   "Adları kopyala" değişenleri JSON olarak verir. Ad boş olamaz, en fazla 80 karakter.
+- **Bölüm bölüm sayfa** (docs/istek-2.md, Aşama 1): üst çubukta uygulama adı + "Menü" (yukarıdan açılan dikey liste;
+  seçince / dışarı tıklayınca / Esc ile kapanır), sağda mikrofon ve ses simgeleri. Aynı anda tek bölüm: Ana sayfa · Sınav ·
+  Serbest çalışma · Önceki testlerim · Ayarlar · Yardım. Adres: #ana-sayfa, #sinav, #kendi-sinavim, #serbest, #gecmis, #ayarlar,
+  #yardim (geri tuşu çalışır); ilk açılışta Ana sayfa, sonra son kullanılan bölüm. Sınav ve Serbest çalışma tek çalışma alanını
+  (`#workspace`) paylaşır, alan `setMode` ile bölüme taşınır. Sınav sürerken Serbest çalışma bölümü yalnızca uyarı gösterir.
+  Ayarlar sekmeli (Standart sınav · Ses ve algılama · Görünüm · Arayüz adları · Gelişmiş); form tek parça kalır.
+  Salamander atfı her bölümün altındaki `.attrib` satırında. Bütün renkler `css/style.css` `:root`'ta (canvas renkleri de oradan okunur).
+- **Duraklat / Devam**: bekleyen zamanlayıcılar iptal, ses susar, ölçüm ve soru süresi durur; durum makinesi yerinde bekler.
+  Devam: çalım yarıda kaldıysa yeniden çalınır (tekrar sayılmaz), doğrulama / soru sonu bekliyorsa sürer.
+  Çalışma alanından başka bölüme geçince kendiliğinden duraklar; geri dönünce kendiliğinden sürmez ("Devam" gerekir).
 
 ## Doğrulanmamış / bilinen sınırlar
 - Tone.js (14.8.49) ve VexFlow (4.2.5) gerçek kütüphaneleriyle henüz denenmedi (önceki geliştirme ortamında CDN'ler

@@ -6,21 +6,22 @@
 <meta name="color-scheme" content="dark">
 <title>Solfej Lab · İşitme Eğitimi</title>
 
-<link rel="stylesheet" href="./css/style.css?v=202610312307">
+<link rel="stylesheet" href="./css/style.css?v=202610312327">
 <!-- Sürüm etiketi (?v=…): yayından sonra tarayıcı önbelleğinde eski ve yeni dosyalar karışmasın.
      Elle değiştirmeyin; dosyaları değiştirdikten sonra: npm run stamp (scripts/stamp.mjs import map'i de yeniden üretir) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=202610312307",
-    "./js/audio.js": "./js/audio.js?v=202610312307",
-    "./js/config.js": "./js/config.js?v=202610312307",
-    "./js/mic.js": "./js/mic.js?v=202610312307",
-    "./js/pure.js": "./js/pure.js?v=202610312307",
-    "./js/settings.js": "./js/settings.js?v=202610312307",
-    "./js/staff.js": "./js/staff.js?v=202610312307",
-    "./js/summary.js": "./js/summary.js?v=202610312307",
-    "./js/ui.js": "./js/ui.js?v=202610312307"
+    "./js/app.js": "./js/app.js?v=202610312327",
+    "./js/audio.js": "./js/audio.js?v=202610312327",
+    "./js/config.js": "./js/config.js?v=202610312327",
+    "./js/mic.js": "./js/mic.js?v=202610312327",
+    "./js/nav.js": "./js/nav.js?v=202610312327",
+    "./js/pure.js": "./js/pure.js?v=202610312327",
+    "./js/settings.js": "./js/settings.js?v=202610312327",
+    "./js/staff.js": "./js/staff.js?v=202610312327",
+    "./js/summary.js": "./js/summary.js?v=202610312327",
+    "./js/ui.js": "./js/ui.js?v=202610312327"
   }
 }
 </script>
@@ -29,75 +30,60 @@
 <body>
 <main class="app">
 
-  <header class="top">
-    <div>
-      <h1>Solfej Lab</h1>
-      <p class="sub" id="subLine"></p>
+  <!-- ── Üst çubuk ── -->
+  <header class="top" id="topbar">
+    <div class="top-left">
+      <a class="brand" href="#ana-sayfa"><h1>Solfej Lab</h1></a>
+      <button class="menu-btn" id="menuBtn" type="button" aria-expanded="false" aria-controls="menuList"><span class="menu-ico" aria-hidden="true">☰</span><span data-text="btnMenu">Menü</span></button>
     </div>
-    <div class="chips">
-      <span class="chip" id="micChip"><i class="dot"></i><span id="micChipText">Mikrofon kapalı</span></span>
-      <span class="chip" id="engineChip"><i class="dot"></i><span id="engineChipText">Ses: piyano</span></span>
-      <span class="chip mono" id="detChip">Algılama: YIN</span>
-      <span class="chip mono" id="latChip" hidden></span>
-      <button class="chip chip-btn" id="cfgChip" type="button" hidden>Özel ayarlar etkin</button>
+    <div class="status-icons">
+      <button class="chip chip-btn" id="cfgChip" type="button" hidden data-text="chipCustomConfig">Özel ayarlar etkin</button>
+      <span class="st-ico" id="micChip" title="Mikrofon kapalı"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg><i class="dot"></i><span class="sr-only" id="micChipText">Mikrofon kapalı</span></span>
+      <span class="st-ico" id="engineChip" title="Ses: piyano"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 9v6h4l5 4V5L8 9H4z"/><path d="M16.5 8.5a5 5 0 0 1 0 7"/></svg><i class="dot"></i><span class="sr-only" id="engineChipText">Ses: piyano</span></span>
     </div>
+    <!-- Menü: yukarıdan açılan dikey bölüm listesi (seçince, dışarı tıklayınca ya da Esc ile kapanır) -->
+    <nav class="menu" id="menuList" aria-label="Bölümler" hidden>
+      <a href="#ana-sayfa" data-sec="ana-sayfa"><span data-text="navHome">Ana sayfa</span></a>
+      <a href="#sinav" data-sec="sinav"><span data-text="navExam">Sınav</span></a>
+      <a href="#serbest" data-sec="serbest"><span data-text="navPractice">Serbest çalışma</span></a>
+      <a href="#gecmis" data-sec="gecmis"><span data-text="navHistory">Önceki testlerim</span></a>
+      <a href="#ayarlar" data-sec="ayarlar"><span data-text="navSettings">Ayarlar</span></a>
+      <a href="#yardim" data-sec="yardim"><span data-text="navHelp">Yardım</span></a>
+    </nav>
   </header>
 
   <div class="alert" id="alert" role="alert" hidden></div>
   <div class="notice" id="notice" role="status" hidden></div>
 
-  <!-- ── Mod + kontroller ── -->
-  <section class="panel" aria-label="Çalışma modu">
-    <div class="panel-head"><h2 data-text="panelMode">Çalışma modu</h2></div>
-    <div class="tabs" role="tablist" aria-label="Mod">
-      <button class="tab" id="tabExam" role="tab" type="button" aria-selected="true" aria-controls="examControls" data-text="tabExam">Sınav</button>
-      <button class="tab" id="tabPractice" role="tab" type="button" aria-selected="false" aria-controls="practiceControls" data-text="tabPractice">Serbest çalışma</button>
+  <!-- ══ Ana sayfa ══ -->
+  <section class="section" id="sec-home" data-sec="ana-sayfa" hidden>
+    <div class="hero">
+      <h2 class="hero-title" data-text="homeTitle">Bugün ne çalışalım?</h2>
+      <p class="sub" id="subLine"></p>
     </div>
+    <div class="tiles">
+      <a class="tile" href="#sinav"><b data-text="tileExam">Sınav</b><span data-text="tileExamDesc">Konservatuvar sınavı biçiminde: tek, iki ve üç ses</span></a>
+      <a class="tile" href="#kendi-sinavim"><b data-text="tileCustom">Kendi sınavını hazırla</b><span data-text="tileCustomDesc">Soru tiplerini, aralıkları ve kuralları sen seç</span></a>
+      <a class="tile" href="#serbest"><b data-text="tilePractice">Serbest çalışma</b><span data-text="tilePracticeDesc">Ses, aralık ya da akor seç; kendi hızında çalış</span></a>
+      <a class="tile" href="#gecmis"><b data-text="tileHistory">Önceki testlerim</b><span data-text="tileHistoryDesc">Puanların, eğilimin ve teşhislerin</span></a>
+    </div>
+  </section>
 
-    <div id="examControls" role="tabpanel" aria-labelledby="tabExam">
+  <!-- ══ Sınav ══ -->
+  <section class="section" id="sec-exam" data-sec="sinav" hidden>
+    <div class="panel" id="examPanel">
+      <div class="panel-head"><h2 data-text="panelExam">Sınav</h2></div>
+    <div id="examControls">
       <p class="exam-info" id="examInfo"></p>
       <div class="actions">
         <button class="btn primary" id="startBtn" type="button" data-text="btnStart">▶ Teste Başla</button>
         <button class="btn" id="examReplayBtn" type="button" disabled data-text="btnExamReplay">↻ Tekrar Çal</button>
+        <button class="btn" id="examPauseBtn" type="button" disabled data-text="btnPause">⏸ Duraklat</button>
         <button class="btn" id="skipBtn" type="button" disabled data-text="btnSkip">⏭ Soruyu Geç</button>
         <button class="btn ghost" id="endBtn" type="button" disabled data-text="btnEnd">■ Testi Bitir</button>
       </div>
     </div>
-
-    <div id="practiceControls" role="tabpanel" aria-labelledby="tabPractice" hidden>
-      <div class="fields">
-        <label class="field"><span>Kök ses</span><select id="rootSelect"></select></label>
-        <label class="field"><span>Kök oktavı</span><select id="octaveSelect"></select></label>
-        <label class="field"><span>Ses / aralık / akor</span><select id="typeSelect"></select></label>
-        <label class="field"><span data-text="labelPlayback">Çalım biçimi</span><select id="playbackSelect">
-          <option value="harmonic" data-text="playbackHarmonic">Birlikte (armonik)</option>
-          <option value="melodic" data-text="playbackMelodic">Ayrı ayrı (kökten yukarı)</option>
-          <option value="both" data-text="playbackBoth">Önce ayrı, sonra birlikte</option>
-        </select></label>
-      </div>
-      <div class="actions">
-        <button class="btn primary" id="playBtn" type="button" data-text="btnPlay">▶ Çal &amp; Başla</button>
-        <button class="btn" id="replayBtn" type="button" disabled data-text="btnReplay">↻ Tekrar Çal</button>
-        <button class="btn ghost" id="resetBtn" type="button" disabled data-text="btnReset">⟲ Sıfırla</button>
-      </div>
     </div>
-
-    <div class="common">
-      <label class="field device-field"><span>Mikrofon girişi</span><select id="deviceSelect" disabled><option>Mikrofon açılınca listelenir</option></select></label>
-      <div class="switch-row">
-        <label class="switch">
-          <input type="checkbox" id="foldToggle" checked>
-          <span class="track"></span>
-          <span class="switch-text"><span data-text="toggleFold">Oktav toleransı</span><small id="foldHint"></small></span>
-        </label>
-        <label class="switch">
-          <input type="checkbox" id="staffToggle">
-          <span class="track"></span>
-          <span class="switch-text"><span data-text="toggleStaff">Portede göster</span><small data-text="toggleStaffHint">Perde nota portesi üzerinde çizilir (kapalı: sent grafiği)</small></span>
-        </label>
-      </div>
-    </div>
-  </section>
 
   <!-- ── Sınav sonucu: teşhis ekranı ── -->
   <section class="panel summary" id="summaryPanel" hidden aria-labelledby="summaryTitle">
@@ -142,90 +128,149 @@
     </div>
   </section>
 
-  <!-- ── Okunacak sesler ── -->
-  <section class="panel" aria-label="Okunacak sesler">
-    <div class="panel-head">
-      <h2><span data-text="panelNotes">Okunacak sesler</span> <span class="ex-title" id="exTitle"></span></h2>
-      <span class="stage" id="stateLabel" data-s="IDLE">Hazır</span>
-    </div>
-    <div class="exam-progress" id="examProgress" hidden>
-      <div class="progress-head"><span id="progressText"></span><span class="mono" id="progressTimer"></span></div>
-      <div class="segments" id="segments" role="list" aria-label="Soru ilerlemesi"></div>
-      <div class="progress-legend"><span><i class="lg-done"></i>Tam</span><span><i class="lg-partial"></i>Kısmi</span><span><i class="lg-fail"></i>Geçildi / süre doldu</span></div>
-    </div>
-    <div class="notes" id="notes" role="list"></div>
-    <p class="status" id="statusLine" role="status" aria-live="polite"></p>
-  </section>
-
-  <!-- ── Porte (isteğe bağlı) ── -->
-  <section class="panel" id="staffPanel" hidden aria-label="Nota portesi">
-    <div class="panel-head"><h2 data-text="panelStaff">Porte</h2><span class="stage">VexFlow</span></div>
-    <div class="staff-paper"><div class="staff-host" id="staff"></div></div>
-    <p class="staff-msg" id="staffMsg"></p>
-  </section>
-
-  <!-- ── Akort aleti ── -->
-  <section class="panel tuner" id="tuner" data-zone="none" aria-label="Akort ibresi">
-    <div class="panel-head"><h2 data-text="panelTuner">Akort</h2></div>
-    <div class="readouts">
-      <div class="target">
-        <span class="label" data-text="labelTarget">Hedef</span>
-        <b id="targetName">—</b>
-        <span class="mono muted" id="targetFreq">— Hz</span>
-      </div>
-      <div class="cents">
-        <span class="mono" id="centsVal">—</span>
-        <span class="zone-label" data-text="labelDeviation">hedefe göre</span>
-      </div>
-      <div class="heard">
-        <span class="label" data-text="labelHeard">Okunan</span>
-        <b class="mono" id="heardFreq">— Hz</b>
-        <span class="mono muted" id="heardNote">&nbsp;</span>
-      </div>
-    </div>
-
-    <div class="contour">
-      <div class="contour-head">
-        <span class="ch-staff">Porte · son <span id="staffSpan">6</span> sn · okunan perde, nota yazımına göre</span>
-        <span class="ch-cents" hidden>Perde grafiği · son <span id="contourSpan">6</span> sn · hedefe göre sapma (sent)</span>
-        <span class="contour-legend">
-          <span class="ch-cents" hidden><i class="key-line k-pitch"></i><span data-text="legendPitch">Okunan perde</span></span>
-          <span><i class="key-line k-held"></i><span data-text="legendHeld">Tolerans içinde</span></span>
-          <span class="ch-staff"><i class="key-line k-out"></i><span data-text="legendOut">Dışında</span></span>
-          <span class="ch-cents" hidden><i class="key-band"></i>±<span id="contourTol">20</span> sent bandı</span>
-          <span class="ch-staff"><i class="key-line k-guide"></i><span data-text="legendGuide">Hedef</span></span>
-        </span>
-      </div>
-      <div class="view-row">
-        <canvas id="contour" role="img" aria-label="Okunan perde, nota portesi üzerinde"></canvas>
-        <!-- Dikey akort aleti: aşağı pes, yukarı tiz; uçlar bir yarım ses aşağı/yukarı -->
-        <div class="vgauge" aria-hidden="true">
-          <div class="vg-names"><span class="vg-above" id="vgAbove" data-text="gaugeSharp">tiz</span><span class="vg-target" id="vgTarget"></span><span class="vg-below" id="vgBelow" data-text="gaugeFlat">pes</span></div>
-          <div class="gauge" id="gauge"><div class="needle" id="needle"></div></div>
-          <div class="ticks" id="ticks"></div>
+    <div class="ws-slot" id="examSlot">
+      <!-- ── Çalışma alanı: Sınav ve Serbest çalışma bölümleri arasında taşınır (kopyalanmaz) ── -->
+      <div class="workspace" id="workspace">
+      <!-- ── Okunacak sesler ── -->
+      <section class="panel" aria-label="Okunacak sesler">
+        <div class="panel-head">
+          <h2><span data-text="panelNotes">Okunacak sesler</span> <span class="ex-title" id="exTitle"></span></h2>
+          <span class="stage" id="stateLabel" data-s="IDLE">Hazır</span>
         </div>
-      </div>
-      <p class="coach idle" id="coachLine" role="status" aria-live="polite"></p>
-    </div>
+        <div class="exam-progress" id="examProgress" hidden>
+          <div class="progress-head"><span id="progressText"></span><span class="mono" id="progressTimer"></span></div>
+          <div class="segments" id="segments" role="list" aria-label="Soru ilerlemesi"></div>
+          <div class="progress-legend"><span><i class="lg-done"></i>Tam</span><span><i class="lg-partial"></i>Kısmi</span><span><i class="lg-fail"></i>Geçildi / süre doldu</span></div>
+        </div>
+        <div class="notes" id="notes" role="list"></div>
+        <p class="status" id="statusLine" role="status" aria-live="polite"></p>
+      </section>
 
-    <div class="sustain">
-      <div class="sustain-head"><span data-text="labelSustain">Süreklilik (sustain)</span><span class="mono" id="sustainText">0,00 / 0,25 s</span></div>
-      <div class="bar"><div class="fill" id="sustainFill"></div></div>
-    </div>
+      <!-- ── Porte (isteğe bağlı) ── -->
+      <section class="panel" id="staffPanel" hidden aria-label="Nota portesi">
+        <div class="panel-head"><h2 data-text="panelStaff">Porte</h2><span class="stage">VexFlow</span></div>
+        <div class="staff-paper"><div class="staff-host" id="staff"></div></div>
+        <p class="staff-msg" id="staffMsg"></p>
+      </section>
 
-    <div class="meter-row">
-      <div class="meter" title="Mikrofon seviyesi (pembe çizgi = gürültü eşiği)">
-        <div class="meter-fill" id="levelFill"></div>
-        <div class="meter-thr" id="levelThr"></div>
+      <!-- ── Akort aleti ── -->
+      <section class="panel tuner" id="tuner" data-zone="none" aria-label="Akort ibresi">
+        <div class="panel-head"><h2 data-text="panelTuner">Akort</h2></div>
+        <div class="readouts">
+          <div class="target">
+            <span class="label" data-text="labelTarget">Hedef</span>
+            <b id="targetName">—</b>
+            <span class="mono muted" id="targetFreq">— Hz</span>
+          </div>
+          <div class="cents">
+            <span class="mono" id="centsVal">—</span>
+            <span class="zone-label" data-text="labelDeviation">hedefe göre</span>
+          </div>
+          <div class="heard">
+            <span class="label" data-text="labelHeard">Okunan</span>
+            <b class="mono" id="heardFreq">— Hz</b>
+            <span class="mono muted" id="heardNote">&nbsp;</span>
+          </div>
+        </div>
+
+        <div class="contour">
+          <div class="contour-head">
+            <span class="ch-staff">Porte · son <span id="staffSpan">6</span> sn · okunan perde, nota yazımına göre</span>
+            <span class="ch-cents" hidden>Perde grafiği · son <span id="contourSpan">6</span> sn · hedefe göre sapma (sent)</span>
+            <span class="contour-legend">
+              <span class="ch-cents" hidden><i class="key-line k-pitch"></i><span data-text="legendPitch">Okunan perde</span></span>
+              <span><i class="key-line k-held"></i><span data-text="legendHeld">Tolerans içinde</span></span>
+              <span class="ch-staff"><i class="key-line k-out"></i><span data-text="legendOut">Dışında</span></span>
+              <span class="ch-cents" hidden><i class="key-band"></i>±<span id="contourTol">20</span> sent bandı</span>
+              <span class="ch-staff"><i class="key-line k-guide"></i><span data-text="legendGuide">Hedef</span></span>
+            </span>
+          </div>
+          <div class="view-row">
+            <canvas id="contour" role="img" aria-label="Okunan perde, nota portesi üzerinde"></canvas>
+            <!-- Dikey akort aleti: aşağı pes, yukarı tiz; uçlar bir yarım ses aşağı/yukarı -->
+            <div class="vgauge" aria-hidden="true">
+              <div class="vg-names"><span class="vg-above" id="vgAbove" data-text="gaugeSharp">tiz</span><span class="vg-target" id="vgTarget"></span><span class="vg-below" id="vgBelow" data-text="gaugeFlat">pes</span></div>
+              <div class="gauge" id="gauge"><div class="needle" id="needle"></div></div>
+              <div class="ticks" id="ticks"></div>
+            </div>
+          </div>
+          <p class="coach idle" id="coachLine" role="status" aria-live="polite"></p>
+        </div>
+
+        <div class="sustain">
+          <div class="sustain-head"><span data-text="labelSustain">Süreklilik (sustain)</span><span class="mono" id="sustainText">0,00 / 0,25 s</span></div>
+          <div class="bar"><div class="fill" id="sustainFill"></div></div>
+        </div>
+
+        <div class="meter-row">
+          <div class="meter" title="Mikrofon seviyesi (pembe çizgi = gürültü eşiği)">
+            <div class="meter-fill" id="levelFill"></div>
+            <div class="meter-thr" id="levelThr"></div>
+          </div>
+          <label class="thr">Gürültü eşiği (RMS)
+            <input type="range" id="thrRange" min="-70" max="-15" step="1" value="-40">
+            <span class="mono" id="thrText">−40 dBFS</span>
+          </label>
+          <span class="mono muted" id="clarityText">netlik —</span>
+        </div>
+        <!-- Ses ayarları: mikrofon girişi, oktav toleransı, görünüm (kompakt satır) -->
+        <div class="common audio-row">
+          <label class="field device-field"><span data-text="labelDevice">Mikrofon girişi</span><select id="deviceSelect" disabled><option>Mikrofon açılınca listelenir</option></select></label>
+          <div class="switch-row">
+            <label class="switch">
+              <input type="checkbox" id="foldToggle" checked>
+              <span class="track"></span>
+              <span class="switch-text"><span data-text="toggleFold">Oktav toleransı</span><small id="foldHint"></small></span>
+            </label>
+            <label class="switch">
+              <input type="checkbox" id="staffToggle">
+              <span class="track"></span>
+              <span class="switch-text"><span data-text="toggleStaff">Portede göster</span><small data-text="toggleStaffHint">Perde nota portesi üzerinde çizilir (kapalı: sent grafiği)</small></span>
+            </label>
+          </div>
+          <div class="tech-info">
+            <span class="chip mono" id="detChip">Algılama: YIN</span>
+            <span class="chip mono" id="latChip" hidden></span>
+          </div>
+        </div>
+      </section>
+
       </div>
-      <label class="thr">Gürültü eşiği (RMS)
-        <input type="range" id="thrRange" min="-70" max="-15" step="1" value="-40">
-        <span class="mono" id="thrText">−40 dBFS</span>
-      </label>
-      <span class="mono muted" id="clarityText">netlik —</span>
     </div>
   </section>
 
+  <!-- ══ Serbest çalışma ══ -->
+  <section class="section" id="sec-practice" data-sec="serbest" hidden>
+    <div class="panel" id="practicePanel">
+      <div class="panel-head"><h2 data-text="panelPractice">Serbest çalışma</h2></div>
+      <div class="busy" id="practiceBusy" hidden>
+        <p data-text="practiceBusyMsg">Sürmekte olan bir sınav var; serbest çalışma için önce sınavı bitirin.</p>
+        <div class="actions"><a class="btn small" href="#sinav" data-text="btnBackToExam">Sınava dön</a></div>
+      </div>
+    <div id="practiceControls">
+      <div class="fields">
+        <label class="field"><span>Kök ses</span><select id="rootSelect"></select></label>
+        <label class="field"><span>Kök oktavı</span><select id="octaveSelect"></select></label>
+        <label class="field"><span>Ses / aralık / akor</span><select id="typeSelect"></select></label>
+        <label class="field"><span data-text="labelPlayback">Çalım biçimi</span><select id="playbackSelect">
+          <option value="harmonic" data-text="playbackHarmonic">Birlikte (armonik)</option>
+          <option value="melodic" data-text="playbackMelodic">Ayrı ayrı (kökten yukarı)</option>
+          <option value="both" data-text="playbackBoth">Önce ayrı, sonra birlikte</option>
+        </select></label>
+      </div>
+      <div class="actions">
+        <button class="btn primary" id="playBtn" type="button" data-text="btnPlay">▶ Çal &amp; Başla</button>
+        <button class="btn" id="replayBtn" type="button" disabled data-text="btnReplay">↻ Tekrar Çal</button>
+        <button class="btn" id="practicePauseBtn" type="button" disabled data-text="btnPause">⏸ Duraklat</button>
+        <button class="btn ghost" id="resetBtn" type="button" disabled data-text="btnReset">⟲ Sıfırla</button>
+      </div>
+    </div>
+    </div>
+    <div class="ws-slot" id="practiceSlot"></div>
+  </section>
+
+  <!-- ══ Önceki testlerim ══ -->
+  <section class="section" id="sec-history" data-sec="gecmis" hidden>
   <!-- ── Önceki testlerim ── -->
   <section class="panel" id="historyPanel" aria-labelledby="historyTitle">
     <div class="panel-head">
@@ -236,22 +281,33 @@
     <div class="history-chart" id="historyChart"></div>
     <ol class="history-list" id="historyList"></ol>
   </section>
+  </section>
 
-  <!-- ── Ayarlar ve standartlar ── -->
-  <details class="panel settings" id="settingsPanel">
-    <summary><span class="sum-title" data-text="panelSettings">Ayarlar ve standartlar</span><span class="muted">tolerans · süre · soru yapısı · ses · algılama</span></summary>
+  <!-- ══ Ayarlar ══ -->
+  <section class="section" id="sec-settings" data-sec="ayarlar" hidden>
+  <!-- ── Ayarlar ve standartlar (sekmeli) ── -->
+  <div class="panel settings" id="settingsPanel">
+    <div class="panel-head"><h2 data-text="panelSettings">Ayarlar ve standartlar</h2></div>
+    <div class="tabs set-tabs" role="tablist" aria-label="Ayar grupları">
+      <button class="tab" type="button" role="tab" data-tab="std" aria-selected="true" data-text="setTabStd">Standart sınav</button>
+      <button class="tab" type="button" role="tab" data-tab="audio" aria-selected="false" data-text="setTabAudio">Ses ve algılama</button>
+      <button class="tab" type="button" role="tab" data-tab="view" aria-selected="false" data-text="setTabView">Görünüm</button>
+      <button class="tab" type="button" role="tab" data-tab="names" aria-selected="false" data-text="setTabNames">Arayüz adları</button>
+      <button class="tab" type="button" role="tab" data-tab="adv" aria-selected="false" data-text="setTabAdv">Gelişmiş (JSON)</button>
+    </div>
     <div class="settings-body">
       <p class="small-note">Buradaki değerler bu tarayıcıda saklanır ve koddaki CONFIG varsayılanlarının üzerine yazılır. Soru sayıları, register ve aralık havuzu bir sonraki testte geçerli olur.</p>
-      <div class="settings-top">
+      <div class="settings-top" data-tab="std">
         <label class="field"><span>Hazır standart</span><select id="presetSelect"></select></label>
       </div>
       <form id="settingsForm" class="settings-form" novalidate></form>
-      <div class="actions">
+      <div class="actions" id="settingsActions">
         <button class="btn primary" id="applySettings" type="button" data-text="btnApply">Kaydet ve uygula</button>
         <button class="btn ghost" id="resetSettings" type="button" data-text="btnDefaults">Varsayılana dön</button>
       </div>
       <p class="settings-msg" id="settingsMsg" role="status" aria-live="polite"></p>
 
+      <div class="set-adv" data-tab="adv">
       <h3 class="set-h3">Gelişmiş · JSON</h3>
       <p class="small-note">Yalnızca varsayılandan farklı ayarlar listelenir. Bir kurumun standardını dosya olarak paylaşmak için dışa aktarın; öğrenciler içe aktararak aynı ayarlarla çalışır.</p>
       <textarea id="jsonArea" class="json-area" spellcheck="false" aria-label="Özel ayarlar (JSON)"></textarea>
@@ -262,8 +318,32 @@
         <button class="btn ghost" id="jsonCopyAll" type="button" data-text="btnJsonCopyAll">Tüm CONFIG'i kopyala</button>
         <input type="file" id="jsonImport" accept="application/json,.json" hidden>
       </div>
+      </div>
     </div>
-  </details>
+  </div>
+  </section>
+
+  <!-- ══ Yardım ══ -->
+  <section class="section" id="sec-help" data-sec="yardim" hidden>
+    <div class="panel help">
+      <div class="panel-head"><h2 data-text="panelHelp">Yardım</h2></div>
+      <h3 class="set-h3" data-text="helpHowTo">Nasıl kullanılır?</h3>
+      <ol class="howto">
+        <li><b>Sınav</b> ya da <b>Serbest çalışma</b> bölümünü açın; ilk kullanımda tarayıcı mikrofon izni ister.</li>
+        <li>Sesler piyanoyla çalınır. Ardından en alttaki sesten başlayarak sesleri sırayla “na” hecesiyle söyleyin.</li>
+        <li>Her ses tolerans içinde ve tutma süresi boyunca sabit kalınca doğrulanır; sonra sıradaki sesin kilidi açılır.</li>
+        <li>Porte ve dikey gösterge sesinizin hedefe göre yerini gösterir; yönlendirme satırı birkaç saniyede bir kısa bir öneri verir.</li>
+        <li>Ara vermek için “Duraklat”a basın. Sınav sırasında başka bölüme geçerseniz sınav kendiliğinden duraklar.</li>
+        <li>Sınav bitince teşhis ekranı açılır; sonuçlar “Önceki testlerim”de bu tarayıcıda saklanır.</li>
+      </ol>
+      <h3 class="set-h3" data-text="helpTips">İpuçları</h3>
+      <p class="tips">
+        Kulaklık kullanın — hoparlörden çıkan piyano mikrofona karışırsa doğrulama bozulur.
+        Tarayıcının yankı giderme, gürültü bastırma ve otomatik kazanç işlemleri kapatılır; ses kartınızın
+        giriş kazancını sesiniz kırpılmayacak şekilde ayarlayın. Pembe çizgi, altındaki sinyallerin yok sayıldığı gürültü eşiğidir.
+      </p>
+    </div>
+  </section>
 
   <div class="edit-bar" id="editBar" role="region" aria-label="Ad düzenleme" hidden>
     <span>Ad düzenleme: kesik çizgili bir yazıya tıklayın · Enter kaydeder, Esc vazgeçer</span>
@@ -271,13 +351,9 @@
     <button class="btn small primary" id="editDoneBtn" type="button">Bitir</button>
   </div>
 
-  <p class="tips">
-    İpuçları: Kulaklık kullanın — hoparlörden çıkan piyano mikrofona karışırsa doğrulama bozulur.
-    Tarayıcının yankı giderme, gürültü bastırma ve otomatik kazanç işlemleri kapatılır; ses kartınızın
-    giriş kazancını sesiniz kırpılmayacak şekilde ayarlayın. Pembe çizgi, altındaki sinyallerin yok sayıldığı gürültü eşiğidir.
-    <br>Piyano örnekleri: Salamander Grand Piano (Alexander Holm, CC BY 3.0) · Tone.js · VexFlow ·
-    YIN algoritması: de Cheveigné &amp; Kawahara (2002) · MPM: pitchy (isteğe bağlı).
-  </p>
+  <!-- Lisans gereği her bölümün altında görünür kalır -->
+  <footer class="attrib">Piyano örnekleri: Salamander Grand Piano (Alexander Holm, CC BY 3.0) · Tone.js · VexFlow ·
+    YIN algoritması: de Cheveigné &amp; Kawahara (2002) · MPM: pitchy (isteğe bağlı)</footer>
 </main>
 
 <!-- file:// ile açılırsa ES modülleri yüklenemez: uyarı göster -->
@@ -288,6 +364,6 @@
     a.hidden = false;
   }
 </script>
-<script type="module" src="./js/app.js?v=202610312307"></script>
+<script type="module" src="./js/app.js?v=202610312327"></script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 // Solfej Lab — gerçek Chromium (headless) uçtan uca testi
 //  Çalıştırma: bir kez `npm install` ve `npx playwright install chromium`, sonra `npm run e2e`
 //  Tek senaryo: `ONLY=A npm run e2e` (A tam sınav · B Tone/VexFlow taklidi · C sınav provası · D telefon · E zorlanan şarkıcı
-//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme)
+//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma)
 //  • Sayfa localhost'tan sunulur (güvenli bağlam → getUserMedia).
 //  • Mikrofon = "sanal şarkıcı": o anki hedef sesi (+9 sent tiz) söyleyen osilatör → MediaStream.
 //  • CDN'ler: senaryo 'offline' → hepsi engellenir (yedek yollar); 'stub' → Tone.js / VexFlow taklitleri.
@@ -111,7 +111,7 @@ const browser = await chromium.launch({
   args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
 });
 
-async function openPage(scenario, overrides, { width = 980, height = 1400 } = {}) {
+async function openPage(scenario, overrides, { width = 980, height = 1400, hash = 'sinav' } = {}) {
   const context = await browser.newContext({ viewport: { width, height }, permissions: ['microphone'] });
   await context.addInitScript(SINGER);
   await context.addInitScript(`(() => { try { if (!sessionStorage.getItem('__init')) { sessionStorage.setItem('__init', '1'); localStorage.clear(); ${overrides ? `localStorage.setItem('solfejlab.config.v1', ${JSON.stringify(JSON.stringify(overrides))});` : ''} } } catch (e) {} })();`);
@@ -127,7 +127,7 @@ async function openPage(scenario, overrides, { width = 980, height = 1400 } = {}
   const consoleMsgs = [];
   page.on('console', (m) => { if (['error', 'warning'].includes(m.type())) consoleMsgs.push(`${m.type()}: ${m.text()}`); });
   page.on('pageerror', (e) => consoleMsgs.push(`PAGEERROR: ${e.message}`));
-  await page.goto(`${BASE}?debug&seed=4242`);
+  await page.goto(`${BASE}?debug&seed=4242${hash ? '#' + hash : ''}`);   // varsayılan: doğrudan Sınav bölümü
   await page.waitForFunction(() => window.__dbg && window.solfejLab);
   return { context, page, consoleMsgs, requests };
 }
@@ -141,6 +141,8 @@ const snap = (page) => page.evaluate(() => {
     noteStates: [...document.querySelectorAll('.note')].map((n) => n.dataset.state).join(','),
   };
 });
+/** Bölüme git (adres çubuğu → menüdeki gibi) */
+async function go(page, key) { await page.evaluate((k) => { location.hash = k; }, key); await page.waitForFunction((k) => !document.querySelector(`main > .section[data-sec="${k}"]`)?.hidden || k === 'kendi-sinavim', key); }
 async function waitFor(page, fn, arg, timeout = 30000) { await page.waitForFunction(fn, arg, { timeout, polling: 50 }); }
 
 // ═══ SENARYO A: CDN'ler kapalı → yedek ses (sentez) + YIN; tam sınav ═══
@@ -247,7 +249,7 @@ if (run('A')) {
   assert.equal(same, JSON.stringify(R.titles));
 
   // ── Ayarlar paneli: tolerans 15, uygula → CONFIG + başlık + çip + localStorage ──
-  await page.click('#settingsPanel > summary');
+  await go(page, 'ayarlar');
   await page.fill('#set-TOLERANCE_CENTS', '15');
   await page.fill('#set-SUSTAIN_TIME_MS', '400');
   await page.uncheck('#settingsForm [data-path="INTERVAL_RULES.POOL"] input[value="A4"]');
@@ -273,6 +275,7 @@ if (run('A')) {
   log('geçersiz ayar:', JSON.stringify(rej));
   assert.ok(rej.err && rej.tol === 15);
   // JSON: dar register → reddedilmeli; bozuk JSON → hata
+  await page.click('#settingsPanel [data-tab="adv"].tab');   // JSON: Gelişmiş sekmesi
   await page.fill('#jsonArea', '{"REGISTER":{"minMidi":60,"maxMidi":64}}');
   await page.click('#jsonApply');
   assert.match(await page.textContent('#settingsMsg'), /çok dar|Uygulanmadı/);
@@ -280,6 +283,7 @@ if (run('A')) {
   await page.click('#jsonApply');
   assert.match(await page.textContent('#settingsMsg'), /JSON okunamadı/);
   // Ön ayar "Sıkı" → forma yüklenir → uygula
+  await page.click('#settingsPanel [data-tab="std"].tab');
   await page.selectOption('#presetSelect', 'siki');
   await page.click('#applySettings');
   assert.equal(await page.evaluate(() => window.solfejLab.CONFIG.TOLERANCE_CENTS), 10);
@@ -292,6 +296,7 @@ if (run('A')) {
   assert.equal(reset.chip, false);
 
   // ── Porte görünümü varsayılan açık; ayrı VexFlow paneli varsayılan gizli ──
+  await go(page, 'sinav');
   assert.equal(await page.isChecked('#staffToggle'), true, '"Portede göster" varsayılan açık');
   assert.equal(await page.isHidden('#staffPanel'), true, 'VexFlow paneli varsayılan gizli');
   // ── VexFlow paneli açılır ama yüklenemez → anlaşılır mesaj, uygulama çalışmaya devam eder ──
@@ -310,7 +315,7 @@ if (run('A')) {
   assert.ok(hist.staffOn, '"Portede göster" tercihi korunmalı');
 
   // ── Serbest çalışma: E♭ majör, oktav aşağıdan söyleme ──
-  await page.click('#tabPractice');
+  await go(page, 'serbest');
   await page.selectOption('#rootSelect', '5');           // E♭
   await page.selectOption('#octaveSelect', '4');
   await page.selectOption('#typeSelect', 'major');
@@ -400,7 +405,7 @@ if (run('D')) {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   log('yatay taşma (px):', overflow);
   assert.ok(overflow <= 0, `yatay taşma ${overflow}px`);
-  await page.click('#settingsPanel > summary');
+  await go(page, 'ayarlar');
   const overflow2 = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
   assert.ok(overflow2 <= 0, `ayarlar açıkken yatay taşma ${overflow2}px`);
   await page.screenshot({ path: `${OUT}/e2e-7-mobile.png`, fullPage: true });
@@ -409,7 +414,8 @@ if (run('D')) {
   const names = mods.map((u) => u.split('/').pop());
   log('yüklenen modüller:', names.join(' '));
   assert.equal(new Set(names).size, names.length, 'her dosya bir kez yüklenmeli');
-  assert.equal(names.length, 10, '9 modül + style.css');
+  const jsCount = fs.readdirSync(path.join(ROOT, 'js')).filter((f) => f.endsWith('.js')).length;
+  assert.equal(names.length, jsCount + 1, 'her modül + style.css');
   assert.ok(names.every((n) => /\?v=[\w.-]+$/.test(n)), 'her adreste sürüm etiketi olmalı');
   await context.close();
   // file:// ile açılırsa modüller yüklenemez → "npm run serve" uyarısı
@@ -472,7 +478,7 @@ if (run('E')) {
 if (run('F')) {
   log('F) serbest çalışma: 6 sn −60 sent, sonra düzeltme');
   const { context, page, consoleMsgs } = await openPage('offline', FAST);
-  await page.click('#tabPractice');
+  await go(page, 'serbest');
   await page.selectOption('#rootSelect', '0');            // Do
   await page.selectOption('#octaveSelect', '4');
   await page.selectOption('#typeSelect', 'single');
@@ -522,7 +528,8 @@ if (run('F')) {
 if (run('G')) {
   log('G) arayüz adları: sayfada düzenleme');
   const { context, page, consoleMsgs } = await openPage('offline', FAST);
-  await page.click('#settingsPanel > summary');
+  await go(page, 'ayarlar');
+  await page.click('#settingsPanel [data-tab="names"].tab');
   const fields = await page.evaluate(() => ({
     n: document.querySelectorAll('#settingsForm [data-kind="text"]').length,
     leaves: (function walk(o) { return Object.values(o).reduce((s, v) => s + (v && typeof v === 'object' ? walk(v) : 1), 0); })(window.solfejLab.defaults.TEXTS),
@@ -535,6 +542,7 @@ if (run('G')) {
   await page.check('#editNamesToggle', { force: true });
   assert.ok(await page.evaluate(() => document.body.classList.contains('edit-names')));
   assert.ok(await page.isVisible('#editBar'));
+  await go(page, 'sinav');
   // Düğmeye tıklamak işlemi başlatmaz, düzenleyici açılır; Enter kaydeder
   await page.click('#startBtn');
   await page.waitForSelector('.name-editor');
@@ -550,15 +558,15 @@ if (run('G')) {
   await page.click('#tuner .panel-head h2');
   await page.fill('.name-editor', 'Akort aleti');
   await page.press('.name-editor', 'Enter');
-  // Boş ad reddedilir, sekme işlemi başlamaz
-  await page.click('#tabPractice');
+  // Boş ad reddedilir, menü açılmaz
+  await page.click('#menuBtn [data-text]');
   await page.fill('.name-editor', '   ');
   await page.press('.name-editor', 'Enter');
   const G1 = await page.evaluate(() => ({
     texts: window.solfejLab.CONFIG.TEXTS, start: document.getElementById('startBtn').textContent,
     skip: document.getElementById('skipBtn').textContent, tuner: document.querySelector('#tuner .panel-head h2').textContent,
     status: document.getElementById('statusLine').textContent, notice: document.getElementById('notice').textContent,
-    mode: document.getElementById('tabExam').getAttribute('aria-selected'), state: window.__dbg.state,
+    hash: location.hash, menuOpen: !document.getElementById('menuList').hidden, state: window.__dbg.state,
     stored: JSON.parse(localStorage.getItem('solfejlab.config.v1') || '{}'),
   }));
   log('düzenleme sonrası:', G1.start, '|', G1.skip, '|', G1.tuner, '|', G1.status.slice(0, 40), '| uyarı:', G1.notice);
@@ -567,8 +575,9 @@ if (run('G')) {
   assert.equal(G1.tuner, 'Akort aleti');
   assert.match(G1.status, /^“Başlat” düğmesine basın/, 'durum metnindeki düğme adı da değişmeli');
   assert.match(G1.notice, /boş olamaz/);
-  assert.equal(G1.texts.tabPractice, 'Serbest çalışma');
-  assert.equal(G1.mode, 'true', 'sekmeye tıklamak modu değiştirmemeli');
+  assert.equal(G1.texts.btnMenu, 'Menü');
+  assert.equal(G1.hash, '#sinav', 'bölüm değişmemeli');
+  assert.equal(G1.menuOpen, false, 'düzenleme modunda menü açılmamalı');
   assert.equal(G1.state, 'IDLE');
   assert.deepEqual(G1.stored.TEXTS, { btnStart: 'Başlat', panelTuner: 'Akort aleti' });
   // Adları kopyala → JSON (pano yoksa JSON kutusuna)
@@ -589,6 +598,97 @@ if (run('G')) {
   await page.waitForFunction(() => window.__dbg);
   assert.equal(await page.textContent('#startBtn'), 'Başlat');
   assert.equal(await page.textContent('#tuner .panel-head h2'), 'Akort aleti');
+  assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
+  await context.close();
+}
+
+// ═══ SENARYO H: bölümler ve menü · adres çubuğu / geri tuşu · son bölüm · Duraklat / Devam ═══
+if (run('H')) {
+  log('H) bölümler, menü, duraklatma');
+  const { context, page, consoleMsgs } = await openPage('offline', FAST, { hash: '' });
+  const visible = () => page.evaluate(() => [...document.querySelectorAll('main > .section')].filter((s) => !s.hidden).map((s) => s.dataset.sec));
+  const shown = (k) => page.waitForFunction((x) => !document.querySelector('main > .section[data-sec="' + x + '"]').hidden, k);
+  // İlk açılış: Ana sayfa, adres #ana-sayfa; büyük kutucuklar
+  assert.deepEqual(await visible(), ['ana-sayfa']);
+  assert.equal(await page.evaluate(() => location.hash), '#ana-sayfa');
+  assert.equal(await page.locator('.tile').count(), 4);
+  await page.screenshot({ path: `${OUT}/e2e-11-home.png` });
+  // Menü: aç → liste görünür; Esc kapatır; dışarı tıklama kapatır; seçince bölüm açılır ve menü kapanır
+  await page.click('#menuBtn');
+  assert.equal(await page.isVisible('#menuList'), true);
+  assert.equal(await page.getAttribute('#menuBtn', 'aria-expanded'), 'true');
+  await page.screenshot({ path: `${OUT}/e2e-12-menu.png` });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isHidden('#menuList'), true);
+  await page.click('#menuBtn');
+  await page.mouse.click(600, 700);
+  assert.equal(await page.isHidden('#menuList'), true, 'dışarı tıklayınca kapanmalı');
+  await page.click('#menuBtn');
+  await page.click('#menuList a[data-sec="yardim"]');
+  await shown('yardim');
+  assert.deepEqual(await visible(), ['yardim']);
+  assert.equal(await page.isHidden('#menuList'), true);
+  // Kutucuk → Serbest çalışma; tarayıcının geri tuşu → Yardım
+  await go(page, 'ana-sayfa');
+  await page.click('.tile[href="#serbest"]');
+  await shown('serbest');
+  assert.deepEqual(await visible(), ['serbest']);
+  assert.equal(await page.evaluate(() => !!document.querySelector('#practiceSlot #workspace')), true, 'çalışma alanı Serbest çalışmaya taşınmalı');
+  await page.goBack();
+  await page.waitForFunction(() => location.hash === '#ana-sayfa');
+  await page.goBack();
+  await page.waitForFunction(() => location.hash === '#yardim');
+  await shown('yardim');
+  assert.deepEqual(await visible(), ['yardim']);
+  // "Özel ayarlar etkin" çipi Ayarlar bölümünü açar
+  await page.evaluate(() => window.solfejLab.setConfig({ TOLERANCE_CENTS: 18 }));
+  await page.click('#cfgChip');
+  await shown('ayarlar');
+  assert.deepEqual(await visible(), ['ayarlar']);
+  await page.evaluate(() => window.solfejLab.resetConfig());
+  // Sınav: başlat → dinlerken Duraklat → soru süresi durur, durum "Duraklatıldı" → Devam
+  await go(page, 'sinav');
+  assert.equal(await page.evaluate(() => !!document.querySelector('#examSlot #workspace')), true);
+  await page.evaluate(() => { window.__singer.enabled = false; });
+  await page.click('#startBtn');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  await page.waitForTimeout(300);
+  await page.click('#examPauseBtn');
+  const p1 = await page.evaluate(() => ({ paused: window.__dbg.paused, ms: window.__dbg.session.result.listenMs, status: document.getElementById('statusLine').textContent, label: document.getElementById('stateLabel').textContent, btn: document.getElementById('examPauseBtn').textContent }));
+  await page.waitForTimeout(700);
+  const ms2 = await page.evaluate(() => window.__dbg.session.result.listenMs);
+  log('duraklatıldı:', JSON.stringify(p1), '→ 0,7 sn sonra listenMs', Math.round(ms2));
+  assert.equal(p1.paused, true);
+  assert.match(p1.status, /^Duraklatıldı/);
+  assert.equal(p1.label, 'Duraklatıldı');
+  assert.equal(p1.btn, '▶ Devam');
+  assert.equal(ms2, p1.ms, 'duraklatılınca soru süresi durmalı');
+  assert.equal(await page.isDisabled('#skipBtn'), true, 'duraklatılmışken geçme kapalı');
+  await page.screenshot({ path: `${OUT}/e2e-13-paused.png` });
+  await page.click('#examPauseBtn');
+  await page.evaluate(() => { window.__singer.enabled = true; });
+  await waitFor(page, () => !window.__dbg.paused && window.__dbg.session.index >= 1, null, 15000);
+  log('devam: sıradaki soruya geçildi');
+  // Sınav sürerken başka bölüme geçmek → kendiliğinden duraklar; Serbest çalışma uyarı gösterir; dönünce Devam ile sürer
+  await page.evaluate(() => { window.__singer.enabled = false; });
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  await go(page, 'gecmis');
+  assert.equal(await page.evaluate(() => window.__dbg.paused), true, 'bölüm değişince sınav duraklamalı');
+  await go(page, 'serbest');
+  assert.equal(await page.isVisible('#practiceBusy'), true);
+  assert.equal(await page.isHidden('#practiceControls'), true);
+  await go(page, 'sinav');
+  assert.equal(await page.evaluate(() => window.__dbg.paused), true, 'geri dönünce kendiliğinden sürmemeli');
+  await page.click('#examPauseBtn');
+  assert.equal(await page.evaluate(() => window.__dbg.paused), false);
+  await page.click('#endBtn');
+  await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 10000);
+  assert.equal(await page.isVisible('#summaryPanel'), true, 'teşhis ekranı Sınav bölümünde');
+  // Yeniden açılış: adreste bölüm yoksa son kullanılan bölüm açılır
+  await go(page, 'gecmis');
+  await page.goto(`${BASE}?debug`);
+  await page.waitForFunction(() => window.__dbg);
+  assert.deepEqual(await visible(), ['gecmis'], 'son kullanılan bölüm');
   assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
   await context.close();
 }

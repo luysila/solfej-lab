@@ -38,10 +38,12 @@ import { CONFIG, DEFAULT_CONFIG } from './config.js';
 import { ExamSession, Exercise, PLAYBACK_MODES, ROOTS, S, TYPE_BY_ID, clamp, coachMessage, compareToTarget, computeDiagnostics, dbToLin, deepClone, deepMerge, freqToMidi, generateSession, isPlainObject, makeHistoryEntry, midiToFreq, mulberry32, nearestNoteName, octaveModeFor, recordPitchFrame, rootMeanSquare, zoneOf } from './pure.js';
 import { audioCtx, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound } from './audio.js';
 import { analyser, assignRmsLinear, detector, ensureMic, explainError, medianFilter, micStream, refreshDevices, rmsLinear, settings, setupDetector, startMic, timeBuf } from './mic.js';
+import { canPauseNow, paused, setPausedState } from './ui.js';
 import { after, assignExercise, assignLastDiag, assignLastReadoutTs, assignMode, assignNeedleTarget, assignSession, assignStarting, assignUiReady, buildNoteBoxes, buildTicks, cancelFlow, clearReadouts, coachState, coachWin, easeNeedle, examActive, exercise, fillSelects, fmtCents, fsm, gaugeHalf, gaugeRange, hideAlert, lastDiag, lastReadoutTs, mode, needleTarget, nf1, nf2, observeGauge, paintGaugeBackground, paintLevel, paintSustain, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, renderTimer, resetCoach, selectionChanged, session, setCoach, setText, setZone, showAlert, showNotice, starting, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
 import { contour, drawContour, markContour, pushContour, scheduleStaffDraw, setStaffEnabled, setupContour, staffView } from './staff.js';
 import { addHistory, clearHistory, hideSummary, loadHistory, renderHistory, showSummary } from './summary.js';
-import { CONFIG_KEY, PREFS_KEY, applyOverrides, applyTexts, buildSettingsForm, configOverrides, fillPresetSelect, fillSettingsForm, onApplySettings, onCopyAll, onCopyNames, onEditClick, onJsonApply, onJsonExport, onJsonImportFile, onPresetChange, positionEditor, refreshJsonArea, reportApply, savePrefs, setEditNames, setTextKey, storageGet } from './settings.js';
+import { bindNav, goSection, initNav } from './nav.js';
+import { CONFIG_KEY, PREFS_KEY, applyOverrides, bindSettingsTabs, applyTexts, buildSettingsForm, configOverrides, fillPresetSelect, fillSettingsForm, onApplySettings, onCopyAll, onCopyNames, onEditClick, onJsonApply, onJsonExport, onJsonImportFile, onPresetChange, positionEditor, refreshJsonArea, reportApply, savePrefs, setEditNames, setTextKey, storageGet } from './settings.js';
 
 // ───────────────────────────────────────────────────────────────────────
 // 6) DURUM MAKİNESİ GEÇİŞ EYLEMLERİ
@@ -95,10 +97,7 @@ export function onStateChange(next, prev, payload) {
       setText(ui.sustainText, `${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
       setZone('perfect');
       markContour(performance.now(), `✓${exercise.index + 1}`);
-      after(CONFIG.AUDIO.VERIFIED_HOLD_MS, () => {
-        const finished = exercise.advance();        // doğrulanmamış notada hata fırlatır (kilit)
-        fsm.go(finished ? S.COMPLETE : S.LISTENING, finished ? { reason: 'done' } : undefined);
-      });
+      after(CONFIG.AUDIO.VERIFIED_HOLD_MS, advanceVerified);
       break;
     }
 
@@ -108,13 +107,7 @@ export function onStateChange(next, prev, payload) {
         const reason = payload?.reason ?? 'done';
         if (reason !== 'done') exercise.abandon();
         session.finishQuestion(reason);
-        const last = session.isLast;
-        after(CONFIG.EXAM.NEXT_QUESTION_DELAY_MS, () => {
-          if (last) { finishSession(); return; }
-          session.index++;
-          loadQuestion(session.current);
-          fsm.go(S.PLAYING, { fresh: true });
-        });
+        after(CONFIG.EXAM.NEXT_QUESTION_DELAY_MS, nextQuestion);
       } else {
         playReward(exercise.notes);
       }
@@ -129,6 +122,46 @@ export function onStateChange(next, prev, payload) {
   renderAll();
 }
 
+/** Doğrulanan sesten sonra kilidi açar: sıradaki ses ya da soru sonu (duraklatmadan dönüşte de çağrılır) */
+export function advanceVerified() {
+  const finished = exercise.advance();            // doğrulanmamış notada hata fırlatır (kilit)
+  fsm.go(finished ? S.COMPLETE : S.LISTENING, finished ? { reason: 'done' } : undefined);
+}
+/** Sınavda soru bitince: sıradaki soru ya da teşhis ekranı */
+export function nextQuestion() {
+  if (!session) return;
+  if (session.isLast) { finishSession(); return; }
+  session.index++;
+  loadQuestion(session.current);
+  fsm.go(S.PLAYING, { fresh: true });
+}
+
+// ── Duraklat / Devam ──
+// Duraklatınca bekleyen zamanlayıcılar iptal edilir, ses susar, ölçüm ve soru süresi durur (durum makinesi olduğu yerde kalır).
+// Devam edince durum yerinden sürer: çalım yarıda kaldıysa sesler yeniden çalınır (tekrar sayılmaz).
+export function pauseFlow() {
+  if (!canPauseNow()) return false;
+  cancelFlow();
+  stopAllSound();
+  setPausedState(true);
+  tracker.reset();
+  medianFilter.reset();
+  clearReadouts();
+  resetCoach();
+  renderAll();
+  return true;
+}
+export function resumeFlow() {
+  if (!paused) return;
+  setPausedState(false);
+  const st = fsm.state;
+  if (st === S.PLAYING) { fsm.go(S.LISTENING); fsm.go(S.PLAYING, { fresh: false, playback: practicePlayback() }); }
+  else if (st === S.VERIFIED) advanceVerified();
+  else if (st === S.COMPLETE && session) nextQuestion();
+  renderAll();
+}
+export function togglePause() { if (paused) resumeFlow(); else pauseFlow(); }
+
 export function loadQuestion(q) {
   assignExercise(new Exercise(q.notes));
   buildNoteBoxes();
@@ -138,6 +171,7 @@ export function loadQuestion(q) {
 /** Sınavı kapatır: teşhisi hesaplar, kaydeder, teşhis ekranına geçer */
 export function finishSession() {
   if (!session) return;
+  setPausedState(false);
   session.finishedAt = Date.now();
   const attempted = session.attempted;
   assignLastDiag(attempted.length ? computeDiagnostics(attempted, CONFIG) : null);
@@ -150,6 +184,7 @@ export function finishSession() {
 
 export function hardReset() {
   cancelFlow();
+  setPausedState(false);
   stopAllSound();
   assignSession(null);
   if (fsm.state !== S.IDLE) fsm.go(S.IDLE);
@@ -250,10 +285,7 @@ export async function onDeviceChange() {
 export function setMode(next, { persist = true } = {}) {
   if (examActive()) return;
   assignMode(next);
-  ui.tabExam.setAttribute('aria-selected', String(next === 'exam'));
-  ui.tabPractice.setAttribute('aria-selected', String(next === 'practice'));
-  ui.examControls.hidden = next !== 'exam';
-  ui.practiceControls.hidden = next !== 'practice';
+  (next === 'exam' ? ui.examSlot : ui.practiceSlot).append(ui.workspace);   // çalışma alanı bölüme taşınır
   hideSummary();
   if (next === 'practice') {
     selectionChanged();                             // egzersizi kurar + sıfırlar
@@ -283,7 +315,7 @@ export function frame(ts) {
   paintLevel(rms);
   if (session && ts - lastTimerTs > 250) { lastTimerTs = ts; renderTimer(); }
 
-  if (fsm.state !== S.LISTENING) {                  // çalma / bekleme: ölçüm yok, yalnızca ibre süzülür
+  if (paused || fsm.state !== S.LISTENING) {        // çalma / bekleme / duraklatma: ölçüm yok, yalnızca ibre süzülür
     easeNeedle(Math.min(dt, 100));
     return;
   }
@@ -368,9 +400,9 @@ export function frame(ts) {
 // ───────────────────────────────────────────────────────────────────────
 export let historyClearArmed = 0;
 export function bindEvents() {
-  ui.tabExam.addEventListener('click', () => setMode('exam'));
-  ui.tabPractice.addEventListener('click', () => setMode('practice'));
   ui.startBtn.addEventListener('click', onStartExam);
+  ui.examPause.addEventListener('click', togglePause);
+  ui.practicePause.addEventListener('click', togglePause);
   ui.examReplay.addEventListener('click', onExamReplay);
   ui.skipBtn.addEventListener('click', onSkip);
   ui.endBtn.addEventListener('click', onEndExam);
@@ -409,7 +441,9 @@ export function bindEvents() {
     clearHistory();
   });
 
-  ui.cfgChip.addEventListener('click', () => { ui.settingsPanel.open = true; ui.settingsPanel.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+  ui.cfgChip.addEventListener('click', () => goSection('ayarlar'));
+  bindNav();
+  bindSettingsTabs();
   ui.applySettings.addEventListener('click', onApplySettings);
   ui.resetSettings.addEventListener('click', () => { ui.presetSelect.value = ''; reportApply(applyOverrides({})); });
   ui.presetSelect.addEventListener('change', onPresetChange);
@@ -477,6 +511,7 @@ export function init() {
   renderHistory();
   setStaffEnabled(typeof prefs.staffView === 'boolean' ? prefs.staffView : CONFIG.UI.SHOW_STAFF, { persist: false });
   setMode(prefs.mode === 'practice' ? 'practice' : 'exam', { persist: false });   // serbest çalışma porteyi açar
+  initNav();                                        // adres çubuğundaki bölüm ya da son kullanılan bölüm (ilk açılışta Ana sayfa)
   if (cfgProblem) showNotice(`Kayıtlı özel ayarlar geçersiz olduğu için varsayılanlar kullanılıyor (${cfgProblem}).`);
 
   // 3) Ses: AudioContext şimdi "askıda" oluşturulur, piyano örnekleri arka planda yüklenir.
@@ -509,7 +544,7 @@ if (new URLSearchParams(location.search).has('debug')) {
     get state() { return fsm.state; }, get exercise() { return exercise; }, get session() { return session; },
     get tracker() { return tracker; }, get detector() { return detector; }, get audioCtx() { return audioCtx; },
     get piano() { return piano; }, get diag() { return lastDiag; }, get staff() { return staffView; },
-    get overrides() { return configOverrides; }, get contour() { return contour; }, fsm, CONFIG,
+    get overrides() { return configOverrides; }, get contour() { return contour; }, get paused() { return paused; }, fsm, CONFIG,
   };
 }
 

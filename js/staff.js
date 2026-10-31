@@ -18,13 +18,14 @@ export function setupContour() {
   contour.ctx = cv.getContext('2d');
   const cs = getComputedStyle(document.documentElement);
   const v = (name, fb) => cs.getPropertyValue(name).trim() || fb;
+  // Renkler css/style.css'teki :root değişkenlerinden (palet tek yerden değişir); ikinci değer yedek
   contour.colors = {
     accent: v('--accent', '#8aa4ff'), green: v('--green', '#34d399'), red: v('--red', '#f87171'),
     yellow: v('--yellow', '#fbbf24'),
-    muted: v('--muted', '#8894ab'), grid: 'rgba(148,163,184,.14)', zero: 'rgba(255,255,255,.30)',
-    band: 'rgba(52,211,153,.12)', mark: 'rgba(148,163,184,.40)',
-    staff: 'rgba(203,213,225,.42)', clef: 'rgba(226,232,240,.82)', c4: 'rgba(203,213,225,.30)',
-    head: 'rgba(203,213,225,.78)', guide: 'rgba(138,164,255,.55)',
+    muted: v('--muted', '#8894ab'), grid: v('--chart-grid', 'rgba(148,163,184,.14)'), zero: v('--chart-zero', 'rgba(255,255,255,.30)'),
+    band: v('--chart-band', 'rgba(52,211,153,.12)'), mark: v('--chart-mark', 'rgba(148,163,184,.40)'),
+    staff: v('--staff-line', 'rgba(203,213,225,.42)'), clef: v('--staff-clef', 'rgba(226,232,240,.82)'), c4: v('--staff-c4', 'rgba(203,213,225,.30)'),
+    head: v('--staff-head', 'rgba(203,213,225,.78)'), guide: v('--staff-guide', 'rgba(138,164,255,.55)'),
   };
   contour.mono = v('--mono', 'monospace');
   const measure = () => {
@@ -522,7 +523,8 @@ export function renderGrandStaff(VF, host, notes, states, hostW) {
   for (const [k, s] of [['BRACE', 'brace'], ['SINGLE_LEFT', 'singleLeft'], ['SINGLE_RIGHT', 'singleRight']]) {
     new StaveConnector(treble, bass).setType(TYPE[k] ?? s).setContext(ctx).draw();
   }
-  const COLOR = { done: '#047857', active: '#4338ca', missed: '#b91c1c' };
+  const cs = getComputedStyle(document.documentElement), cv = (n, fb) => cs.getPropertyValue(n).trim() || fb;
+  const COLOR = { done: cv('--vex-done', '#047857'), active: cv('--vex-active', '#4338ca'), missed: cv('--vex-missed', '#b91c1c') };
   const items = notes.map((n, i) => ({ n, i }));
   const build = (list, clef) => {
     if (!list.length) return new GhostNote({ duration: 'w' });
