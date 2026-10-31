@@ -2,16 +2,17 @@
 // Perde grafiği (sent grafiği), porte görünümü (canvas çift porte, nota başları) ve ayrı VexFlow porte paneli.
 
 import { CONFIG } from './config.js';
-import { LETTERS, MINUS, S, clamp, makeStaffMap, staffStep } from './pure.js';
+import { loadUiState, saveUiState } from './nav.js';
+import { LETTERS, MINUS, S, VIEW_MODES, clamp, makeStaffMap, staffStep } from './pure.js';
 import { loadScriptGlobal } from './audio.js';
-import { exercise, fsm, isNoteRevealed, noteState, practiceTitle, session, setText, ui } from './ui.js';
-import { savePrefs } from './settings.js';
+import { exercise, fsm, isNoteRevealed, mode, noteState, practiceTitle, session, setText, ui } from './ui.js';
 
 // ── Perde grafiği (zaman içinde hedefe göre sapma) — canvas ──
 //  staffMode = true → porte görünümü (drawStaffContour); false → eski sent grafiği
+//  lineMode  = false → "Porte" görünümü: akan çizgi ve olay işaretleri çizilmez (yalnız hedef ve canlı nota başı)
 export const contour = {
   pts: [], marks: [], w: 0, h: 0, dpr: 1, ctx: null, colors: null, mono: 'monospace',
-  staffMode: false, G: null, layer: null, map: null, mapNotes: null,
+  staffMode: false, lineMode: true, G: null, layer: null, map: null, mapNotes: null,
 };
 export function setupContour() {
   const cv = ui.contour;
@@ -349,7 +350,7 @@ export function drawStaffContour(now) {
   ctx.textAlign = 'left';
   ctx.textBaseline = 'top';
   ctx.lineWidth = 1;
-  for (const m of contour.marks) {
+  for (const m of contour.lineMode ? contour.marks : []) {
     const x = Math.round(X(m.t)) + 0.5;
     if (x < G.L || x > G.xNow) continue;
     ctx.strokeStyle = C.mark;
@@ -368,6 +369,14 @@ export function drawStaffContour(now) {
 
   // Okunan perde: her parça kendi karesinin rengiyle (tolerans içinde yeşil, dışında kırmızı; isteğe bağlı sarı)
   const pts = contour.pts;
+  if (contour.lineMode) drawStaffLine(ctx, G, X, pts, top, bottom);   // "Porte" görünümünde akan çizgi yok
+
+  // "Şimdi" sütunu: alıştırmanın sesleri içi boş nota başı (sınavda yalnızca açılanlar)
+  drawStaffHeads(ctx, G, pts, now, st);
+}
+/** Akan çizgi: her parça kendi karesinin rengiyle; porte aralığı dışına taşan kareler kenarda çentik */
+export function drawStaffLine(ctx, G, X, pts, top, bottom) {
+  const C = contour.colors;
   ctx.save();
   ctx.beginPath();
   ctx.rect(G.L, 0, G.xNow - G.L + 2, G.H);                       // anahtarların üstüne taşmasın
@@ -395,8 +404,10 @@ export function drawStaffContour(now) {
     if (x < G.L) continue;
     ctx.fillRect(x - 1, p.s > G.hi ? top : bottom - 3, 2, 3);
   }
-
-  // "Şimdi" sütunu: alıştırmanın sesleri içi boş nota başı (sınavda yalnızca açılanlar)
+}
+/** Nota başları: alıştırmanın sesleri (içi boş) ve okunan sesin canlı nota başı (dolu) */
+export function drawStaffHeads(ctx, G, pts, now, st) {
+  const C = contour.colors;
   const states = staffStates();
   const COLOR = { done: C.green, missed: C.red, active: C.accent, pending: C.head };
   const heads = layoutHeads(exercise.notes, G);
@@ -439,16 +450,43 @@ export const VEX_ACC = { '-2': 'bb', '-1': 'b', '1': '#', '2': '##' };
 export const vexKey = (n) => `${LETTERS[n.letter].toLowerCase()}${VEX_ACC[n.acc] ?? ''}/${n.octave}`;
 export let staffRaf = 0;
 
-export function setStaffEnabled(on, { persist = true } = {}) {
-  staffView.on = on;
-  ui.staffToggle.checked = on;
-  contour.staffMode = on;
-  for (const n of document.querySelectorAll('.contour .ch-staff')) n.hidden = !on;
-  for (const n of document.querySelectorAll('.contour .ch-cents')) n.hidden = on;
-  ui.contour.setAttribute('aria-label', on ? 'Okunan perde, nota portesi üzerinde' : 'Okunan perdenin hedefe göre zaman içindeki sapması');
+// ── Görünüm: 'staff' (yalnız porte) · 'staff+graph' (porte + akan çizgi) · 'graph' (sent grafiği) ──
+// Sınav ve Serbest çalışma için ayrı ayrı hatırlanır (solfejlab.ui.v1 → viewMode.exam / viewMode.practice).
+export let viewMode = 'staff+graph';
+/** Bir çalışma modunun hatırlanan görünümü (yoksa CONFIG.UI.VIEW_MODE) */
+export function viewModeFor(m) {
+  const v = loadUiState().viewMode?.[m];
+  return VIEW_MODES.includes(v) ? v : CONFIG.UI.VIEW_MODE;
+}
+export function setViewMode(vm, { persist = true } = {}) {
+  if (!VIEW_MODES.includes(vm)) vm = CONFIG.UI.VIEW_MODE;
+  viewMode = vm;
+  const staffOn = vm !== 'graph';
+  staffView.on = staffOn;
+  contour.staffMode = staffOn;
+  contour.lineMode = vm !== 'staff';
+  for (const b of document.querySelectorAll('#viewSeg [data-view]')) b.setAttribute('aria-pressed', String(b.dataset.view === vm));
+  for (const n of document.querySelectorAll('.contour .ch-staff')) n.hidden = !staffOn;
+  for (const n of document.querySelectorAll('.contour .ch-cents')) n.hidden = staffOn;
+  for (const n of document.querySelectorAll('.contour .ch-time')) n.hidden = vm === 'staff';
+  ui.contour.setAttribute('aria-label', staffOn ? 'Okunan perde, nota portesi üzerinde' : 'Okunan perdenin hedefe göre zaman içindeki sapması');
   drawContour(performance.now());
-  if (persist) savePrefs();
+  if (persist) saveUiState({ viewMode: { ...(loadUiState().viewMode || {}), [mode]: vm } });
   updateVexPanel();
+}
+/** Sıradaki görünüme geç (kısayol için) */
+export function cycleViewMode() { setViewMode(VIEW_MODES[(VIEW_MODES.indexOf(viewMode) + 1) % VIEW_MODES.length]); }
+/** Eski ad korunur: açık → Porte + grafik, kapalı → Grafik */
+export function setStaffEnabled(on, opts) { setViewMode(on ? 'staff+graph' : 'graph', opts); }
+
+// ── Sınavdaki "Porte" anahtarı: kapalıyken porte/grafik alanı gizlenir; dikey gösterge ve yönlendirme kalır ──
+export function examStaffOn() { return loadUiState().examStaffOn !== false; }
+export function setExamStaff(on, { persist = true } = {}) {
+  ui.examStaffToggle.checked = on;
+  ui.examStaffSwitch.hidden = mode !== 'exam';
+  ui.tuner.classList.toggle('no-staff', mode === 'exam' && !on);
+  if (persist) saveUiState({ examStaffOn: on });
+  drawContour(performance.now());
 }
 /** Ayrı VexFlow panelini gösterir/gizler; gerekiyorsa kütüphaneyi yükler */
 export function updateVexPanel() {

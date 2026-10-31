@@ -117,7 +117,8 @@ export const CONFIG = {
 
   // ══ 7. ARAYÜZ ═══════════════════════════════════════════════════════
   UI: {
-    SHOW_STAFF: true,             // "Portede göster" varsayılanı: perde grafiği çift porte üzerinde (false → sent grafiği)
+    VIEW_MODE: 'staff+graph',     // görünüm varsayılanı: 'staff' (yalnız porte: hedef ve canlı nota başı) · 'staff+graph' (porte + akan çizgi) · 'graph' (sent grafiği)
+                                  // Sınav ve Serbest çalışma için seçim ayrı ayrı hatırlanır (solfejlab.ui.v1)
     VEXFLOW_PANEL: false,         // ayrı VexFlow porte paneli (yalnızca "Portede göster" açıkken; kütüphane CDN'den yüklenir)
     STAFF_WARN_YELLOW: false,     // portede canlı nota başı ve çizgi: true → sınırdayken (WARNING_CENTS içinde) sarı; false → yalnızca yeşil/kırmızı
     GAUGE_RANGE_CENTS: 100,       // dikey göstergenin yarı ölçeği (± sent); 100 → uçlar tam bir yarım ses aşağı/yukarı
@@ -126,6 +127,7 @@ export const CONFIG = {
     NEEDLE_SMOOTHING_MS: 55,      // ibre yumuşatma (yalnızca görsel; puanlama ham değerle yapılır)
     READOUT_INTERVAL_MS: 80,      // sayısal göstergelerin yenileme aralığı
     COACH_INTERVAL_MS: 5000,      // sözlü yönlendirme aralığı: bu sürenin özetinden tek cümle (anlık uyarı yok)
+    COACH_FONT_PX: 20,            // yönlendirme yazısının boyutu (px, masaüstü); telefonda 2 px küçük
     COACH_FAR_CENTS: 70,          // ortalama sapma bunu aşarsa "epey pes/tiz" söyleyişi (yoksa "biraz pes/tiz")
   },
 
@@ -181,8 +183,6 @@ export const CONFIG = {
     btnJsonCopyAll: "Tüm CONFIG'i kopyala",
     btnCopyNames: 'Adları kopyala',
     toggleFold: 'Oktav toleransı',
-    toggleStaff: 'Portede göster',
-    toggleStaffHint: 'Perde nota portesi üzerinde çizilir (kapalı: sent grafiği)',
     toggleEditNames: 'Adları sayfada düzenle',
     labelTarget: 'Hedef',
     labelHeard: 'Okunan',
@@ -233,34 +233,28 @@ export const CONFIG = {
     setTabAdv: 'Gelişmiş (JSON)',
     helpHowTo: 'Nasıl kullanılır?',
     helpTips: 'İpuçları',
-    // Yönlendirme cümleleri: her durum için 2–3 söyleyiş (sırayla kullanılır, aynı cümle üst üste gelmez)
+    // Görünüm seçici ve sınavdaki porte anahtarı (Aşama 2)
+    labelView: 'Görünüm',
+    viewStaff: 'Porte',
+    viewBoth: 'Porte + grafik',
+    viewGraph: 'Grafik',
+    toggleExamStaff: 'Porte',
+    toggleExamStaffHint: 'Kapalı: yalnızca gösterge ve yönlendirme',
+    // Yönlendirme cümleleri: çok kısa ve net (2–4 kelime), her durum için 2 söyleyiş; yön için ↑ / ↓.
+    // Sırayla kullanılır, aynı cümle üst üste gelmez.
     COACH: {
-      idle:      { a: 'Yönlendirme birkaç saniye içinde burada görünür.' },
-      quiet:     { a: 'Sesinizi henüz duyamıyorum; mikrofona biraz yaklaşın.',
-                   b: 'Ses çok zayıf geliyor; biraz daha dolu bir sesle “na” deyin.',
-                   c: 'Henüz ses gelmiyor; hazır olduğunuzda rahatça başlayın.' },
-      unclear:   { a: 'Sesiniz geliyor ama perde net değil; açık ve düz bir “na” deneyin.',
-                   b: 'Perdeyi seçmekte zorlanıyorum; vibratoyu azaltıp sesi sade tutun.' },
-      blind:     { a: 'Sesi rahat ve düz tutun; doğrulanınca kutu yeşile döner.',
-                   b: 'Dinliyorum; acele etmeden, sabit bir “na” ile devam edin.' },
-      octave:    { a: 'Doğru sese yakınsınız ama oktav farklı; ilk sesi söylediğiniz oktavda kalın.',
-                   b: 'Oktav farklı geliyor; sesi ilk sesin oktavına taşıyın.' },
-      octaveOff: { a: 'Oktav farklı geliyor; sesi yazıldığı oktavda söyleyin.',
-                   b: 'Oktav toleransı kapalı; sesi yazılı oktavına taşıyın.' },
-      good:      { a: 'Çok iyi, tam yerindesiniz; aynı rahatlıkla tutmaya devam edin.',
-                   b: 'Perde doğru; sesi sabit tutun, gerisi kendiliğinden gelecek.' },
-      low:       { a: 'Sesiniz hedefin biraz altında kalıyor; nefesinizi destekleyip hafifçe yukarı taşıyın.',
-                   b: 'Biraz pes kalıyorsunuz; sesi zorlamadan, hafifçe yukarı yerleştirin.',
-                   c: 'Hafif pes; desteği koruyup sesi biraz yukarıda düşünün.' },
-      high:      { a: 'Sesiniz hedefin biraz üstünde kalıyor; omuzları gevşetip hafifçe aşağı bırakın.',
-                   b: 'Biraz tiz kalıyorsunuz; bastırmadan, sesi hafifçe aşağı yerleştirin.',
-                   c: 'Hafif tiz; nefesi rahatlatıp sesi biraz aşağıda düşünün.' },
-      farLow:    { a: 'Hedefin epey altındasınız; sesi içinizden duyup yavaşça yukarı yaklaşın.',
-                   b: 'Belirgin biçimde pes kalıyorsunuz; acele etmeden sesi yukarı doğru arayın.' },
-      farHigh:   { a: 'Hedefin epey üstündesiniz; sesi içinizden duyup yavaşça aşağı inin.',
-                   b: 'Belirgin biçimde tiz kalıyorsunuz; acele etmeden sesi aşağı doğru arayın.' },
-      unsteady:  { a: 'Hedefin çevresindesiniz; sesi kaydırmadan düz tutmayı deneyin.',
-                   b: 'Yakınsınız ama ses dalgalanıyor; nefesi sabit tutup sesi yerinde bırakın.' },
+      idle:      { a: 'Öneriler burada görünür' },
+      quiet:     { a: 'Mikrofona yaklaşın', b: 'Biraz daha güçlü söyleyin' },
+      unclear:   { a: 'Düz ve net bir “na”', b: 'Vibratosuz, sade söyleyin' },
+      blind:     { a: 'Rahat ve düz tutun', b: 'Sabit bir “na” ile sürün' },
+      octave:    { a: 'Oktav farklı', b: 'İlk sesin oktavında kalın' },
+      octaveOff: { a: 'Oktav farklı', b: 'Yazılı oktavda söyleyin' },
+      good:      { a: 'Tam yerinde, tutun', b: 'Çok iyi, böyle kalın' },
+      low:       { a: 'Biraz yükseltin ↑', b: 'Hafifçe yukarı ↑' },
+      high:      { a: 'Biraz alçaltın ↓', b: 'Hafifçe aşağı ↓' },
+      farLow:    { a: 'Daha yukarı ↑↑', b: 'Epey pes, yükseltin ↑↑' },
+      farHigh:   { a: 'Daha aşağı ↓↓', b: 'Epey tiz, alçaltın ↓↓' },
+      unsteady:  { a: 'Sesi sabit tutun', b: 'Kaydırmadan tutun' },
     },
   },
 

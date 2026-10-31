@@ -95,16 +95,21 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
   Perde konumu nota yazımına göre: hedef sesin tam perdesi o notanın nota başının ortasından geçer
   (Re majörde Fa♯ → Fa'nın yeri, ♯ ile); ara perdeler komşu nota konumları arasında orantılı. Dönüşüm `js/pure.js`'te (`makeStaffMap`).
   Oktav toleransı açıkken çizgi, puanlamadaki gibi hedefin oktavına katlanmış perdeyle çizilir.
-  "Portede göster" açık → porte görünümü (varsayılan), kapalı → eski sent grafiği. Ayrı VexFlow paneli varsayılan gizli (`CONFIG.UI`).
+  Görünüm seçici (Aşama 2; eski "Portede göster" anahtarının yerine): "Porte" (yalnız porte: hedef ve canlı nota başı,
+  akan çizgi yok) · "Porte + grafik" (varsayılan, `UI.VIEW_MODE`) · "Grafik" (sent grafiği). Sınav ve Serbest çalışma için
+  ayrı hatırlanır (`solfejlab.ui.v1` → `viewMode`); eski `prefs.staffView` bir kez çevrilir. Sınavda ayrıca "Porte" anahtarı:
+  kapalıyken porte/grafik gizli, dikey gösterge ve yönlendirme kalır. Ayrı VexFlow paneli varsayılan gizli (`CONFIG.UI`).
   Sınavda nota başları ve hedef kılavuz çizgisi `EXAM.REVEAL_NOTE_NAMES`'e uyar; `EXAM.LIVE_FEEDBACK` kapalıysa canlı çizgi yok.
 - **Dikey akort aleti**: aşağı pes, yukarı tiz; ölçek ±100 sent (uçlar tam komşu yarım seslere denk gelir).
   Ortada hedefin adı, uçlarda bir yarım ses aşağı/yukarı notanın adı; sınavda hedef açılmadıysa yalnızca "pes"/"tiz".
   Yerleşim: porte solda ve geniş, gösterge sağda, aynı yükseklikte (telefonda da yan yana).
 - **Canlı nota başı**: okunan ses portede dolu nota başı; tolerans içinde yeşil, dışında kırmızı (çizgi de aynı renk).
-  "Sınırdayken sarı" seçeneği var, varsayılan kapalı. Serbest çalışmada porte görünümü her zaman açık başlar.
+  "Sınırdayken sarı" seçeneği var, varsayılan kapalı.
 - **Yönlendirme panik yaratmaz**: anlık değişen uyarı yazısı yok (renk ve gösterge anlık kalır). Sözlü yönlendirme
   `UI.COACH_INTERVAL_MS` (5000) aralıkla, son aralığın özetinden tek sakin cümle; aynı cümle üst üste gelmez;
   yeni seste özet sıfırlanır. `LIVE_FEEDBACK` kapalıysa pes/tiz yönü söylenmez, yalnızca teknik uyarılar.
+  Aşama 2: cümleler çok kısa (2–4 kelime, her durumda 2 söyleyiş; yön için ↑ / ↓, uzaksa ↑↑ / ↓↓); yazı büyük ve kalın
+  (`UI.COACH_FONT_PX`, varsayılan 20 px, telefonda 2 px küçük; Ayarlar → Görünüm).
 - **Arayüz adları `CONFIG.TEXTS`'te**: panel başlıkları, sekmeler, düğmeler, gösterge etiketleri, yönlendirme cümleleri.
   Ayarlarda "Arayüz adları" grubu kendiliğinden üretilir; "Adları sayfada düzenle" ile yerinde düzenlenir;
   "Adları kopyala" değişenleri JSON olarak verir. Ad boş olamaz, en fazla 80 karakter.

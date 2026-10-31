@@ -1,7 +1,7 @@
 // Solfej Lab — gerçek Chromium (headless) uçtan uca testi
 //  Çalıştırma: bir kez `npm install` ve `npx playwright install chromium`, sonra `npm run e2e`
 //  Tek senaryo: `ONLY=A npm run e2e` (A tam sınav · B Tone/VexFlow taklidi · C sınav provası · D telefon · E zorlanan şarkıcı
-//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma)
+//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici)
 //  • Sayfa localhost'tan sunulur (güvenli bağlam → getUserMedia).
 //  • Mikrofon = "sanal şarkıcı": o anki hedef sesi (+9 sent tiz) söyleyen osilatör → MediaStream.
 //  • CDN'ler: senaryo 'offline' → hepsi engellenir (yedek yollar); 'stub' → Tone.js / VexFlow taklitleri.
@@ -297,11 +297,10 @@ if (run('A')) {
 
   // ── Porte görünümü varsayılan açık; ayrı VexFlow paneli varsayılan gizli ──
   await go(page, 'sinav');
-  assert.equal(await page.isChecked('#staffToggle'), true, '"Portede göster" varsayılan açık');
+  assert.equal(await page.evaluate(() => window.__dbg.viewMode), 'staff+graph', 'görünüm varsayılanı Porte + grafik');
   assert.equal(await page.isHidden('#staffPanel'), true, 'VexFlow paneli varsayılan gizli');
   // ── VexFlow paneli açılır ama yüklenemez → anlaşılır mesaj, uygulama çalışmaya devam eder ──
   await page.evaluate(() => window.solfejLab.setConfig({ UI: { VEXFLOW_PANEL: true } }));
-  await page.check('#staffToggle', { force: true });
   await page.waitForFunction(() => /yüklenemedi/.test(document.getElementById('staffMsg').textContent), null, { timeout: 20000 });
   log('porte (CDN kapalı):', await page.textContent('#staffMsg'));
 
@@ -343,7 +342,6 @@ if (run('B')) {
   const { context, page, consoleMsgs } = await openPage('stub', { ...FAST, UI: { VEXFLOW_PANEL: true }, QUESTION_COUNTS: { single: 1, double: 1, triple: 2 }, CHORD_RULES: { ALTERED_CHANCE: 1 } });
   await page.waitForFunction(() => window.__dbg.piano.state === 'ready', null, { timeout: 20000 });
   assert.match(await page.textContent('#engineChipText'), /piyano/);
-  await page.check('#staffToggle', { force: true });
   await page.click('#startBtn');
   await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 60000);
   const B = await page.evaluate(() => ({
@@ -482,8 +480,8 @@ if (run('F')) {
   await page.selectOption('#rootSelect', '0');            // Do
   await page.selectOption('#octaveSelect', '4');
   await page.selectOption('#typeSelect', 'single');
-  const staffOn = await page.isChecked('#staffToggle');
-  assert.ok(staffOn, 'serbest çalışmada porte görünümü açık başlamalı');
+  const staffOn = (await page.evaluate(() => window.__dbg.viewMode)) !== 'graph';
+  assert.ok(staffOn, 'serbest çalışmada porte görünümü açık (varsayılan Porte + grafik)');
   await page.evaluate(() => { const S = window.__singer; S.bias = -60; S.jitter = 2; });
   await page.click('#playBtn');
   await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
@@ -498,7 +496,7 @@ if (run('F')) {
   log('pes evre:', flat.state, '· bölge', flat.zone, '· gösterge', flat.gauge, '· kare', flat.zones.length);
   log('yönlendirme:', flat.coachKey, '·', flat.coach);
   assert.equal(flat.coachKey, 'low', '5 sn sonunda "pes" yönlendirmesi');
-  assert.match(flat.coach, /altında|pes/);
+  assert.match(flat.coach, /↑/, 'pes → yukarı oku');
   assert.equal(flat.state, 'LISTENING', '−60 sentte doğrulanmamalı');
   assert.equal(flat.zone, 'bad');
   // Sanal şarkıcının osilatörü başta 440 Hz'den hedefe kayarken birkaç kare yeşilden geçebilir → %95 yeterli
@@ -689,6 +687,58 @@ if (run('H')) {
   await page.goto(`${BASE}?debug`);
   await page.waitForFunction(() => window.__dbg);
   assert.deepEqual(await visible(), ['gecmis'], 'son kullanılan bölüm');
+  assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
+  await context.close();
+}
+
+// ═══ SENARYO I: görünüm seçici (Porte · Porte + grafik · Grafik), bölüme göre hatırlama, sınavda "Porte" anahtarı, yönlendirme yazısı ═══
+if (run('I')) {
+  log('I) görünüm seçici ve yönlendirme yazısı');
+  const { context, page, consoleMsgs } = await openPage('offline', FAST);
+  const vm = () => page.evaluate(() => ({ mode: window.__dbg.viewMode, staff: window.__dbg.contour.staffMode, line: window.__dbg.contour.lineMode }));
+  assert.deepEqual(await vm(), { mode: 'staff+graph', staff: true, line: true });
+  // Sınavda "Porte": yalnız porte (akan çizgi yok); serbest çalışmada "Grafik"
+  await page.click('#viewSeg [data-view="staff"]');
+  assert.deepEqual(await vm(), { mode: 'staff', staff: true, line: false });
+  assert.equal(await page.getAttribute('#viewSeg [data-view="staff"]', 'aria-pressed'), 'true');
+  await go(page, 'serbest');
+  assert.equal((await vm()).mode, 'staff+graph', 'serbest çalışmanın kendi seçimi');
+  await page.click('#viewSeg [data-view="graph"]');
+  assert.deepEqual(await vm(), { mode: 'graph', staff: false, line: true });
+  assert.equal(await page.isVisible('.contour .ch-cents >> nth=0'), true, 'sent grafiği başlığı');
+  await go(page, 'sinav');
+  assert.equal((await vm()).mode, 'staff', 'sınav seçimi hatırlanmalı');
+  // Yeniden yükleme: seçimler korunur (solfejlab.ui.v1)
+  await page.reload();
+  await page.waitForFunction(() => window.__dbg);
+  assert.equal((await vm()).mode, 'staff');
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('solfejlab.ui.v1')).viewMode);
+  assert.deepEqual(stored, { exam: 'staff', practice: 'graph' });
+  // Yalnız porte görünümünde dinlerken: canlı nota başı var, akan çizgi çizilmez
+  await page.click('#startBtn');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  await page.waitForTimeout(500);
+  await (await page.$('#tuner')).screenshot({ path: `${OUT}/e2e-14-view-staff-only.png` });
+  // Sınavda "Porte" kapalı: porte/grafik gizli, gösterge ve yönlendirme görünür
+  assert.equal(await page.isVisible('#examStaffSwitch'), true);
+  await page.uncheck('#examStaffToggle', { force: true });
+  const off = await page.evaluate(() => ({ canvas: getComputedStyle(document.getElementById('contour')).display, gauge: !!document.querySelector('.vgauge').offsetParent, coach: !!document.getElementById('coachLine').offsetParent }));
+  log('porte kapalı:', JSON.stringify(off));
+  assert.deepEqual(off, { canvas: 'none', gauge: true, coach: true });
+  await (await page.$('#tuner')).screenshot({ path: `${OUT}/e2e-15-exam-staff-off.png` });
+  await page.check('#examStaffToggle', { force: true });
+  assert.notEqual(await page.evaluate(() => getComputedStyle(document.getElementById('contour')).display), 'none');
+  await page.click('#endBtn');
+  // Serbest çalışmada "Porte" anahtarı görünmez
+  await go(page, 'serbest');
+  assert.equal(await page.isHidden('#examStaffSwitch'), true);
+  // Yönlendirme yazısı: masaüstünde 20 px kalın; ayardan değişir; telefonda 2 px küçük
+  const fs1 = await page.evaluate(() => { const c = getComputedStyle(document.getElementById('coachLine')); document.getElementById('coachLine').classList.remove('idle'); const d = getComputedStyle(document.getElementById('coachLine')); return { size: d.fontSize, weight: d.fontWeight }; });
+  assert.deepEqual(fs1, { size: '20px', weight: '700' });
+  await page.evaluate(() => window.solfejLab.setConfig({ UI: { COACH_FONT_PX: 24 } }));
+  assert.equal(await page.evaluate(() => { document.getElementById('coachLine').classList.remove('idle'); return getComputedStyle(document.getElementById('coachLine')).fontSize; }), '24px');
+  await page.setViewportSize({ width: 390, height: 900 });
+  assert.equal(await page.evaluate(() => { document.getElementById('coachLine').classList.remove('idle'); return getComputedStyle(document.getElementById('coachLine')).fontSize; }), '22px');
   assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
   await context.close();
 }

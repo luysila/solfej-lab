@@ -249,18 +249,35 @@ test('Yönlendirme: 5 sn özeti → tek sakin cümle, tekrar yok, sınav provas�
   for (const c of [-60, 30, -120, 4]) assert.equal(key(run(sing(c)), { live: false }), 'blind');
   assert.equal(key(run(() => ({ loud: false })), { live: false }), 'quiet');
 
-  // Aynı cümle üst üste gelmez; her durumda 2–3 söyleyiş var, metinler CONFIG.TEXTS.COACH'tan
+  // Aynı cümle üst üste gelmez; her durumda 2 söyleyiş var, metinler CONFIG.TEXTS.COACH'tan
   const state = {};
   const texts = Array.from({ length: 6 }, () => M.coachMessage(flat, state, {}, cfg));
   assert.ok(texts.every((m) => m.key === 'low' && m.path.startsWith('COACH.low.')));
   for (let i = 1; i < texts.length; i++) assert.notEqual(texts[i].text, texts[i - 1].text);
   for (const [k, g] of Object.entries(cfg.TEXTS.COACH)) {
-    if (k !== 'idle') assert.ok(Object.keys(g).length >= 2 && Object.keys(g).length <= 3, `${k}: 2–3 söyleyiş`);
+    if (k !== 'idle') assert.equal(Object.keys(g).length, 2, `${k}: 2 söyleyiş`);
+    // Çok kısa ve net: en fazla 5 sözcük (ok işaretleri sözcük sayılmaz)
+    for (const t of Object.values(g)) {
+      const words = t.replace(/[↑↓]/g, '').trim().split(/\s+/).filter(Boolean);
+      assert.ok(words.length >= 1 && words.length <= 5, `${k}: "${t}" kısa olmalı`);
+    }
   }
-  assert.ok(cfg.TEXTS.COACH.low.a.includes('hedefin biraz altında'));
-  // Pes / tiz cümleleri gerçekten yön söylüyor
-  for (const t of Object.values(cfg.TEXTS.COACH.low)) assert.match(t, /alt|pes|yukarı/);
-  for (const t of Object.values(cfg.TEXTS.COACH.high)) assert.match(t, /üst|tiz|aşağı/);
+  // Pes → yukarı ↑, tiz → aşağı ↓; çok uzaksa çift ok
+  for (const t of Object.values(cfg.TEXTS.COACH.low)) assert.match(t, /↑/);
+  for (const t of Object.values(cfg.TEXTS.COACH.high)) assert.match(t, /↓/);
+  for (const t of Object.values(cfg.TEXTS.COACH.farLow)) assert.match(t, /↑↑/);
+  for (const t of Object.values(cfg.TEXTS.COACH.farHigh)) assert.match(t, /↓↓/);
+});
+
+test('Görünüm ve yönlendirme yazısı ayarları: VIEW_MODE ve COACH_FONT_PX doğrulanır', () => {
+  const D = M.DEFAULT_CONFIG;
+  assert.equal(D.UI.VIEW_MODE, 'staff+graph');
+  assert.equal(D.UI.COACH_FONT_PX, 20);
+  assert.deepEqual(M.VIEW_MODES, ['staff', 'staff+graph', 'graph']);
+  for (const v of M.VIEW_MODES) assert.deepEqual(M.validateConfig(M.deepMerge(D, { UI: { VIEW_MODE: v } })), []);
+  assert.match(M.validateConfig(M.deepMerge(D, { UI: { VIEW_MODE: 'porte' } })).join(), /UI\.VIEW_MODE/);
+  assert.match(M.validateConfig(M.deepMerge(D, { UI: { COACH_FONT_PX: 8 } })).join(), /UI\.COACH_FONT_PX/);
+  assert.deepEqual(M.validateConfig(M.deepMerge(D, { UI: { COACH_FONT_PX: 26 } })), []);
 });
 
 test('Arayüz adları: boş olamaz, en fazla 80 karakter (cümleler 160), dışarıdan gelen ad ayıklanır', () => {

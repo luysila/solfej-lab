@@ -22,7 +22,8 @@ export const ui = {
   examPause: $('examPauseBtn'), practicePause: $('practicePauseBtn'), settingsActions: $('settingsActions'),
   examInfo: $('examInfo'), startBtn: $('startBtn'), examReplay: $('examReplayBtn'), skipBtn: $('skipBtn'), endBtn: $('endBtn'),
   root: $('rootSelect'), octave: $('octaveSelect'), type: $('typeSelect'), play: $('playBtn'), replay: $('replayBtn'), reset: $('resetBtn'),
-  device: $('deviceSelect'), fold: $('foldToggle'), foldHint: $('foldHint'), staffToggle: $('staffToggle'),
+  device: $('deviceSelect'), fold: $('foldToggle'), foldHint: $('foldHint'),
+  examStaffToggle: $('examStaffToggle'), examStaffSwitch: $('examStaffSwitch'), viewSeg: $('viewSeg'),
   summaryPanel: $('summaryPanel'), sumMeta: $('sumMeta'), sumScore: $('sumScore'), sumScoreSub: $('sumScoreSub'), sumTendency: $('sumTendency'),
   sumBiasMark: $('sumBiasMark'), sumBiasMin: $('sumBiasMin'), sumBiasMax: $('sumBiasMax'), sumHardest: $('sumHardest'), sumHardestWhy: $('sumHardestWhy'),
   sumRows: $('sumRows'), sumRoles: $('sumRoles'), sumAdvice: $('sumAdvice'), sumNew: $('sumNewBtn'), sumClose: $('sumCloseBtn'),
@@ -517,6 +518,10 @@ export function setCoach(m) {
   ui.coach.dataset.key = m ? m.key : 'idle';
   ui.coach.classList.toggle('idle', !m);
   setText(ui.coach, text);
+}
+/** Yönlendirme yazı boyutu (CONFIG.UI.COACH_FONT_PX; telefonda CSS 2 px küçültür) */
+export function applyCoachFont() {
+  document.documentElement.style.setProperty('--coach-fs', `${CONFIG.UI.COACH_FONT_PX}px`);
 }
 /** Yeni ses / yeni çalım: özet sıfırlanır, satır bekleme metnine döner */
 export function resetCoach() {

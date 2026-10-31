@@ -38,11 +38,11 @@ import { CONFIG, DEFAULT_CONFIG } from './config.js';
 import { ExamSession, Exercise, PLAYBACK_MODES, ROOTS, S, TYPE_BY_ID, clamp, coachMessage, compareToTarget, computeDiagnostics, dbToLin, deepClone, deepMerge, freqToMidi, generateSession, isPlainObject, makeHistoryEntry, midiToFreq, mulberry32, nearestNoteName, octaveModeFor, recordPitchFrame, rootMeanSquare, zoneOf } from './pure.js';
 import { audioCtx, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound } from './audio.js';
 import { analyser, assignRmsLinear, detector, ensureMic, explainError, medianFilter, micStream, refreshDevices, rmsLinear, settings, setupDetector, startMic, timeBuf } from './mic.js';
-import { canPauseNow, paused, setPausedState } from './ui.js';
+import { applyCoachFont, canPauseNow, paused, setPausedState } from './ui.js';
 import { after, assignExercise, assignLastDiag, assignLastReadoutTs, assignMode, assignNeedleTarget, assignSession, assignStarting, assignUiReady, buildNoteBoxes, buildTicks, cancelFlow, clearReadouts, coachState, coachWin, easeNeedle, examActive, exercise, fillSelects, fmtCents, fsm, gaugeHalf, gaugeRange, hideAlert, lastDiag, lastReadoutTs, mode, needleTarget, nf1, nf2, observeGauge, paintGaugeBackground, paintLevel, paintSustain, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, renderTimer, resetCoach, selectionChanged, session, setCoach, setText, setZone, showAlert, showNotice, starting, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
-import { contour, drawContour, markContour, pushContour, scheduleStaffDraw, setStaffEnabled, setupContour, staffView } from './staff.js';
+import { contour, drawContour, examStaffOn, markContour, pushContour, scheduleStaffDraw, setExamStaff, setViewMode, setupContour, staffView, viewMode, viewModeFor } from './staff.js';
 import { addHistory, clearHistory, hideSummary, loadHistory, renderHistory, showSummary } from './summary.js';
-import { bindNav, goSection, initNav } from './nav.js';
+import { bindNav, goSection, initNav, loadUiState, saveUiState } from './nav.js';
 import { CONFIG_KEY, PREFS_KEY, applyOverrides, bindSettingsTabs, applyTexts, buildSettingsForm, configOverrides, fillPresetSelect, fillSettingsForm, onApplySettings, onCopyAll, onCopyNames, onEditClick, onJsonApply, onJsonExport, onJsonImportFile, onPresetChange, positionEditor, refreshJsonArea, reportApply, savePrefs, setEditNames, setTextKey, storageGet } from './settings.js';
 
 // ───────────────────────────────────────────────────────────────────────
@@ -287,10 +287,10 @@ export function setMode(next, { persist = true } = {}) {
   assignMode(next);
   (next === 'exam' ? ui.examSlot : ui.practiceSlot).append(ui.workspace);   // çalışma alanı bölüme taşınır
   hideSummary();
-  if (next === 'practice') {
-    selectionChanged();                             // egzersizi kurar + sıfırlar
-    setStaffEnabled(true, { persist: false });      // serbest çalışmada porte görünümü her zaman açık başlar
-  } else { assignExercise(new Exercise([])); buildNoteBoxes(); hardReset(); }
+  if (next === 'practice') selectionChanged();      // egzersizi kurar + sıfırlar
+  else { assignExercise(new Exercise([])); buildNoteBoxes(); hardReset(); }
+  setViewMode(viewModeFor(next), { persist: false });   // görünüm Sınav ve Serbest çalışma için ayrı hatırlanır
+  setExamStaff(examStaffOn(), { persist: false });
   if (persist) savePrefs();
 }
 
@@ -421,7 +421,8 @@ export function bindEvents() {
     tracker.reset();
     savePrefs();
   });
-  ui.staffToggle.addEventListener('change', () => setStaffEnabled(ui.staffToggle.checked));
+  for (const b of ui.viewSeg.querySelectorAll('[data-view]')) b.addEventListener('click', () => setViewMode(b.dataset.view));
+  ui.examStaffToggle.addEventListener('change', () => setExamStaff(ui.examStaffToggle.checked));
   ui.thr.addEventListener('input', () => {
     settings.rmsDb = +ui.thr.value;
     assignRmsLinear(dbToLin(settings.rmsDb));
@@ -509,7 +510,12 @@ export function init() {
   renderDetectorChip();
   renderEngineChip();
   renderHistory();
-  setStaffEnabled(typeof prefs.staffView === 'boolean' ? prefs.staffView : CONFIG.UI.SHOW_STAFF, { persist: false });
+  // Eski "Portede göster" tercihi (prefs.staffView) bir kez yeni görünüm seçimine çevrilir
+  if (!loadUiState().viewMode && typeof prefs.staffView === 'boolean') {
+    const v = prefs.staffView ? 'staff+graph' : 'graph';
+    saveUiState({ viewMode: { exam: v, practice: v } });
+  }
+  applyCoachFont();
   setMode(prefs.mode === 'practice' ? 'practice' : 'exam', { persist: false });   // serbest çalışma porteyi açar
   initNav();                                        // adres çubuğundaki bölüm ya da son kullanılan bölüm (ilk açılışta Ana sayfa)
   if (cfgProblem) showNotice(`Kayıtlı özel ayarlar geçersiz olduğu için varsayılanlar kullanılıyor (${cfgProblem}).`);
@@ -544,7 +550,7 @@ if (new URLSearchParams(location.search).has('debug')) {
     get state() { return fsm.state; }, get exercise() { return exercise; }, get session() { return session; },
     get tracker() { return tracker; }, get detector() { return detector; }, get audioCtx() { return audioCtx; },
     get piano() { return piano; }, get diag() { return lastDiag; }, get staff() { return staffView; },
-    get overrides() { return configOverrides; }, get contour() { return contour; }, get paused() { return paused; }, fsm, CONFIG,
+    get overrides() { return configOverrides; }, get contour() { return contour; }, get paused() { return paused; }, get viewMode() { return viewMode; }, fsm, CONFIG,
   };
 }
 

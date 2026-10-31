@@ -5,7 +5,7 @@ import { CONFIG, DEFAULT_CONFIG } from './config.js';
 import { INTERVAL_TYPES, MedianFilter, S, clamp, deepClone, deepMerge, diffConfig, getPath, isPlainObject, midiName, sanitizeOverrides, setPath, textLeaves, textMaxLen, validateConfig } from './pure.js';
 import { audioCtx, masterGain, piano, preparePiano, resetPiano } from './audio.js';
 import { analyser, assignMedianFilter, medianFilter, settings, setupDetector } from './mic.js';
-import { buildTicks, el, examActive, fsm, mode, paintGaugeBackground, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, selectionChanged, session, setText, showNotice, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
+import { applyCoachFont, buildTicks, el, examActive, fsm, mode, paintGaugeBackground, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, selectionChanged, session, setText, showNotice, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
 import { drawContour, staffView, updateVexPanel } from './staff.js';
 import { renderHistory } from './summary.js';
 import { practicePlayback } from './app.js';
@@ -182,6 +182,8 @@ export const SETTINGS_SCHEMA = [
     { path: 'PITCH.MEDIAN_FRAMES', label: 'Medyan filtre (kare)', type: 'number', min: 1, max: 9, step: 1 },
   ] },
   { title: 'Görünüm', tab: 'view', fields: [
+    { path: 'UI.VIEW_MODE', label: 'Görünüm varsayılanı', type: 'select', options: [['staff', 'Porte'], ['staff+graph', 'Porte + grafik'], ['graph', 'Grafik (sent)']] },
+    { path: 'UI.COACH_FONT_PX', label: 'Yönlendirme yazı boyutu (px)', type: 'number', min: 12, max: 40, step: 1 },
     { path: 'UI.VEXFLOW_PANEL', label: 'Ayrı VexFlow porte paneli', type: 'bool' },
     { path: 'UI.STAFF_WARN_YELLOW', label: 'Portede sınırdayken sarı', type: 'bool' },
   ] },
@@ -397,7 +399,7 @@ export function storageRemove(key) { try { localStorage.removeItem(key); } catch
 export function savePrefs() {
   if (!uiReady) return;
   storageSet(PREFS_KEY, {
-    mode, gateDb: settings.rmsDb, fold: settings.fold, staffView: staffView.on,   // eski "staff" alanı (VexFlow paneli) artık okunmaz
+    mode, gateDb: settings.rmsDb, fold: settings.fold,   // görünüm seçimi artık solfejlab.ui.v1'de (eski staffView bir kez çevrilir)
     practice: { root: ui.root.value, octave: ui.octave.value, type: ui.type.value },
     playback: practicePlayback(),                   // serbest çalışma "Çalım biçimi"
   });
@@ -457,6 +459,7 @@ export function onConfigChanged(prev) {
     selectionChanged();
   }
   updateVexPanel();
+  applyCoachFont();
   applyTexts();
   fillSettingsForm(CONFIG);
   refreshJsonArea();

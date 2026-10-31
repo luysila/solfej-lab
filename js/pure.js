@@ -309,6 +309,8 @@ export function planTriads(count, rules = CONFIG.CHORD_RULES, rng = Math.random)
 //  Tek seste 'melodic' ile 'both' aynıdır: ses bir kez, MELODIC_NOTE_S boyunca çalınır.
 // ───────────────────────────────────────────────────────────────────────
 export const PLAYBACK_MODES = ['harmonic', 'melodic', 'both'];
+/** Çalışma alanının görünümü: yalnız porte · porte + grafik · sent grafiği */
+export const VIEW_MODES = ['staff', 'staff+graph', 'graph'];
 
 /** @returns {{total:number, steps:Array<{start:number, dur:number, indices:number[]}>}}  süreler saniye */
 export function playbackPlan(mode, count, audio = CONFIG.AUDIO) {
@@ -1040,6 +1042,8 @@ export function validateConfig(cfg) {
   num(cfg.UI?.CONTOUR_RANGE_CENTS, 20, 1200, 'UI.CONTOUR_RANGE_CENTS');
   num(cfg.UI?.COACH_INTERVAL_MS, 1000, 60000, 'UI.COACH_INTERVAL_MS');
   num(cfg.UI?.COACH_FAR_CENTS, 30, 600, 'UI.COACH_FAR_CENTS');
+  num(cfg.UI?.COACH_FONT_PX, 12, 40, 'UI.COACH_FONT_PX');
+  oneOf(cfg.UI?.VIEW_MODE, VIEW_MODES, 'UI.VIEW_MODE');
   num(cfg.HISTORY?.MAX_ENTRIES, 1, 1000, 'HISTORY.MAX_ENTRIES');
   for (const [p, v] of textLeaves(cfg.TEXTS)) {                // arayüz adları: boş olamaz, uzunluk sınırı
     if (typeof v !== 'string' || !v.trim()) errs.push(`TEXTS.${p}: ad boş olamaz`);

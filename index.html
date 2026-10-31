@@ -6,22 +6,22 @@
 <meta name="color-scheme" content="dark">
 <title>Solfej Lab · İşitme Eğitimi</title>
 
-<link rel="stylesheet" href="./css/style.css?v=202610312327">
+<link rel="stylesheet" href="./css/style.css?v=202610312335">
 <!-- Sürüm etiketi (?v=…): yayından sonra tarayıcı önbelleğinde eski ve yeni dosyalar karışmasın.
      Elle değiştirmeyin; dosyaları değiştirdikten sonra: npm run stamp (scripts/stamp.mjs import map'i de yeniden üretir) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=202610312327",
-    "./js/audio.js": "./js/audio.js?v=202610312327",
-    "./js/config.js": "./js/config.js?v=202610312327",
-    "./js/mic.js": "./js/mic.js?v=202610312327",
-    "./js/nav.js": "./js/nav.js?v=202610312327",
-    "./js/pure.js": "./js/pure.js?v=202610312327",
-    "./js/settings.js": "./js/settings.js?v=202610312327",
-    "./js/staff.js": "./js/staff.js?v=202610312327",
-    "./js/summary.js": "./js/summary.js?v=202610312327",
-    "./js/ui.js": "./js/ui.js?v=202610312327"
+    "./js/app.js": "./js/app.js?v=202610312335",
+    "./js/audio.js": "./js/audio.js?v=202610312335",
+    "./js/config.js": "./js/config.js?v=202610312335",
+    "./js/mic.js": "./js/mic.js?v=202610312335",
+    "./js/nav.js": "./js/nav.js?v=202610312335",
+    "./js/pure.js": "./js/pure.js?v=202610312335",
+    "./js/settings.js": "./js/settings.js?v=202610312335",
+    "./js/staff.js": "./js/staff.js?v=202610312335",
+    "./js/summary.js": "./js/summary.js?v=202610312335",
+    "./js/ui.js": "./js/ui.js?v=202610312335"
   }
 }
 </script>
@@ -175,7 +175,7 @@
 
         <div class="contour">
           <div class="contour-head">
-            <span class="ch-staff">Porte · son <span id="staffSpan">6</span> sn · okunan perde, nota yazımına göre</span>
+            <span class="ch-staff">Porte · <span class="ch-time">son <span id="staffSpan">6</span> sn · </span>okunan perde, nota yazımına göre</span>
             <span class="ch-cents" hidden>Perde grafiği · son <span id="contourSpan">6</span> sn · hedefe göre sapma (sent)</span>
             <span class="contour-legend">
               <span class="ch-cents" hidden><i class="key-line k-pitch"></i><span data-text="legendPitch">Okunan perde</span></span>
@@ -222,11 +222,21 @@
               <span class="track"></span>
               <span class="switch-text"><span data-text="toggleFold">Oktav toleransı</span><small id="foldHint"></small></span>
             </label>
-            <label class="switch">
-              <input type="checkbox" id="staffToggle">
+            <!-- Sınavda porte/grafik alanını gizleyip yalnızca dikey gösterge ve yönlendirmeyi bırakır -->
+            <label class="switch" id="examStaffSwitch">
+              <input type="checkbox" id="examStaffToggle" checked>
               <span class="track"></span>
-              <span class="switch-text"><span data-text="toggleStaff">Portede göster</span><small data-text="toggleStaffHint">Perde nota portesi üzerinde çizilir (kapalı: sent grafiği)</small></span>
+              <span class="switch-text"><span data-text="toggleExamStaff">Porte</span><small data-text="toggleExamStaffHint">Kapalı: yalnızca gösterge ve yönlendirme</small></span>
             </label>
+          </div>
+          <!-- Görünüm: Porte · Porte + grafik · Grafik (Sınav ve Serbest çalışma için ayrı hatırlanır) -->
+          <div class="view-ctl" role="group" aria-labelledby="viewLabel">
+            <span class="ctl-label" id="viewLabel" data-text="labelView">Görünüm</span>
+            <div class="seg-ctl" id="viewSeg">
+              <button type="button" data-view="staff" aria-pressed="false" data-text="viewStaff">Porte</button>
+              <button type="button" data-view="staff+graph" aria-pressed="true" data-text="viewBoth">Porte + grafik</button>
+              <button type="button" data-view="graph" aria-pressed="false" data-text="viewGraph">Grafik</button>
+            </div>
           </div>
           <div class="tech-info">
             <span class="chip mono" id="detChip">Algılama: YIN</span>
@@ -364,6 +374,6 @@
     a.hidden = false;
   }
 </script>
-<script type="module" src="./js/app.js?v=202610312327"></script>
+<script type="module" src="./js/app.js?v=202610312335"></script>
 </body>
 </html>
