@@ -35,10 +35,12 @@
 // ═════════════════════════════════════════════════════════════════════════
 
 import { CONFIG, DEFAULT_CONFIG } from './config.js';
+import { customExamToConfig } from './pure.js';
 import { ExamSession, Exercise, PLAYBACK_MODES, ROOTS, S, TYPE_BY_ID, clamp, coachMessage, compareToTarget, computeDiagnostics, dbToLin, deepClone, deepMerge, freqToMidi, generateSession, isPlainObject, makeHistoryEntry, midiToFreq, mulberry32, nearestNoteName, octaveModeFor, recordPitchFrame, rootMeanSquare, zoneOf } from './pure.js';
 import { audioCtx, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound } from './audio.js';
 import { analyser, assignRmsLinear, detector, ensureMic, explainError, medianFilter, micStream, refreshDevices, rmsLinear, settings, setupDetector, startMic, timeBuf } from './mic.js';
-import { applyCoachFont, canPauseNow, paused, setPausedState } from './ui.js';
+import { activeCfg, applyCoachFont, canPauseNow, paused, setPausedState } from './ui.js';
+import { buildCustomUI, examTab } from './custom.js';
 import { after, assignExercise, assignLastDiag, assignLastReadoutTs, assignMode, assignNeedleTarget, assignSession, assignStarting, assignUiReady, buildNoteBoxes, buildTicks, cancelFlow, clearReadouts, coachState, coachWin, easeNeedle, examActive, exercise, fillSelects, fmtCents, fsm, gaugeHalf, gaugeRange, hideAlert, lastDiag, lastReadoutTs, mode, needleTarget, nf1, nf2, observeGauge, paintGaugeBackground, paintLevel, paintSustain, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, renderTimer, resetCoach, selectionChanged, session, setCoach, setText, setZone, showAlert, showNotice, starting, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
 import { contour, drawContour, examStaffOn, markContour, pushContour, scheduleStaffDraw, setExamStaff, setViewMode, setupContour, staffView, viewMode, viewModeFor } from './staff.js';
 import { addHistory, clearHistory, hideSummary, loadHistory, renderHistory, showSummary } from './summary.js';
@@ -71,7 +73,7 @@ export function onStateChange(next, prev, payload) {
       stopAllSound();
       // Ne çalınacak: tek ses (kutuya tıklandı) · sınavda EXAM.PLAYBACK · serbest çalışmada "Çalım biçimi"
       const single = Number.isInteger(payload?.single) ? payload.single : null;
-      const how = single !== null ? 'melodic' : session ? CONFIG.EXAM.PLAYBACK : (payload?.playback ?? 'harmonic');
+      const how = single !== null ? 'melodic' : session ? activeCfg().EXAM.PLAYBACK : (payload?.playback ?? 'harmonic');
       const total = playMelodic(single !== null ? [exercise.notes[single]] : exercise.notes, how, audioCtx.currentTime + 0.06);
       markContour(performance.now(), single !== null ? `♪${single + 1}` : session ? `▶${session.index + 1}` : '▶');
       // Dinleme çalım bitince başlar (ilerleme korunur: yalnızca fresh çalımda baştan)
@@ -94,7 +96,7 @@ export function onStateChange(next, prev, payload) {
       if (stats) stats.verified = true;
       ui.sustainFill.classList.add('full');
       paintSustain(1);
-      setText(ui.sustainText, `${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
+      setText(ui.sustainText, `${nf2.format(activeCfg().SUSTAIN_TIME_MS / 1000)} / ${nf2.format(activeCfg().SUSTAIN_TIME_MS / 1000)} s`);
       setZone('perfect');
       markContour(performance.now(), `✓${exercise.index + 1}`);
       after(CONFIG.AUDIO.VERIFIED_HOLD_MS, advanceVerified);
@@ -107,7 +109,7 @@ export function onStateChange(next, prev, payload) {
         const reason = payload?.reason ?? 'done';
         if (reason !== 'done') exercise.abandon();
         session.finishQuestion(reason);
-        after(CONFIG.EXAM.NEXT_QUESTION_DELAY_MS, nextQuestion);
+        after(activeCfg().EXAM.NEXT_QUESTION_DELAY_MS, nextQuestion);
       } else {
         playReward(exercise.notes);
       }
@@ -174,9 +176,10 @@ export function finishSession() {
   setPausedState(false);
   session.finishedAt = Date.now();
   const attempted = session.attempted;
-  assignLastDiag(attempted.length ? computeDiagnostics(attempted, CONFIG) : null);
+  const cfg = activeCfg();                          // özel sınavda oturumun kendi ayarı
+  assignLastDiag(attempted.length ? computeDiagnostics(attempted, cfg) : null);
   if (lastDiag && CONFIG.HISTORY.ENABLED && (!session.aborted || CONFIG.HISTORY.SAVE_UNFINISHED)) {
-    addHistory(makeHistoryEntry(session, lastDiag, CONFIG));
+    addHistory(makeHistoryEntry(session, lastDiag, cfg));
   }
   cancelFlow();
   fsm.go(S.SUMMARY);
@@ -187,6 +190,7 @@ export function hardReset() {
   setPausedState(false);
   stopAllSound();
   assignSession(null);
+  applySessionCfg();                                // sayaç ve gösterge bantları genel ayara döner
   if (fsm.state !== S.IDLE) fsm.go(S.IDLE);
   else { exercise.restart(); tracker.reset(); clearReadouts(); renderAll(); }
 }
@@ -212,8 +216,22 @@ export function nextSeed() {
   return (Date.now() ^ Math.floor(Math.random() * 0x7fffffff)) >>> 0;
 }
 
-export async function onStartExam() {
+/** Oturumun etkin ayarını sustain sayacına ve gösterge bantlarına uygular */
+export function applySessionCfg() {
+  tracker.cfg = activeCfg();
+  paintGaugeBackground();
+  buildTicks();
+}
+
+/**
+ * Sınavı başlatır. opts.custom: özel sınav tanımı (yalnız bu oturuma uygulanır).
+ * opts.repeat: teşhis ekranındaki "Yeni Test" — biten sınav özel sınavsa aynısını yeniden başlatır.
+ * Standart sekmedeki başlat düğmesi her zaman standart sınavı başlatır.
+ */
+export async function onStartExam(opts) {
   if (starting || examActive()) return;
+  const custom = opts?.custom ?? (opts?.repeat && fsm.state === S.SUMMARY ? session?.custom ?? null : null);
+  const examCfg = custom ? customExamToConfig(custom, CONFIG) : CONFIG;
   assignStarting(true);
   hideAlert();
   renderAll();
@@ -221,7 +239,7 @@ export async function onStartExam() {
   if (!ok) { assignStarting(false); renderAll(); return; }
   const seed = nextSeed();
   let questions;
-  try { questions = generateSession(CONFIG, mulberry32(seed)); }
+  try { questions = generateSession(examCfg, mulberry32(seed)); }
   catch (err) { assignStarting(false); showAlert(`Sınav oluşturulamadı: ${err.message}`); renderAll(); return; }
   if (CONFIG.AUDIO.INSTRUMENT === 'piano') {
     const p = preparePiano();
@@ -234,16 +252,17 @@ export async function onStartExam() {
   hardReset();
   hideSummary();
   assignLastDiag(null);
-  assignSession(new ExamSession(questions, { seed, startedAt: Date.now() }));
+  assignSession(new ExamSession(questions, { seed, startedAt: Date.now(), cfg: examCfg, name: custom?.name ?? null, custom }));
+  applySessionCfg();
   loadQuestion(session.current);
   fsm.go(S.PLAYING, { fresh: true });
 }
 
 export function onExamReplay() {
-  if (session && fsm.state === S.LISTENING && CONFIG.EXAM.ALLOW_REPLAY) fsm.go(S.PLAYING, { replay: true });
+  if (session && fsm.state === S.LISTENING && activeCfg().EXAM.ALLOW_REPLAY) fsm.go(S.PLAYING, { replay: true });
 }
 export function onSkip() {
-  if (!session || fsm.state !== S.LISTENING || !CONFIG.EXAM.ALLOW_SKIP) return;
+  if (!session || fsm.state !== S.LISTENING || !activeCfg().EXAM.ALLOW_SKIP) return;
   fsm.go(S.COMPLETE, { reason: 'skipped' });
 }
 export function onEndExam() {
@@ -320,6 +339,7 @@ export function frame(ts) {
     return;
   }
   if (dt > CONFIG.PITCH.MAX_FRAME_GAP_MS) { tracker.reset(); medianFilter.reset(); dt = 0; }
+  const xc = activeCfg();                           // sınav akışı ayarı (özel sınavda oturumun; tolerans, süre, geri bildirim)
 
   const target = exercise.current;
   if (!target) return;
@@ -346,16 +366,16 @@ export function frame(ts) {
   else if ((invalidMs += dt) > CONFIG.SUSTAIN_DROPOUT_GRACE_MS) medianFilter.reset();
 
   const absCents = Math.abs(cents);
-  const zone = valid ? zoneOf(absCents) : 'none';
+  const zone = valid ? zoneOf(absCents, xc) : 'none';
   const passed = tracker.update(dt, valid, absCents);   // puanlama HAM (yumuşatılmamış) değerle
-  if (valid && stats) recordPitchFrame(stats, cents);
-  if (valid && exercise.anchorK === null && absCents <= CONFIG.TOLERANCE_CENTS) {
+  if (valid && stats) recordPitchFrame(stats, cents, xc);
+  if (valid && exercise.anchorK === null && absCents <= xc.TOLERANCE_CENTS) {
     octaveVotes.set(lastOctave, (octaveVotes.get(lastOctave) || 0) + 1);
   }
 
-  const feedback = !session || CONFIG.EXAM.LIVE_FEEDBACK;
+  const feedback = !session || xc.EXAM.LIVE_FEEDBACK;
   if (feedback) {
-    pushContour(ts, valid ? cents : NaN, valid && absCents <= CONFIG.TOLERANCE_CENTS, valid ? target.midi + cents / 100 : NaN, zone);
+    pushContour(ts, valid ? cents : NaN, valid && absCents <= xc.TOLERANCE_CENTS, valid ? target.midi + cents / 100 : NaN, zone);
     if (valid) assignNeedleTarget((clamp(cents, -gaugeRange(), gaugeRange()) / gaugeRange()) * gaugeHalf);
     setZone(zone);
     paintSustain(tracker.progress);
@@ -368,20 +388,20 @@ export function frame(ts) {
       setText(ui.centsVal, valid ? fmtCents(cents) : '—');
       setText(ui.heardFreq, valid ? `${nf1.format(freq)} Hz` : '— Hz');
       setText(ui.heardNote, valid ? `≈ ${nearestNoteName(freq)}` : ' ');
-      setText(ui.sustainText, `${nf2.format(tracker.ms / 1000)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
+      setText(ui.sustainText, `${nf2.format(tracker.ms / 1000)} / ${nf2.format(xc.SUSTAIN_TIME_MS / 1000)} s`);
     }
     setText(ui.clarityText, loud ? `netlik ${nf2.format(clarity)}` : 'netlik —');
   }
 
   // Yönlendirme: her COACH_INTERVAL_MS'de bir, son aralığın özetinden tek cümle
-  coachWin.push(dt, { loud, valid, cents, held: valid && absCents <= CONFIG.TOLERANCE_CENTS });
+  coachWin.push(dt, { loud, valid, cents, held: valid && absCents <= xc.TOLERANCE_CENTS });
   if (coachWin.ms >= CONFIG.UI.COACH_INTERVAL_MS) {
-    const m = coachMessage(coachWin.summary(), coachState, { live: feedback, fold: settings.fold }, CONFIG);
+    const m = coachMessage(coachWin.summary(), coachState, { live: feedback, fold: settings.fold }, { ...CONFIG, TOLERANCE_CENTS: xc.TOLERANCE_CENTS });
     if (m) setCoach(m);
     coachWin.reset();
   }
 
-  const limit = session ? CONFIG.EXAM.QUESTION_TIME_LIMIT_S : 0;
+  const limit = session ? xc.EXAM.QUESTION_TIME_LIMIT_S : 0;
   if (passed) {
     if (exercise.index === 0 && exercise.anchorK === null) {     // oktav çapası: tutma sırasındaki çoğunluk oyu
       let best = lastOctave, bestN = -1;
@@ -400,7 +420,7 @@ export function frame(ts) {
 // ───────────────────────────────────────────────────────────────────────
 export let historyClearArmed = 0;
 export function bindEvents() {
-  ui.startBtn.addEventListener('click', onStartExam);
+  ui.startBtn.addEventListener('click', () => onStartExam({ repeat: examTab === 'custom' }));   // özel sekmedeki teşhis ekranında aynı özel sınav
   ui.examPause.addEventListener('click', togglePause);
   ui.practicePause.addEventListener('click', togglePause);
   ui.examReplay.addEventListener('click', onExamReplay);
@@ -412,7 +432,8 @@ export function bindEvents() {
   for (const select of [ui.root, ui.octave, ui.type, ui.inversion]) select.addEventListener('change', selectionChanged);
   document.getElementById('playbackSelect').addEventListener('change', savePrefs);
   ui.device.addEventListener('change', onDeviceChange);
-  ui.sumNew.addEventListener('click', onStartExam);
+  ui.sumNew.addEventListener('click', () => onStartExam({ repeat: true }));   // biten sınavın aynısı (özel sınavda aynı özel sınav)
+  for (const b of document.querySelectorAll('#examTabs [data-etab]')) b.addEventListener('click', () => goSection(b.dataset.etab === 'custom' ? 'kendi-sinavim' : 'sinav'));
   ui.sumClose.addEventListener('click', hideSummary);
 
   ui.fold.addEventListener('change', () => {
@@ -500,6 +521,7 @@ export function init() {
   setupContour();
   updateThresholdUi();
   bindEvents();
+  buildCustomUI();
 
   assignUiReady(true);
   applyTexts();

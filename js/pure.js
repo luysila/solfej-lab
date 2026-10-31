@@ -300,8 +300,12 @@ export function planTriads(count, rules = CONFIG.CHORD_RULES, rng = Math.random)
   const setSize  = Math.max(1, Math.floor(rules.SET_SIZE || 5));
   const mainIds  = Object.keys(rules.MAIN_WEIGHTS || {}).filter((id) => TYPE_BY_ID[id]?.kind === 'chord' && rules.MAIN_WEIGHTS[id] > 0);
   const altIds   = (rules.ALTERED_TYPES || []).filter((id) => TYPE_BY_ID[id]?.kind === 'chord');
-  if (!mainIds.length) throw Object.assign(new Error('CHORD_RULES.MAIN_WEIGHTS: en az bir ana akor tipi gerekli'), { code: 'CONFIG' });
+  if (!mainIds.length && !altIds.length) throw Object.assign(new Error('CHORD_RULES.MAIN_WEIGHTS: en az bir ana akor tipi gerekli'), { code: 'CONFIG' });
   const out = [];
+  if (!mainIds.length) {                           // yalnız artmış/eksilmiş seçildi: kural uygulanamaz, hepsi bu tiplerden
+    for (let i = 0; i < count; i++) out.push(altIds[Math.floor(rng() * altIds.length)]);
+    return out.map((id) => TYPE_BY_ID[id]);
+  }
   for (let start = 0; start < count; start += setSize) {
     const size   = Math.min(setSize, count - start);
     const maxAlt = Math.min(Math.max(0, Math.floor(rules.MAX_ALTERED_PER_SET ?? 1)), size);
@@ -342,6 +346,122 @@ export function orderForSinging(notes, singOrder = 'bass') {
   if (singOrder !== 'root' || notes.length < 2 || notes[0].role === 'Kök' || !notes.some((n) => n.role === 'Kök')) return notes;
   const rank = { 'Kök': 0, "3'lü": 1, "5'li": 2 };
   return [...notes].sort((a, b) => (rank[a.role] ?? 9) - (rank[b.role] ?? 9)).map((n, i) => ({ ...n, index: i }));
+}
+
+// ───────────────────────────────────────────────────────────────────────
+// KENDİ SINAVIN — kompakt pencereden gelen tanım → doğrulama → oturuma özel CONFIG (genel CONFIG değişmez)
+// ───────────────────────────────────────────────────────────────────────
+export const CUSTOM_TIME_LIMITS = [0, 15, 30, 60];
+export const CUSTOM_TOLERANCES = { 30: 50, 20: 35, 10: 25 };   // tolerans → sarı bant sınırı (esnek · varsayılan · sıkı)
+export const CUSTOM_REVEALS = ['after', 'end', 'session', 'never'];
+export const CUSTOM_CHORDS = ['major', 'minor', 'augmented', 'diminished'];
+/** Yeni bir özel sınavın başlangıç değerleri (standart sınavdan) */
+export function defaultCustomExam(cfg = CONFIG) {
+  return {
+    name: 'Sınavım',
+    counts: { ...cfg.QUESTION_COUNTS },
+    intervals: [...cfg.INTERVAL_RULES.POOL],
+    chords: [...CUSTOM_CHORDS],
+    alteredRule: true,                              // 5 soruda en fazla 1 artmış/eksilmiş
+    inversions: INVERSIONS.filter((v) => (cfg.CHORD_RULES.INVERSIONS?.[v.key] ?? 0) > 0).map((v) => v.key),
+    order: cfg.QUESTION_ORDER,
+    register: { ...cfg.REGISTER },
+    playback: cfg.EXAM.PLAYBACK,
+    timeLimit: CUSTOM_TIME_LIMITS.includes(cfg.EXAM.QUESTION_TIME_LIMIT_S) ? cfg.EXAM.QUESTION_TIME_LIMIT_S : 0,
+    allowReplay: cfg.EXAM.ALLOW_REPLAY,
+    allowSkip: cfg.EXAM.ALLOW_SKIP,
+    reveal: CUSTOM_REVEALS.includes(cfg.EXAM.REVEAL_NOTE_NAMES) ? cfg.EXAM.REVEAL_NOTE_NAMES : 'after',
+    liveFeedback: cfg.EXAM.LIVE_FEEDBACK,
+    tolerance: CUSTOM_TOLERANCES[cfg.TOLERANCE_CENTS] ? cfg.TOLERANCE_CENTS : 20,
+    sustainMs: cfg.SUSTAIN_TIME_MS,
+  };
+}
+/** Dışarıdan / kayıttan gelen tanımı varsayılanlarla tamamlar, türleri düzeltir (bilinmeyen değerler atılır) */
+export function normalizeCustomExam(raw, cfg = CONFIG) {
+  const d = defaultCustomExam(cfg), x = isPlainObject(raw) ? raw : {};
+  const int = (v, lo, hi, fb) => (Number.isFinite(+v) ? clamp(Math.round(+v), lo, hi) : fb);
+  const list = (v, allowed, fb) => (Array.isArray(v) ? [...new Set(v.filter((id) => allowed.includes(id)))] : fb);
+  const pick = (v, allowed, fb) => (allowed.includes(v) ? v : fb);
+  const out = {
+    name: typeof x.name === 'string' && x.name.trim() ? x.name.trim().slice(0, 60) : d.name,
+    counts: Object.fromEntries(KINDS.map((k) => [k, int(x.counts?.[k], 0, 50, d.counts[k])])),
+    intervals: list(x.intervals, INTERVAL_TYPES.map((t) => t.id), d.intervals),
+    chords: list(x.chords, CUSTOM_CHORDS, d.chords),
+    alteredRule: typeof x.alteredRule === 'boolean' ? x.alteredRule : d.alteredRule,
+    inversions: list(x.inversions, INVERSIONS.map((v) => v.key), d.inversions),
+    order: pick(x.order, ['grouped', 'shuffled'], d.order),
+    register: { minMidi: int(x.register?.minMidi, 21, 108, d.register.minMidi), maxMidi: int(x.register?.maxMidi, 21, 108, d.register.maxMidi) },
+    playback: pick(x.playback, PLAYBACK_MODES, d.playback),
+    timeLimit: pick(+x.timeLimit, CUSTOM_TIME_LIMITS, d.timeLimit),
+    allowReplay: typeof x.allowReplay === 'boolean' ? x.allowReplay : d.allowReplay,
+    allowSkip: typeof x.allowSkip === 'boolean' ? x.allowSkip : d.allowSkip,
+    reveal: pick(x.reveal, CUSTOM_REVEALS, d.reveal),
+    liveFeedback: typeof x.liveFeedback === 'boolean' ? x.liveFeedback : d.liveFeedback,
+    tolerance: CUSTOM_TOLERANCES[+x.tolerance] ? +x.tolerance : d.tolerance,
+    sustainMs: int(x.sustainMs, 50, 3000, d.sustainMs),
+  };
+  if (typeof x.id === 'string') out.id = x.id.slice(0, 40);
+  if (Number.isFinite(x.savedAt)) out.savedAt = x.savedAt;
+  return out;
+}
+/** Özel sınav tanımını oturuma özel tam yapılandırmaya çevirir (genel CONFIG'in kopyası üzerine) */
+export function customExamToConfig(ex, base = CONFIG) {
+  const main = ex.chords.filter((id) => id === 'major' || id === 'minor');
+  const alt = ex.chords.filter((id) => id === 'augmented' || id === 'diminished');
+  const ruleOn = ex.alteredRule && main.length > 0;   // kural yalnız ana akor da seçiliyse uygulanabilir
+  const invW = Object.fromEntries(INVERSIONS.map((v) => [v.key, ex.inversions.includes(v.key) ? (base.CHORD_RULES.INVERSIONS?.[v.key] || 1) : 0]));
+  const out = deepMerge(base, {
+    QUESTION_COUNTS: { ...ex.counts },
+    QUESTION_ORDER: ex.order,
+    REGISTER: { ...ex.register },
+    INTERVAL_RULES: { POOL: [...ex.intervals] },
+    CHORD_RULES: ruleOn
+      ? { MAIN_WEIGHTS: Object.fromEntries(main.map((id) => [id, 1])), ALTERED_TYPES: alt, MAX_ALTERED_PER_SET: alt.length ? 1 : 0, MIN_EACH_MAIN: 1,
+          INVERSIONS: invW, AUGMENTED_INVERSIONS: base.CHORD_RULES.AUGMENTED_INVERSIONS || !ex.inversions.includes('root') }
+      : { MAIN_WEIGHTS: Object.fromEntries((main.length ? ex.chords : alt).map((id) => [id, 1])), ALTERED_TYPES: main.length ? [] : alt, MAX_ALTERED_PER_SET: 0, MIN_EACH_MAIN: 0,
+          INVERSIONS: invW, AUGMENTED_INVERSIONS: base.CHORD_RULES.AUGMENTED_INVERSIONS || !ex.inversions.includes('root') },
+    EXAM: {
+      PLAYBACK: ex.playback, QUESTION_TIME_LIMIT_S: ex.timeLimit, ALLOW_REPLAY: ex.allowReplay, ALLOW_SKIP: ex.allowSkip,
+      REVEAL_NOTE_NAMES: ex.reveal, LIVE_FEEDBACK: ex.liveFeedback,
+    },
+    TOLERANCE_CENTS: ex.tolerance,
+    WARNING_CENTS: CUSTOM_TOLERANCES[ex.tolerance] ?? Math.round(ex.tolerance * 1.75),
+    SUSTAIN_TIME_MS: ex.sustainMs,
+  });
+  // Ağırlık sözlükleri birleştirilmez, tümüyle değiştirilir (yoksa standart sınavın seçilmeyen akorları kalırdı)
+  out.CHORD_RULES.MAIN_WEIGHTS = Object.fromEntries((ruleOn || main.length ? (ruleOn ? main : ex.chords) : alt).map((id) => [id, 1]));
+  out.CHORD_RULES.INVERSIONS = invW;
+  return out;
+}
+/** Özel sınav tanımındaki hatalar (Türkçe, kullanıcıya gösterilir); boş liste = başlatılabilir */
+export function validateCustomExam(ex, base = CONFIG) {
+  const errs = [];
+  const total = KINDS.reduce((s, k) => s + (ex.counts?.[k] || 0), 0);
+  if (!ex.name || !String(ex.name).trim()) errs.push('Sınavın adı boş olamaz');
+  if (!total) errs.push('En az bir soru olmalı');
+  if (ex.counts?.double > 0 && !ex.intervals?.length) errs.push('İki ses sorusu var ama aralık seçilmemiş');
+  if (ex.counts?.triple > 0 && !ex.chords?.length) errs.push('Üç ses sorusu var ama akor seçilmemiş');
+  if (ex.counts?.triple > 0 && !ex.inversions?.length) errs.push('Üç ses sorusu var ama akor durumu seçilmemiş');
+  if (!(ex.register?.maxMidi > ex.register?.minMidi)) errs.push('Ses aralığının üst sınırı alt sınırdan yüksek olmalı');
+  if (errs.length) return errs;
+  try { generateSession(customExamToConfig(ex, base), mulberry32(1)); }   // dar register vb. burada yakalanır
+  catch (err) { errs.push(err.code === 'REGISTER' ? `Ses aralığı çok dar: ${err.message}` : err.message); }
+  return errs;
+}
+/** Yaklaşık süre (dk): soru başına dinleme + söyleme (tek 20 sn, iki 30 sn, üç 40 sn) + çalım biçimi farkı */
+export function estimateExamMinutes(ex, audio = CONFIG.AUDIO) {
+  const per = { single: 20, double: 30, triple: 40 }, voices = { single: 1, double: 2, triple: 3 };
+  let sec = 0;
+  for (const k of KINDS) {
+    const n = ex.counts?.[k] || 0;
+    sec += n * (per[k] + playbackDuration(ex.playback, voices[k], audio) - audio.CHORD_DURATION_S);
+  }
+  return Math.max(1, Math.round(sec / 60));
+}
+/** Kayıtlı sınav listesi: geçersizleri at, en fazla max tane */
+export function normalizeCustomExams(raw, max = 30, cfg = CONFIG) {
+  if (!Array.isArray(raw)) return [];
+  return raw.filter(isPlainObject).map((x) => normalizeCustomExam(x, cfg)).filter((x) => x.id).slice(0, max);
 }
 
 // ───────────────────────────────────────────────────────────────────────
@@ -783,8 +903,15 @@ export function recordPitchFrame(stats, cents, cfg = CONFIG) {
 }
 
 export class ExamSession {
-  constructor(questions, { seed = 0, startedAt = Date.now() } = {}) {
+  /**
+   * cfg: oturumun etkin ayarı (standart sınavda CONFIG; özel sınavda customExamToConfig() sonucu).
+   * Sınav akışı (tekrar/geçme izni, süre, tolerans, nota adlarının açılması…) bu ayarı okur; genel CONFIG değişmez.
+   */
+  constructor(questions, { seed = 0, startedAt = Date.now(), cfg = null, name = null, custom = null } = {}) {
     this.questions = questions;
+    this.cfg = cfg;
+    this.name = name;                               // özel sınavın adı (standartta null)
+    this.custom = custom;                           // özel sınav tanımı (Yeni Test aynı sınavı başlatır)
     this.seed = seed;
     this.startedAt = startedAt;
     this.finishedAt = null;
@@ -998,6 +1125,7 @@ export function makeHistoryEntry(session, diag, cfg = CONFIG) {
     at: session.startedAt,
     durationMs: Math.max(0, (session.finishedAt ?? session.startedAt) - session.startedAt),
     seed: session.seed,
+    name: session.name ?? null,                     // özel sınavın adı (eski kayıtlarda yok)
     score: diag.score,
     complete: !session.aborted,
     answered: diag.totals.questions,
@@ -1066,7 +1194,7 @@ export function validateConfig(cfg) {
   if (!(cfg.REGISTER?.maxMidi > cfg.REGISTER?.minMidi)) errs.push('REGISTER: üst sınır alt sınırdan büyük olmalı');
   oneOf(cfg.OCTAVE_MODE, ['anchored', 'free', 'off'], 'OCTAVE_MODE');
   oneOf(cfg.QUESTION_ORDER, ['grouped', 'shuffled'], 'QUESTION_ORDER');
-  oneOf(cfg.EXAM?.REVEAL_NOTE_NAMES, ['after', 'end', 'always', 'never'], 'EXAM.REVEAL_NOTE_NAMES');
+  oneOf(cfg.EXAM?.REVEAL_NOTE_NAMES, ['after', 'end', 'session', 'always', 'never'], 'EXAM.REVEAL_NOTE_NAMES');
   num(cfg.EXAM?.QUESTION_TIME_LIMIT_S, 0, 3600, 'EXAM.QUESTION_TIME_LIMIT_S');
   num(cfg.EXAM?.NEXT_QUESTION_DELAY_MS, 0, 20000, 'EXAM.NEXT_QUESTION_DELAY_MS');
   oneOf(cfg.SPELLING?.SINGLE_NOTE_ACCIDENTALS, ['mixed', 'sharp', 'flat'], 'SPELLING.SINGLE_NOTE_ACCIDENTALS');

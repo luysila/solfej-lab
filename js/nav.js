@@ -5,9 +5,10 @@
 
 import { examActive, mode, ui } from './ui.js';
 import { pauseFlow, setMode } from './app.js';
+import { setExamTab } from './custom.js';
 import { storageGet, storageSet } from './settings.js';
 
-/** Adres → bölüm. "kendi-sinavim" Sınav bölümünü açar (özel sınav sekmesi Aşama 4'te). */
+/** Adres → bölüm. "kendi-sinavim" Sınav bölümünü "Kendi sınavını hazırla" sekmesiyle açar. */
 export const SECTIONS = {
   'ana-sayfa': 'sec-home', sinav: 'sec-exam', 'kendi-sinavim': 'sec-exam', serbest: 'sec-practice',
   gecmis: 'sec-history', ayarlar: 'sec-settings', yardim: 'sec-help',
@@ -42,10 +43,11 @@ export function showSection(key) {
   ui.practiceBusy.hidden = !(work === 'practice' && examBusy);
   ui.practiceControls.hidden = work === 'practice' && examBusy;
   if (work === 'exam' || (work === 'practice' && !examBusy)) (work === 'exam' ? ui.examSlot : ui.practiceSlot).append(ui.workspace);
+  if (work === 'exam') setExamTab(key === 'kendi-sinavim' ? 'custom' : 'std');   // #kendi-sinavim → "Kendi sınavını hazırla" sekmesi
 
   for (const sec of document.querySelectorAll('main > .section')) sec.hidden = sec.id !== id;
   for (const a of ui.menuList.querySelectorAll('a[data-sec]')) {
-    if (a.dataset.sec === key || (key === 'kendi-sinavim' && a.dataset.sec === 'sinav')) a.setAttribute('aria-current', 'page');
+    if (a.dataset.sec === key) a.setAttribute('aria-current', 'page');
     else a.removeAttribute('aria-current');
   }
   currentSection = key;

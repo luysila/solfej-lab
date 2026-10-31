@@ -429,6 +429,65 @@ test('Teşhis: üç ses soruları duruma göre ayrılır, en zor durum bulunur',
   assert.equal(d.byType.triple.questions, 5);
 });
 
+test('Kendi sınavın: varsayılanlar, doğrulama, oturuma özel CONFIG (genel CONFIG değişmez), süre tahmini', () => {
+  const C = M.CONFIG, before = JSON.stringify(C);
+  const d = M.defaultCustomExam(C);
+  assert.deepEqual(d.counts, { single: 5, double: 5, triple: 5 });
+  assert.deepEqual(d.inversions, ['root', 'first', 'second']);
+  assert.deepEqual(M.validateCustomExam(d, C), []);
+  assert.equal(M.estimateExamMinutes(d, C.AUDIO), 8, '15 soru · yaklaşık 8 dk');
+  // Hatalar: başlat düğmesi kapanır, neden yazılır
+  const bad = (patch) => M.validateCustomExam({ ...d, ...patch }, C).join(' | ');
+  assert.match(bad({ intervals: [] }), /aralık seçilmemiş/);
+  assert.match(bad({ chords: [] }), /akor seçilmemiş/);
+  assert.match(bad({ inversions: [] }), /akor durumu seçilmemiş/);
+  assert.match(bad({ counts: { single: 0, double: 0, triple: 0 } }), /En az bir soru/);
+  assert.match(bad({ register: { minMidi: 60, maxMidi: 64 } }), /çok dar/);
+  assert.match(bad({ register: { minMidi: 60, maxMidi: 60 } }), /üst sınırı/);
+  assert.match(bad({ name: '  ' }), /adı boş/);
+  assert.deepEqual(M.validateCustomExam({ ...d, counts: { single: 3, double: 0, triple: 0 }, intervals: [], chords: [] }, C), [], 'iki/üç ses yoksa seçim gerekmez');
+  // Oturuma özel ayar: soru yapısı, akış ve tolerans; genel CONFIG değişmez
+  const ex = { ...d, name: 'Triton ve 6\'lılar', counts: { single: 0, double: 6, triple: 4 }, intervals: ['A4', 'd5', 'm6', 'M6'], chords: ['minor', 'diminished'],
+    inversions: ['first', 'second'], order: 'shuffled', playback: 'both', timeLimit: 30, allowReplay: false, allowSkip: false, reveal: 'session', liveFeedback: false, tolerance: 10, sustainMs: 400 };
+  const cfg = M.customExamToConfig(ex, C);
+  assert.equal(JSON.stringify(C), before, 'genel CONFIG değişmemeli');
+  assert.deepEqual(M.validateConfig(cfg), []);
+  assert.equal(cfg.TOLERANCE_CENTS, 10); assert.equal(cfg.WARNING_CENTS, 25); assert.equal(cfg.SUSTAIN_TIME_MS, 400);
+  assert.deepEqual(cfg.EXAM, { ...C.EXAM, PLAYBACK: 'both', QUESTION_TIME_LIMIT_S: 30, ALLOW_REPLAY: false, ALLOW_SKIP: false, REVEAL_NOTE_NAMES: 'session', LIVE_FEEDBACK: false });
+  for (let seed = 1; seed <= 60; seed++) {
+    const qs = M.generateSession(cfg, M.mulberry32(seed));
+    assert.equal(qs.length, 10);
+    assert.ok(qs.filter((q) => q.kind === 'double').every((q) => ex.intervals.includes(q.type.id)));
+    const tri = qs.filter((q) => q.kind === 'triple');
+    assert.ok(tri.every((q) => ['minor', 'diminished'].includes(q.type.id)));
+    assert.ok(tri.every((q) => q.inversion > 0), 'yalnız çevrimler');
+    assert.ok(tri.filter((q) => q.type.id === 'diminished').length <= 1, '5 soruda en fazla 1 eksilmiş');
+  }
+  // Yalnız artmış seçilince de çalışır (kural uygulanamaz → hepsi artmış); kural kapalıyken artmış/eksilmiş serbest
+  const onlyAug = M.customExamToConfig({ ...d, counts: { single: 0, double: 0, triple: 5 }, chords: ['augmented'] }, C);
+  assert.ok(M.generateSession(onlyAug, M.mulberry32(5)).every((q) => q.type.id === 'augmented'));
+  const free = M.customExamToConfig({ ...d, counts: { single: 0, double: 0, triple: 10 }, alteredRule: false }, C);
+  let maxAlt = 0;
+  for (let seed = 1; seed <= 80; seed++) maxAlt = Math.max(maxAlt, M.generateSession(free, M.mulberry32(seed)).slice(0, 5).filter((q) => ['augmented', 'diminished'].includes(q.type.id)).length);
+  assert.ok(maxAlt >= 2, 'kural kapalı: bir 5\'li sette 2+ artmış/eksilmiş olabilmeli');
+  // Kayıt: bozuk alanlar ayıklanır, en fazla 30, kimliksizler atılır
+  const raw = [{ id: 'a1', name: 'X', counts: { single: 99, double: 'abc' }, intervals: ['m3', 'yok'], reveal: 'bilinmeyen', tolerance: 15 }, { name: 'kimliksiz' }, 5];
+  const list = M.normalizeCustomExams(raw, 30, C);
+  assert.equal(list.length, 1);
+  assert.deepEqual(list[0].counts, { single: 50, double: 5, triple: 5 });
+  assert.deepEqual(list[0].intervals, ['m3']);
+  assert.equal(list[0].reveal, 'after'); assert.equal(list[0].tolerance, 20);
+  assert.equal(M.normalizeCustomExams(Array.from({ length: 40 }, (_, i) => ({ id: `e${i}` })), 30, C).length, 30);
+  // Oturum ayarı ve adı ExamSession'da, geçmiş kaydına ad eklenir
+  const sess = new M.ExamSession(M.generateSession(cfg, M.mulberry32(1)), { seed: 1, cfg, name: ex.name, custom: ex });
+  assert.equal(sess.cfg, cfg); assert.equal(sess.name, ex.name);
+  sess.finishQuestion('done'); sess.abort();
+  const entry = M.makeHistoryEntry(sess, M.computeDiagnostics(sess.attempted, cfg), cfg);
+  assert.equal(entry.name, ex.name);
+  assert.equal(entry.settings.tol, 10);
+  assert.deepEqual(M.normalizeHistory([{ score: 50, at: 1 }]).length, 1, 'eski (adsız) kayıtlar bozulmaz');
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {

@@ -1,7 +1,7 @@
 // Solfej Lab — gerçek Chromium (headless) uçtan uca testi
 //  Çalıştırma: bir kez `npm install` ve `npx playwright install chromium`, sonra `npm run e2e`
 //  Tek senaryo: `ONLY=A npm run e2e` (A tam sınav · B Tone/VexFlow taklidi · C sınav provası · D telefon · E zorlanan şarkıcı
-//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici)
+//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici · J kendi sınavın)
 //  • Sayfa localhost'tan sunulur (güvenli bağlam → getUserMedia).
 //  • Mikrofon = "sanal şarkıcı": o anki hedef sesi (+9 sent tiz) söyleyen osilatör → MediaStream.
 //  • CDN'ler: senaryo 'offline' → hepsi engellenir (yedek yollar); 'stub' → Tone.js / VexFlow taklitleri.
@@ -749,6 +749,108 @@ if (run('I')) {
   assert.equal(await page.evaluate(() => { document.getElementById('coachLine').classList.remove('idle'); return getComputedStyle(document.getElementById('coachLine')).fontSize; }), '24px');
   await page.setViewportSize({ width: 390, height: 900 });
   assert.equal(await page.evaluate(() => { document.getElementById('coachLine').classList.remove('idle'); return getComputedStyle(document.getElementById('coachLine')).fontSize; }), '22px');
+  assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
+  await context.close();
+}
+
+// ═══ SENARYO J: Kendi sınavını hazırla — kompakt pencere, doğrulama, Sınavlarım, oturuma özel ayar, cevaplar, geçmişte ad ═══
+if (run('J')) {
+  log('J) kendi sınavını hazırla');
+  const { context, page, consoleMsgs } = await openPage('offline', FAST, { hash: 'ana-sayfa' });
+  await page.click('.tile[href="#kendi-sinavim"]');
+  await page.waitForFunction(() => !document.getElementById('customExam').hidden);
+  assert.equal(await page.getAttribute('#examTabs [data-etab="custom"]', 'aria-selected'), 'true');
+  assert.equal(await page.isHidden('#workspace'), true, 'pencere tek ekranda: çalışma alanı gizli');
+  assert.match(await page.textContent('.cx-sum'), /^15 soru · yaklaşık 8 dk$/);
+  // Ad, sayılar (artı/eksi), aralık hızlı seçimi, akor ve durum çipleri, süre, nota adları, tolerans
+  await page.fill('#cxName', 'Triton ve çevrimler');
+  const minus = async (k, n) => { for (let i = 0; i < n; i++) await page.click(`.cx-count:has(#cxCount-${k}) .stepper button:first-child`); };
+  await minus('single', 5);                                                           // 5 → 0 (sonra − düğmesi kapanır)
+  assert.equal(await page.isDisabled('.cx-count:has(#cxCount-single) .stepper button:first-child'), true, '0 sınırında eksi kapalı');
+  await page.click('.cx-count:has(#cxCount-single) .stepper button:last-child');     // 1
+  await minus('double', 4);                                                           // 1
+  await minus('triple', 3);                                                           // 2
+  const quick = (txt) => page.click(`.cx-quick .cx-chip:text-is("${txt}")`);
+  await quick('Hiçbiri');
+  const blocked = await page.evaluate(() => ({ dis: document.getElementById('cxStart').disabled, err: document.querySelector('.cx-err').textContent }));
+  log('aralık yokken:', JSON.stringify(blocked));
+  assert.equal(blocked.dis, true);
+  assert.match(blocked.err, /aralık seçilmemiş/);
+  await quick('Triton');
+  await page.click('.cx-chip[data-value="major"]');                                    // majörü kaldır → minör, artmış, eksilmiş
+  await page.click('.cx-chip[data-value="augmented"]');
+  await page.click('.cx-chip[data-value="root"]');                                     // yalnız çevrimler
+  await page.click('.cx-chip:text-is("Sınav sonunda")');
+  await page.click('.cx-chip:text-is("Sıkı ±10")');
+  await page.click('.cx-chip:text-is("Ayrı ayrı")');
+  const state = await page.evaluate(() => ({ sum: document.querySelector('.cx-sum').textContent, dis: document.getElementById('cxStart').disabled, err: document.querySelector('.cx-err').textContent }));
+  log('özet:', JSON.stringify(state));
+  assert.match(state.sum, /^4 soru · yaklaşık \d+ dk$/);
+  assert.equal(state.dis, false);
+  await page.screenshot({ path: `${OUT}/e2e-16-custom-builder.png`, fullPage: true });
+  // Kaydet → Sınavlarım; yenile → durur; kopyala → 2; sil (iki tıklamayla) → 1
+  await page.click('#cxSave');
+  assert.equal(await page.locator('#cxList .cx-item').count(), 1);
+  await page.reload();
+  await page.waitForFunction(() => window.__dbg && !document.getElementById('customExam').hidden);
+  assert.equal(await page.locator('#cxList .cx-item').count(), 1, 'solfejlab.exams.v1 korunmalı');
+  await page.click('#cxList .cx-item >> nth=0 >> button:text-is("Kopyala")');
+  assert.equal(await page.locator('#cxList .cx-item').count(), 2);
+  const del = page.locator('#cxList .cx-item >> nth=1 >> button:text-is("Sil")');
+  await del.click();
+  await page.click('#cxList .cx-item >> nth=1 >> button:text-is("Silinsin mi?")');
+  assert.equal(await page.locator('#cxList .cx-item').count(), 1);
+  const stored = await page.evaluate(() => JSON.parse(localStorage.getItem('solfejlab.exams.v1')));
+  assert.equal(stored.length, 1);
+  assert.equal(stored[0].name, 'Triton ve çevrimler');
+  // Kayıtlı sınavı başlat → oturuma özel ayar (genel CONFIG değişmez); pencere gizlenir, sekmeler kilitlenir
+  await page.evaluate(() => { const S = window.__singer; S.bias = 2; S.jitter = 2; });
+  await page.click('#cxList .cx-item >> nth=0 >> button:text-is("▶ Başlat")');
+  await waitFor(page, () => window.__dbg.session && window.__dbg.state === 'LISTENING', null, 15000);
+  const run1 = await page.evaluate(() => {
+    const s = window.__dbg.session;
+    return { name: s.name, tol: s.cfg.TOLERANCE_CENTS, global: window.solfejLab.CONFIG.TOLERANCE_CENTS, reveal: s.cfg.EXAM.REVEAL_NOTE_NAMES, playback: s.cfg.EXAM.PLAYBACK,
+      kinds: s.questions.map((q) => q.kind).join(','), triInv: s.questions.filter((q) => q.kind === 'triple').map((q) => q.inversion), types: s.questions.map((q) => q.type.id).join(','),
+      tabsDisabled: document.querySelector('#examTabs [data-etab="std"]').disabled, builderHidden: document.getElementById('customExam').hidden, info: document.getElementById('examInfo').textContent,
+      names: [...document.querySelectorAll('.note .name')].map((n) => n.textContent).join(' ') };
+  });
+  log('özel sınav:', JSON.stringify(run1));
+  assert.equal(run1.name, 'Triton ve çevrimler');
+  assert.equal(run1.tol, 10);
+  assert.equal(run1.global, 20, 'genel CONFIG değişmemeli');
+  assert.equal(run1.reveal, 'session');
+  assert.equal(run1.playback, 'melodic');
+  assert.equal(run1.kinds, 'single,double,triple,triple');
+  assert.ok(run1.triInv.every((v) => v > 0), 'yalnız çevrimler');
+  assert.ok(run1.types.split(',').slice(1, 2).every((t) => ['A4', 'd5'].includes(t)));
+  assert.ok(run1.tabsDisabled && run1.builderHidden);
+  assert.match(run1.info, /Triton ve çevrimler/);
+  assert.equal(run1.names, '?', '"sınav sonunda": soru sırasında ad gizli');
+  await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 60000);
+  const end = await page.evaluate(() => ({
+    answersOpen: document.getElementById('sumAnswersWrap').open, answers: [...document.querySelectorAll('#sumAnswers li')].map((li) => li.textContent),
+    hist: JSON.parse(localStorage.getItem('solfejlab.history.v1') || '[]').map((h) => h.name), histText: document.querySelector('#historyList li')?.textContent,
+    gaugeTol: [...document.querySelectorAll('#ticks .tick')].map((t) => t.textContent).join(' '),
+  }));
+  log('teşhis:', JSON.stringify(end).slice(0, 300));
+  assert.equal(end.answersOpen, true);
+  assert.equal(end.answers.length, 4);
+  assert.ok(end.answers.some((a) => /çevrim/.test(a)), 'cevaplarda çevrim');
+  assert.deepEqual(end.hist, ['Triton ve çevrimler']);
+  assert.match(end.gaugeTol, /−10/, 'gösterge bantları oturumun toleransıyla');
+  await page.screenshot({ path: `${OUT}/e2e-17-custom-summary.png`, fullPage: true });
+  // "Yeni Test" aynı özel sınavı yeniden başlatır
+  await page.click('#sumNewBtn');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  assert.equal(await page.evaluate(() => window.__dbg.session.name), 'Triton ve çevrimler');
+  await page.click('#endBtn');
+  await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 10000);
+  // Standart sınav sekmesine dönünce genel ayar geçerli (gösterge ±20)
+  await go(page, 'sinav');
+  await page.click('#startBtn');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  const std = await page.evaluate(() => ({ name: window.__dbg.session.name, tol: window.__dbg.session.cfg.TOLERANCE_CENTS, n: window.__dbg.session.questions.length }));
+  assert.deepEqual(std, { name: null, tol: 20, n: 15 });
   assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
   await context.close();
 }

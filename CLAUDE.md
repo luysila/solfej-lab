@@ -47,13 +47,14 @@ düzeni olarak anla (PURE = `js/pure.js`); "Yer:" satırlarındaki fonksiyon ve 
 | `index.html` | Yalnızca sayfa iskeleti (HTML, bütün `id`'ler): üst çubuk + menü, bölümler (`main > .section`), çalışma alanı (`#workspace`), lisans satırı; `css/style.css`, import map, `js/app.js`; file:// uyarısı |
 | `css/style.css` | Bütün tasarım; renkler en üstte `:root` değişkenlerinde; bölümler `/* ── … ── */` başlıklarıyla |
 | `js/config.js` | **0)** `CONFIG` (TOLERANCE_CENTS, SUSTAIN_TIME_MS, QUESTION_COUNTS, REGISTER, CHORD_RULES, EXAM, SCORING, ANALYSIS, PITCH, AUDIO, UI, HISTORY, LIBS, TEXTS, PRESETS) ve dondurulmuş `DEFAULT_CONFIG`. En sık değişecek dosya |
-| `js/pure.js` | **1)** Saf mantık (DOM ve Web Audio yok): yardımcılar, nota teorisi (`buildNotes`, çevrim: `invertTones`, `INVERSIONS`), soru üreticisi (`generateSession`, `planTriads`, `planIntervals`, `pickVoicing`, `pickInversion`, `orderForSinging`), çalım planı (`playbackPlan`), porte konumu (`makeStaffMap`, `semitoneNeighbors`), `compareToTarget`, `YinDetector`, `MedianFilter`, `SustainTracker`, yönlendirme (`CoachWindow`, `coachMessage`), durum makinesi (`S`, `ALLOWED`, `createMachine`), `Exercise`, `ExamSession`, `computeDiagnostics` + `buildAdvice`, `makeHistoryEntry`, `validateConfig`, `sanitizeOverrides`, `textLeaves` |
+| `js/pure.js` | **1)** Saf mantık (DOM ve Web Audio yok): yardımcılar, nota teorisi (`buildNotes`, çevrim: `invertTones`, `INVERSIONS`), soru üreticisi (`generateSession`, `planTriads`, `planIntervals`, `pickVoicing`, `pickInversion`, `orderForSinging`), çalım planı (`playbackPlan`), porte konumu (`makeStaffMap`, `semitoneNeighbors`), `compareToTarget`, `YinDetector`, `MedianFilter`, `SustainTracker`, yönlendirme (`CoachWindow`, `coachMessage`), durum makinesi (`S`, `ALLOWED`, `createMachine`), `Exercise`, `ExamSession`, `computeDiagnostics` + `buildAdvice`, `makeHistoryEntry`, özel sınav (`defaultCustomExam`, `normalizeCustomExam`, `validateCustomExam`, `customExamToConfig`, `estimateExamMinutes`), `validateConfig`, `sanitizeOverrides`, `textLeaves` |
 | `js/audio.js` | **2)** Kütüphane yükleyici (`loadScriptGlobal`, `loadPitchy`) · **3)** ses motoru: tek AudioContext, Tone.js piyano (`preparePiano`), yedek sentez, `playHarmonic`, `playMelodic` |
 | `js/mic.js` | **4)** Mikrofon (`startMic`, getUserMedia işlemsiz) ve algılayıcı kurulumu (`setupDetector`: YIN / pitchy-MPM); `settings` (oktav toleransı, gürültü eşiği, giriş) |
 | `js/ui.js` | **5)** Arayüz: `ui` (DOM bağlantıları), paylaşılan durum (`mode`, `session`, `exercise`, `fsm`, `tracker`…), nota kutuları (`buildNoteBoxes`, `onNoteBoxPlay`), `renderAll` / `renderStatus`, ilerleme şeridi, çipler, dikey akort aleti, yönlendirme satırı (`setCoach`) |
 | `js/staff.js` | Perde grafiği (`setupContour`, `pushContour`, `drawContour`), porte görünümü (`drawStaffContour`, anahtar/nota başı çizimi), VexFlow paneli (`setStaffEnabled`, `drawStaff`) |
 | `js/summary.js` | Teşhis ekranı (`renderSummary`) ve "Önceki testlerim" (`renderHistory`, localStorage) |
 | `js/settings.js` | Arayüz adları (`T`, `applyTexts`, sayfada düzenleme), ayarlar paneli (`SETTINGS_SCHEMA`, `buildField`), kalıcılık (`savePrefs`, `applyOverrides`, `onConfigChanged`) |
+| `js/custom.js` | "Kendi sınavını hazırla" (Sınav bölümünün ikinci alt sekmesi, `#kendi-sinavim`): kompakt pencere (`buildCustomUI`, `renderCustom`), "Sınavlarım" (`solfejlab.exams.v1`, en fazla 30), alt sekme (`setExamTab`, `renderExamPanel`) |
 | `js/nav.js` | Bölümler ve menü: `showSection`, `goSection`, adres çubuğu (`SECTIONS`), geri tuşu, son bölüm (`solfejlab.ui.v1`), menü aç/kapa; bölüm değişince `pauseFlow` |
 | `js/app.js` | Giriş noktası: **6)** `onStateChange` · **7)** ana döngü `frame` · **8)** `bindEvents`, `init`, `window.solfejLab`, `?debug` → `window.__dbg` |
 
@@ -78,7 +79,7 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 - Puanlama ham (yumuşatılmamış) perdeyle yapılır; ibre yumuşatması yalnızca görseldir.
 - Dış kütüphaneler sürümü sabitlenmiş CDN adresleriyle ve yedek adresle yüklenir; yüklenemezse uygulama çalışmaya devam etmeli.
 - Kullanıcı verisi yalnızca tarayıcıda: `solfejlab.history.v1`, `solfejlab.config.v1`, `solfejlab.prefs.v1`,
-  `solfejlab.ui.v1` (arayüz durumu: son bölüm, görünüm seçimleri).
+  `solfejlab.ui.v1` (arayüz durumu: son bölüm, görünüm seçimleri), `solfejlab.exams.v1` (kayıtlı özel sınavlar).
   Kayıt biçimini değiştirirsen anahtarın sürüm numarasını artır.
 - Nota yazımı harf adımı + yarım sesle yapılır (D♭ majör = D♭–F–A♭); çift diyez/bemolden kaçınılır.
 - Dışarıdan gelen metinler (içe aktarılan JSON vb.) DOM'a `textContent` ile yazılır, `innerHTML` ile değil.
@@ -130,6 +131,14 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
 - **Duraklat / Devam**: bekleyen zamanlayıcılar iptal, ses susar, ölçüm ve soru süresi durur; durum makinesi yerinde bekler.
   Devam: çalım yarıda kaldıysa yeniden çalınır (tekrar sayılmaz), doğrulama / soru sonu bekliyorsa sürer.
   Çalışma alanından başka bölüme geçince kendiliğinden duraklar; geri dönünce kendiliğinden sürmez ("Devam" gerekir).
+- **Kendi sınavını hazırla** (Aşama 4): Sınav bölümünde "Standart sınav" · "Kendi sınavını hazırla" alt sekmeleri; menü ve
+  ana sayfadaki kutucuk doğrudan #kendi-sinavim'i açar. Kompakt pencere: artı/eksi sayılar, seçim çipleri, canlı özet
+  ("15 soru · yaklaşık 8 dk"), hatalıysa başlat kapalı ve neden yazılı. Özel sınav ayarı **yalnız o oturuma** uygulanır:
+  `ExamSession.cfg` (`customExamToConfig`), sınav akışı `activeCfg()` ile okur; genel CONFIG değişmez. "5 soruda en fazla 1
+  artmış/eksilmiş" kuralı açılıp kapanır; yalnız artmış/eksilmiş seçilince hepsi bu tiplerden gelir. Nota adları için yeni seçenek
+  `REVEAL_NOTE_NAMES: 'session'` (sınav sonunda): soru sırasında gizli, teşhis ekranındaki "Sorular ve cevaplar" listesinde açık.
+  Teşhis ekranındaki "Yeni Test" biten sınavın aynısını başlatır; standart sekmedeki başlat düğmesi hep standart sınavı.
+  Geçmiş kaydına sınavın adı (`name`) eklenir; eski kayıtlar olduğu gibi okunur.
 
 ## Doğrulanmamış / bilinen sınırlar
 - Tone.js (14.8.49) ve VexFlow (4.2.5) gerçek kütüphaneleriyle henüz denenmedi (önceki geliştirme ortamında CDN'ler

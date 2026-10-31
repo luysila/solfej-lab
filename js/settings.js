@@ -164,7 +164,7 @@ export const SETTINGS_SCHEMA = [
   ] },
   { title: 'Sınav akışı ve puan', tab: 'std', fields: [
     { path: 'EXAM.PLAYBACK', label: 'Sınavda çalım biçimi', type: 'select', options: [['harmonic', 'Birlikte (armonik)'], ['melodic', 'Ayrı ayrı (alttan yukarı)'], ['both', 'Önce ayrı, sonra birlikte']] },
-    { path: 'EXAM.REVEAL_NOTE_NAMES', label: 'Nota adlarını göster', type: 'select', options: [['after', 'Ses doğrulanınca'], ['end', 'Soru bitince'], ['always', 'Her zaman'], ['never', 'Hiçbir zaman']] },
+    { path: 'EXAM.REVEAL_NOTE_NAMES', label: 'Nota adlarını göster', type: 'select', options: [['after', 'Ses doğrulanınca'], ['end', 'Soru bitince'], ['session', 'Sınav sonunda'], ['always', 'Her zaman'], ['never', 'Hiçbir zaman']] },
     { path: 'EXAM.QUESTION_TIME_LIMIT_S', label: 'Soru süre sınırı (sn · 0 = yok)', type: 'number', min: 0, max: 600, step: 5 },
     { path: 'SCORING.REPLAY_PENALTY', label: 'Tekrar başına kesinti (%)', type: 'percent', min: 0, max: 100, step: 5 },
     { path: 'UI.COACH_INTERVAL_MS', label: 'Yönlendirme aralığı (ms)', type: 'number', min: 1000, max: 30000, step: 500 },

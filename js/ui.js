@@ -10,6 +10,7 @@ import { detector, explainError, micStream, settings } from './mic.js';
 import { scheduleStaffDraw } from './staff.js';
 import { T, btnName, configOverrides, editNames, savePrefs, setTextKey, unlockForEditing } from './settings.js';
 import { hardReset, onStateChange } from './app.js';
+import { renderExamPanel } from './custom.js';
 
 // ───────────────────────────────────────────────────────────────────────
 // 5) ARAYÜZ
@@ -19,6 +20,7 @@ export const ui = {
   sub: $('subLine'), micChip: $('micChip'), micChipText: $('micChipText'), engineChip: $('engineChip'), engineChipText: $('engineChipText'),
   detChip: $('detChip'), latChip: $('latChip'), cfgChip: $('cfgChip'), alert: $('alert'), notice: $('notice'),
   examControls: $('examControls'), practiceControls: $('practiceControls'), practiceBusy: $('practiceBusy'),
+  customExam: $('customExam'), sumAnswersWrap: $('sumAnswersWrap'), sumAnswers: $('sumAnswers'),
   menuBtn: $('menuBtn'), menuList: $('menuList'), workspace: $('workspace'), examSlot: $('examSlot'), practiceSlot: $('practiceSlot'),
   examPause: $('examPauseBtn'), practicePause: $('practicePauseBtn'), settingsActions: $('settingsActions'),
   examInfo: $('examInfo'), startBtn: $('startBtn'), examReplay: $('examReplayBtn'), skipBtn: $('skipBtn'), endBtn: $('endBtn'),
@@ -111,25 +113,27 @@ export function after(ms, fn) {
 export function cancelFlow() { flowToken++; clearTimeout(flowTimer); }
 
 export const examActive = () => !!session && fsm.state !== S.IDLE && fsm.state !== S.SUMMARY;
+/** Sınav akışının etkin ayarı: oturum varsa oturumun (özel sınavda kendi ayarı), yoksa genel CONFIG */
+export const activeCfg = () => session?.cfg ?? CONFIG;
 /** Şu an duraklatılabilir mi? Sınav sürerken ya da serbest çalışmada çalım / dinleme / doğrulama sırasında */
 export const canPauseNow = () => !paused && (examActive() || (mode === 'practice' && !session && [S.PLAYING, S.LISTENING, S.VERIFIED].includes(fsm.state)));
-export const gaugeRange = () => Math.max(CONFIG.UI.GAUGE_RANGE_CENTS, CONFIG.WARNING_CENTS + 5);
-export const biasRange  = () => Math.max(30, Math.round(CONFIG.TOLERANCE_CENTS * 1.5));
+export const gaugeRange = () => Math.max(CONFIG.UI.GAUGE_RANGE_CENTS, activeCfg().WARNING_CENTS + 5);
+export const biasRange  = () => Math.max(30, Math.round(activeCfg().TOLERANCE_CENTS * 1.5));
 
 /** Nota adı görünür mü? (serbest çalışmada her zaman; sınavda REVEAL_NOTE_NAMES'e göre) */
 export function isNoteRevealed(i) {
   if (!session) return true;
-  const rv = CONFIG.EXAM.REVEAL_NOTE_NAMES;
+  const rv = activeCfg().EXAM.REVEAL_NOTE_NAMES;
   if (rv === 'always') return true;
-  if (rv === 'never') return false;
+  if (rv === 'never' || rv === 'session') return false;          // 'session': cevaplar teşhis ekranında açılır
   const ended = session.result && session.result.status !== 'pending';
   if (rv === 'end') return !!ended;
   return !!exercise.verified[i] || !!ended;                           // 'after'
 }
 export function answerVisible() {
   if (!session) return true;
-  const rv = CONFIG.EXAM.REVEAL_NOTE_NAMES;
-  if (rv === 'never') return false;
+  const rv = activeCfg().EXAM.REVEAL_NOTE_NAMES;
+  if (rv === 'never' || rv === 'session') return false;
   if (rv === 'always') return true;
   return !!(session.result && session.result.status !== 'pending');
 }
@@ -259,7 +263,7 @@ export function renderExTitle() {
 
 export function renderStatus() {
   const st = fsm.state, cur = exercise.current;
-  const sec = nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000);
+  const sec = nf2.format(activeCfg().SUSTAIN_TIME_MS / 1000);
   let msg = '';
   if (session && session.current) {
     const q = session.current, N = session.questions.length, n = session.index + 1, res = session.result;
@@ -345,7 +349,7 @@ export function renderProgress() {
 }
 export function renderTimer() {
   if (!session) return;
-  const limit = CONFIG.EXAM.QUESTION_TIME_LIMIT_S;
+  const limit = activeCfg().EXAM.QUESTION_TIME_LIMIT_S;
   if (limit > 0 && fsm.state !== S.SUMMARY) {
     const left = Math.max(0, limit - (session.result?.listenMs ?? 0) / 1000);
     setText(ui.progressTimer, `kalan ${nf0.format(Math.ceil(left))} sn`);
@@ -364,8 +368,8 @@ export function renderAll() {
   // Sınav düğmeleri
   ui.startBtn.disabled = starting || active;
   setTextKey(ui.startBtn, st === S.SUMMARY ? 'btnNewTest' : 'btnStart');
-  ui.examReplay.disabled = paused || !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_REPLAY);
-  ui.skipBtn.disabled = paused || !(active && st === S.LISTENING && CONFIG.EXAM.ALLOW_SKIP);
+  ui.examReplay.disabled = paused || !(active && st === S.LISTENING && activeCfg().EXAM.ALLOW_REPLAY);
+  ui.skipBtn.disabled = paused || !(active && st === S.LISTENING && activeCfg().EXAM.ALLOW_SKIP);
   ui.endBtn.disabled = !active;
   // Serbest çalışma düğmeleri
   ui.play.disabled = starting || !!session || !(st === S.IDLE || st === S.COMPLETE) || !exercise.notes.length;
@@ -384,6 +388,7 @@ export function renderAll() {
   renderExTitle();
   renderStatus();
   renderProgress();
+  renderExamPanel();
   scheduleStaffDraw();
   if (editNames) unlockForEditing();                // ad düzenleme modunda devre dışı düğmelere de tıklanabilsin
 }
@@ -465,7 +470,7 @@ export let lastSustainFrac = -1;
 export let lastReadoutTs = 0;
 
 export function paintGaugeBackground() {
-  const R = gaugeRange(), g = CONFIG.TOLERANCE_CENTS, y = CONFIG.WARNING_CENTS;
+  const R = gaugeRange(), g = activeCfg().TOLERANCE_CENTS, y = activeCfg().WARNING_CENTS;
   const p = (c) => `${(50 + (clamp(c, -R, R) / R) * 50).toFixed(2)}%`;   // alttan yüzde (0deg = aşağıdan yukarı)
   const cs = getComputedStyle(document.documentElement), v = (n, fb) => cs.getPropertyValue(n).trim() || fb;   // renkler :root'tan
   const RED = v('--gauge-red', 'rgba(248,113,113,.30)'), YEL = v('--gauge-yellow', 'rgba(251,191,36,.30)'), GRN = v('--gauge-green', 'rgba(52,211,153,.36)');
@@ -475,7 +480,8 @@ export function paintGaugeBackground() {
 export function buildTicks() {
   const R = gaugeRange();
   ui.ticks.replaceChildren();
-  const values = [...new Set([-R, -CONFIG.WARNING_CENTS, -CONFIG.TOLERANCE_CENTS, 0, CONFIG.TOLERANCE_CENTS, CONFIG.WARNING_CENTS, R])];
+  const { WARNING_CENTS: W, TOLERANCE_CENTS: TOL } = activeCfg();
+  const values = [...new Set([-R, -W, -TOL, 0, TOL, W, R])];
   for (const c of values) {
     const tick = el('span', 'tick', `${c > 0 ? '+' : c < 0 ? MINUS : ''}${Math.abs(c)}`);
     tick.style.top = `${50 - (c / R) * 50}%`;
@@ -539,7 +545,7 @@ export function clearReadouts() {
   setText(ui.heardFreq, '— Hz');
   setText(ui.heardNote, ' ');
   setText(ui.clarityText, 'netlik —');
-  setText(ui.sustainText, `${nf2.format(0)} / ${nf2.format(CONFIG.SUSTAIN_TIME_MS / 1000)} s`);
+  setText(ui.sustainText, `${nf2.format(0)} / ${nf2.format(activeCfg().SUSTAIN_TIME_MS / 1000)} s`);
   ui.sustainFill.classList.remove('full');
   paintSustain(0);
   setZone('none');

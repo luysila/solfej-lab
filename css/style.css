@@ -399,6 +399,48 @@ input[type="number"]:focus-visible, input[type="text"]:focus-visible, textarea:f
 .thr input { flex: 1; min-width: 80px; accent-color: var(--accent); }
 @media (max-width: 620px) { .meter-row { grid-template-columns: 1fr; } }
 
+/* ── Kendi sınavını hazırla ── (kompakt pencere: çipler, artı/eksi sayılar, canlı özet) */
+.menu a.sub { padding-left: 26px; font-weight: 500; font-size: 13.5px; }
+.cx { display: grid; gap: 10px; }
+.cx-bar { position: sticky; top: 50px; z-index: 5; display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px 14px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.cx-sumline { display: grid; gap: 2px; }
+.cx-sum { font-size: 15px; }
+.cx-err { font-size: 12.5px; color: var(--red); min-height: 1em; }
+.cx-actions { margin-top: 0; }
+.cx-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); gap: 10px 18px; }
+.cx-row { display: grid; gap: 6px; align-content: start; min-width: 0; }
+.cx-label { font-size: 12px; color: var(--muted); }
+.cx-stack { display: grid; gap: 6px; }
+.chips-row { display: flex; flex-wrap: wrap; gap: 6px; }
+.cx-quick .cx-chip { font-size: 12px; padding: 4px 9px; min-height: 30px; }
+.cx-chip {
+  appearance: none; cursor: pointer; border: 1px solid var(--line); background: var(--field); color: var(--muted);
+  font: 600 13px var(--sans); padding: 6px 11px; min-height: 34px; border-radius: 999px;
+}
+.cx-chip[aria-pressed="true"] { background: rgba(var(--accent-rgb), .18); color: var(--text); border-color: rgba(var(--accent-rgb), .7); }
+.cx-chip:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.cx-counts { display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.cx-count { display: grid; gap: 3px; font-size: 12px; color: var(--text-2); }
+.stepper { display: inline-flex; align-items: center; border: 1px solid var(--line); border-radius: 10px; background: var(--field); overflow: hidden; }
+.stepper button { appearance: none; border: 0; background: transparent; color: var(--text); width: 34px; height: 34px; font: 600 17px var(--sans); cursor: pointer; }
+.stepper button:disabled { opacity: .35; cursor: default; }
+.stepper span { min-width: 44px; text-align: center; font-size: 14px; }
+.cx-reg { display: flex; align-items: center; gap: 8px; }
+.cx-reg select { width: auto; min-width: 92px; }
+.cx-check { font-size: 12.5px; }
+.cx-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.cx-item { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 6px 12px; padding: 8px 10px; border-radius: 10px; background: var(--panel-2); border: 1px solid var(--line); }
+.cx-item.editing { border-color: rgba(var(--accent-rgb), .6); }
+.cx-info { display: grid; gap: 1px; min-width: 0; }
+.cx-info small { color: var(--muted); font-size: 12px; }
+.cx-item-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Sorular ve cevaplar (teşhis ekranı) */
+.answers { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
+.answers > summary { cursor: pointer; font-size: 13px; color: var(--text-2); font-weight: 600; }
+.answer-list { margin: 8px 0 0; padding-left: 22px; display: grid; gap: 4px; font-size: 13px; }
+.answer-list li { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 2px 10px; }
+.answer-list small { color: var(--muted); }
+
 /* ── Sınav sonucu (teşhis) ── */
 .summary { border-color: rgba(var(--accent-rgb), .35); }
 .summary-top { display: grid; grid-template-columns: auto minmax(0, 1.4fr) minmax(0, 1fr); gap: 18px 30px; align-items: start; margin-bottom: 20px; }

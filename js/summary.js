@@ -11,6 +11,7 @@ export function renderSummary(d, sess) {
   const N = sess.questions.length, A = sess.attempted.length;
   setText(ui.sumMeta, `${A}/${N} soru · ${fmtDuration((sess.finishedAt ?? Date.now()) - sess.startedAt)}${sess.aborted ? ' · yarıda bitirildi' : ''} · set #${sess.seed}`);
   if (!d) {
+    renderAnswers(sess);
     setText(ui.sumScore, '—');
     setText(ui.sumTendency, '—');
     ui.sumBiasMark.hidden = true;
@@ -85,6 +86,19 @@ export function renderSummary(d, sess) {
     ui.sumRoles.append(chip);
   }
   ui.sumAdvice.replaceChildren(...d.messages.map((m) => el('li', null, m)));
+  renderAnswers(sess);
+}
+const STATUS_MARK = { done: '✓ tam', partial: '◐ kısmi', skipped: '✗ geçildi', timeout: '✗ süre doldu', unanswered: '— cevaplanmadı', pending: '—' };
+/** Sorular ve cevaplar: nota adları "hiç" değilse (özellikle "sınav sonunda" seçeneğinde cevaplar burada açılır) */
+export function renderAnswers(sess) {
+  const rv = (sess.cfg ?? CONFIG).EXAM.REVEAL_NOTE_NAMES;
+  ui.sumAnswersWrap.hidden = rv === 'never';
+  ui.sumAnswersWrap.open = rv === 'session';
+  ui.sumAnswers.replaceChildren(...sess.results.map((r) => {
+    const li = el('li', `ans-${r.status}`);
+    li.append(el('span', null, r.title), el('small', null, STATUS_MARK[r.status] ?? r.status));
+    return li;
+  }));
 }
 export function showSummary() {
   renderSummary(lastDiag, session);
@@ -168,6 +182,7 @@ export function historyItem(e) {
     e.settings ? `±${e.settings.tol} sent · ${nf2.format((e.settings.sustainMs ?? 0) / 1000)} sn` : null,
     e.complete ? `${e.answered} soru` : `yarım · ${e.answered}/${e.total}`,
   ].filter(Boolean);
+  if (e.name) tags.unshift(`“${e.name}”`);       // özel sınavın adı (eski kayıtlarda yok)
   meta.append(...tags.map((t) => el('span', null, t)));
   const score = el('div', 'h-score');
   score.append(el('b', null, nfMax1.format(e.score)), el('span', 'muted', ' puan'));

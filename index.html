@@ -6,22 +6,23 @@
 <meta name="color-scheme" content="dark">
 <title>Solfej Lab · İşitme Eğitimi</title>
 
-<link rel="stylesheet" href="./css/style.css?v=202610312345">
+<link rel="stylesheet" href="./css/style.css?v=202610312356">
 <!-- Sürüm etiketi (?v=…): yayından sonra tarayıcı önbelleğinde eski ve yeni dosyalar karışmasın.
      Elle değiştirmeyin; dosyaları değiştirdikten sonra: npm run stamp (scripts/stamp.mjs import map'i de yeniden üretir) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=202610312345",
-    "./js/audio.js": "./js/audio.js?v=202610312345",
-    "./js/config.js": "./js/config.js?v=202610312345",
-    "./js/mic.js": "./js/mic.js?v=202610312345",
-    "./js/nav.js": "./js/nav.js?v=202610312345",
-    "./js/pure.js": "./js/pure.js?v=202610312345",
-    "./js/settings.js": "./js/settings.js?v=202610312345",
-    "./js/staff.js": "./js/staff.js?v=202610312345",
-    "./js/summary.js": "./js/summary.js?v=202610312345",
-    "./js/ui.js": "./js/ui.js?v=202610312345"
+    "./js/app.js": "./js/app.js?v=202610312356",
+    "./js/audio.js": "./js/audio.js?v=202610312356",
+    "./js/config.js": "./js/config.js?v=202610312356",
+    "./js/custom.js": "./js/custom.js?v=202610312356",
+    "./js/mic.js": "./js/mic.js?v=202610312356",
+    "./js/nav.js": "./js/nav.js?v=202610312356",
+    "./js/pure.js": "./js/pure.js?v=202610312356",
+    "./js/settings.js": "./js/settings.js?v=202610312356",
+    "./js/staff.js": "./js/staff.js?v=202610312356",
+    "./js/summary.js": "./js/summary.js?v=202610312356",
+    "./js/ui.js": "./js/ui.js?v=202610312356"
   }
 }
 </script>
@@ -45,6 +46,7 @@
     <nav class="menu" id="menuList" aria-label="Bölümler" hidden>
       <a href="#ana-sayfa" data-sec="ana-sayfa"><span data-text="navHome">Ana sayfa</span></a>
       <a href="#sinav" data-sec="sinav"><span data-text="navExam">Sınav</span></a>
+      <a href="#kendi-sinavim" data-sec="kendi-sinavim" class="sub"><span data-text="navCustom">Kendi sınavını hazırla</span></a>
       <a href="#serbest" data-sec="serbest"><span data-text="navPractice">Serbest çalışma</span></a>
       <a href="#gecmis" data-sec="gecmis"><span data-text="navHistory">Önceki testlerim</span></a>
       <a href="#ayarlar" data-sec="ayarlar"><span data-text="navSettings">Ayarlar</span></a>
@@ -73,6 +75,11 @@
   <section class="section" id="sec-exam" data-sec="sinav" hidden>
     <div class="panel" id="examPanel">
       <div class="panel-head"><h2 data-text="panelExam">Sınav</h2></div>
+      <!-- Alt sekmeler: Standart sınav · Kendi sınavını hazırla (#kendi-sinavim) -->
+      <div class="tabs" id="examTabs" role="tablist" aria-label="Sınav türü">
+        <button class="tab" type="button" role="tab" data-etab="std" aria-selected="true" data-text="examTabStd">Standart sınav</button>
+        <button class="tab" type="button" role="tab" data-etab="custom" aria-selected="false" data-text="examTabCustom">Kendi sınavını hazırla</button>
+      </div>
     <div id="examControls">
       <p class="exam-info" id="examInfo"></p>
       <div class="actions">
@@ -83,6 +90,8 @@
         <button class="btn ghost" id="endBtn" type="button" disabled data-text="btnEnd">■ Testi Bitir</button>
       </div>
     </div>
+      <!-- Kendi sınavını hazırla: kompakt pencere (js/custom.js üretir) -->
+      <div class="cx" id="customExam" hidden></div>
     </div>
 
   <!-- ── Sınav sonucu: teşhis ekranı ── -->
@@ -122,6 +131,11 @@
     </div>
     <div class="roles" id="sumRoles"></div>
     <ul class="advice" id="sumAdvice"></ul>
+    <!-- Sorular ve cevaplar (nota adları "hiç" değilse; "sınav sonunda" seçeneğinde cevaplar burada açılır) -->
+    <details class="answers" id="sumAnswersWrap" hidden>
+      <summary data-text="sumAnswersTitle">Sorular ve cevaplar</summary>
+      <ol class="answer-list" id="sumAnswers"></ol>
+    </details>
     <div class="actions">
       <button class="btn primary" id="sumNewBtn" type="button" data-text="btnNewTest">▶ Yeni Test</button>
       <button class="btn ghost" id="sumCloseBtn" type="button" data-text="btnClose">Kapat</button>
@@ -380,6 +394,6 @@
     a.hidden = false;
   }
 </script>
-<script type="module" src="./js/app.js?v=202610312345"></script>
+<script type="module" src="./js/app.js?v=202610312356"></script>
 </body>
 </html>
