@@ -1,7 +1,7 @@
 // Solfej Lab — gerçek Chromium (headless) uçtan uca testi
 //  Çalıştırma: bir kez `npm install` ve `npx playwright install chromium`, sonra `npm run e2e`
 //  Tek senaryo: `ONLY=A npm run e2e` (A tam sınav · B Tone/VexFlow taklidi · C sınav provası · D telefon · E zorlanan şarkıcı
-//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici · J kendi sınavın)
+//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici · J kendi sınavın · K alıştırma)
 //  • Sayfa localhost'tan sunulur (güvenli bağlam → getUserMedia).
 //  • Mikrofon = "sanal şarkıcı": o anki hedef sesi (+9 sent tiz) söyleyen osilatör → MediaStream.
 //  • CDN'ler: senaryo 'offline' → hepsi engellenir (yedek yollar); 'stub' → Tone.js / VexFlow taklitleri.
@@ -851,6 +851,81 @@ if (run('J')) {
   await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
   const std = await page.evaluate(() => ({ name: window.__dbg.session.name, tol: window.__dbg.session.cfg.TOLERANCE_CENTS, n: window.__dbg.session.questions.length }));
   assert.deepEqual(std, { name: null, tol: 20, n: 15 });
+  assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
+  await context.close();
+}
+
+// ═══ SENARYO K: serbest çalışma alıştırma dizileri — 7 iki ses (her sorudan sonra cevap), durdurana kadar yalnız çevrimler ═══
+if (run('K')) {
+  log('K) alıştırma dizileri');
+  const { context, page, consoleMsgs } = await openPage('offline', FAST, { hash: 'serbest' });
+  await page.click('#practiceTabs [data-ptab="drill"]');
+  assert.equal(await page.isVisible('#drillSetup'), true);
+  assert.equal(await page.isHidden('#singleFields'), true);
+  // Rastgele 7 tane iki ses (varsayılan kurulum: iki ses, 7 soru, cevap her sorudan sonra)
+  assert.equal(await page.textContent('#drCount'), '7');
+  assert.equal(await page.getAttribute('#drillSetup .cx-chip[data-value="double"]', 'aria-pressed'), 'true');
+  await page.evaluate(() => { const S = window.__singer; S.bias = 3; S.jitter = 2; S.enabled = false; });
+  await page.click('#drillStartBtn');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  const during = await page.evaluate(() => ({ names: [...document.querySelectorAll('.note .name')].map((n) => n.textContent).join(' '), title: document.getElementById('exTitle').textContent, drill: !!window.__dbg.session.drill, n: window.__dbg.session.questions.length, kinds: [...new Set(window.__dbg.session.questions.map((q) => q.kind))].join() }));
+  log('alıştırma soru 1:', JSON.stringify(during));
+  assert.deepEqual(during, { names: '? ?', title: 'Alıştırma · soru 1/7 · İki ses', drill: true, n: 7, kinds: 'double' });
+  // Nota kutusu ipucu: dinlerken tek sesi çalar (PLAYING), sonra aynı sesten dinleme sürer
+  await page.click('.note >> nth=1', { force: true });
+  assert.equal(await page.evaluate(() => window.__dbg.state), 'PLAYING');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 5000);
+  await page.evaluate(() => { window.__singer.enabled = true; });
+  await waitFor(page, () => window.__dbg.state === 'COMPLETE', null, 15000);
+  const st1 = await page.textContent('#statusLine');
+  log('soru 1 sonu:', st1);
+  assert.match(st1, /^Bu soru: .+ ✓/);
+  await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 60000);
+  const r1 = await page.evaluate(() => ({ visible: !document.getElementById('drillResult').hidden, items: [...document.querySelectorAll('#drillList li')].map((li) => li.textContent), meta: document.getElementById('drillMeta').textContent, summaryHidden: document.getElementById('summaryPanel').hidden,
+    hist: JSON.parse(localStorage.getItem('solfejlab.history.v1') || '[]').map((h) => ({ mode: h.mode, answered: h.answered, complete: h.complete })) }));
+  log('sonuç:', r1.meta, '|', r1.items[0]);
+  assert.equal(r1.visible, true);
+  assert.equal(r1.items.length, 7);
+  assert.ok(r1.items.every((t) => /✓ tam|kısmi|geçildi/.test(t) && /sn$/.test(t)));
+  assert.match(r1.meta, /^7 soru · tam \d/);
+  assert.equal(r1.summaryHidden, true, 'alıştırmada sınav teşhis ekranı açılmaz');
+  assert.deepEqual(r1.hist, [{ mode: 'drill', answered: 7, complete: true }]);
+  await page.screenshot({ path: `${OUT}/e2e-18-drill-result.png`, fullPage: true });
+  // Ben durdurana kadar, yalnız çevrim akorları (major/minor), cevap gösterme
+  await page.click('#drillSetup .cx-chip[data-value="double"]');
+  await page.click('#drillSetup .cx-chip[data-value="triple"]');
+  await page.click('#drillSetup .cx-chip[data-value="root"]');
+  await page.click('#drUntil');
+  await page.click('#drillSetup .cx-chip:text-is("Gösterme")');
+  assert.equal(await page.textContent('#drCount'), '∞');
+  await page.click('#drillStartBtn');
+  await waitFor(page, () => window.__dbg.session && window.__dbg.session.index >= 9, null, 90000);
+  const mid = await page.evaluate(() => ({ n: window.__dbg.session.questions.length, invs: [...new Set(window.__dbg.session.questions.map((q) => q.inversion))].sort().join(), kinds: [...new Set(window.__dbg.session.questions.map((q) => q.kind))].join(), names: [...document.querySelectorAll('.note .name')].map((n) => n.textContent).join(' '), progressHidden: document.getElementById('examProgress').hidden }));
+  log('durdurana kadar:', JSON.stringify(mid));
+  assert.ok(mid.n > 10, 'yeni parça eklenmeli');
+  assert.equal(mid.invs, '1,2', 'yalnız çevrimler');
+  assert.equal(mid.kinds, 'triple');
+  assert.equal(mid.progressHidden, true);
+  await page.click('#drillStopBtn');
+  await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 10000);
+  const r2 = await page.evaluate(() => ({ items: [...document.querySelectorAll('#drillList li')].map((li) => li.textContent), hist: JSON.parse(localStorage.getItem('solfejlab.history.v1')).map((h) => ({ mode: h.mode, complete: h.complete, total: h.total, answered: h.answered })) }));
+  log('durduruldu:', r2.items.length, 'soru ·', r2.items[0]);
+  assert.ok(r2.items.length >= 9 && r2.items.every((t) => /çevrim/.test(t)));
+  assert.deepEqual(r2.hist[1], { mode: 'drill', complete: true, total: r2.items.length, answered: r2.items.length });
+  // Önceki testlerim: "Alıştırma" etiketi ve süzgeç
+  await go(page, 'gecmis');
+  assert.equal(await page.locator('#historyList li').count(), 2);
+  assert.match(await page.textContent('#historyList li >> nth=0'), /Alıştırma/);
+  await page.click('#historyFilter [data-hf="exam"]');
+  assert.equal(await page.locator('#historyList li').count(), 0);
+  await page.click('#historyFilter [data-hf="drill"]');
+  assert.equal(await page.locator('#historyList li').count(), 2);
+  // Tek soruya dönünce alıştırma kapanır; tek soru çalışır
+  await go(page, 'serbest');
+  await page.click('#practiceTabs [data-ptab="single"]');
+  assert.equal(await page.evaluate(() => window.__dbg.session), null);
+  assert.equal(await page.isHidden('#drillResult'), true);
+  assert.equal(await page.isDisabled('#playBtn'), false);
   assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
   await context.close();
 }

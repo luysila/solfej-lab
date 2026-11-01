@@ -56,6 +56,13 @@ export const CONFIG = {
     PLAYBACK: 'harmonic',         // sınavda çalım biçimi: 'harmonic' → birlikte · 'melodic' → ayrı ayrı (kökten yukarı) · 'both' → önce ayrı, sonra birlikte
   },
 
+  // ══ 2b. SERBEST ÇALIŞMA · ALIŞTIRMA DİZİSİ ══════════════════════════
+  PRACTICE: {
+    SHOW_RESULTS: true,           // alıştırma bitince / "Durdur"da soru listesi (durum, sonuç, süre) gösterilsin
+    SAVE_HISTORY: true,           // alıştırmalar "Önceki testlerim"e "Alıştırma" etiketiyle kaydedilsin
+    DRILL_CHUNK: 10,              // "Ben durdurana kadar" dizisinde bir seferde üretilen soru sayısı
+  },
+
   // ══ 3. PUANLAMA ═════════════════════════════════════════════════════
   SCORING: {
     PARTIAL_CREDIT: true,         // 3 sesin 2'si doğrulandıysa sorunun 2/3'ü; false → hepsi ya da hiç
@@ -297,6 +304,26 @@ export const CONFIG = {
     btnCxDelete: 'Sil',
     btnCxConfirmDelete: 'Silinsin mi?',
     sumAnswersTitle: 'Sorular ve cevaplar',
+    // Serbest çalışma: alıştırma dizileri (Aşama 5)
+    practiceTabSingle: 'Tek soru',
+    practiceTabDrill: 'Alıştırma',
+    drKinds: 'Soru tipleri',
+    drCount: 'Soru sayısı',
+    drUntilStop: 'Ben durdurana kadar',
+    drReveal: 'Cevabı göster',
+    drRevealQuestion: 'Her sorudan sonra',
+    drRevealEnd: 'Hepsi bitince',
+    drRevealNever: 'Gösterme',
+    drThisQuestion: 'Bu soru',
+    btnDrillStart: '▶ Alıştırmayı başlat',
+    btnDrillSkip: '⏭ Soruyu Geç',
+    btnDrillStop: '■ Durdur',
+    btnDrillAgain: '▶ Yeniden',
+    panelDrillResult: 'Alıştırma sonucu',
+    histAll: 'Hepsi',
+    histExams: 'Sınav',
+    histDrills: 'Alıştırma',
+    tagDrill: 'Alıştırma',
     // Görünüm seçici ve sınavdaki porte anahtarı (Aşama 2)
     labelView: 'Görünüm',
     viewStaff: 'Porte',

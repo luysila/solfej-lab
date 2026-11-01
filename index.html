@@ -6,23 +6,24 @@
 <meta name="color-scheme" content="dark">
 <title>Solfej Lab · İşitme Eğitimi</title>
 
-<link rel="stylesheet" href="./css/style.css?v=202610312356">
+<link rel="stylesheet" href="./css/style.css?v=202611010006">
 <!-- Sürüm etiketi (?v=…): yayından sonra tarayıcı önbelleğinde eski ve yeni dosyalar karışmasın.
      Elle değiştirmeyin; dosyaları değiştirdikten sonra: npm run stamp (scripts/stamp.mjs import map'i de yeniden üretir) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=202610312356",
-    "./js/audio.js": "./js/audio.js?v=202610312356",
-    "./js/config.js": "./js/config.js?v=202610312356",
-    "./js/custom.js": "./js/custom.js?v=202610312356",
-    "./js/mic.js": "./js/mic.js?v=202610312356",
-    "./js/nav.js": "./js/nav.js?v=202610312356",
-    "./js/pure.js": "./js/pure.js?v=202610312356",
-    "./js/settings.js": "./js/settings.js?v=202610312356",
-    "./js/staff.js": "./js/staff.js?v=202610312356",
-    "./js/summary.js": "./js/summary.js?v=202610312356",
-    "./js/ui.js": "./js/ui.js?v=202610312356"
+    "./js/app.js": "./js/app.js?v=202611010006",
+    "./js/audio.js": "./js/audio.js?v=202611010006",
+    "./js/config.js": "./js/config.js?v=202611010006",
+    "./js/custom.js": "./js/custom.js?v=202611010006",
+    "./js/drill.js": "./js/drill.js?v=202611010006",
+    "./js/mic.js": "./js/mic.js?v=202611010006",
+    "./js/nav.js": "./js/nav.js?v=202611010006",
+    "./js/pure.js": "./js/pure.js?v=202611010006",
+    "./js/settings.js": "./js/settings.js?v=202611010006",
+    "./js/staff.js": "./js/staff.js?v=202611010006",
+    "./js/summary.js": "./js/summary.js?v=202611010006",
+    "./js/ui.js": "./js/ui.js?v=202611010006"
   }
 }
 </script>
@@ -272,7 +273,12 @@
         <div class="actions"><a class="btn small" href="#sinav" data-text="btnBackToExam">Sınava dön</a></div>
       </div>
     <div id="practiceControls">
-      <div class="fields">
+      <!-- Alt sekmeler: Tek soru (kendin seçersin) · Alıştırma (rastgele soru dizisi) -->
+      <div class="tabs" id="practiceTabs" role="tablist" aria-label="Serbest çalışma türü">
+        <button class="tab" type="button" role="tab" data-ptab="single" aria-selected="true" data-text="practiceTabSingle">Tek soru</button>
+        <button class="tab" type="button" role="tab" data-ptab="drill" aria-selected="false" data-text="practiceTabDrill">Alıştırma</button>
+      </div>
+      <div class="fields" id="singleFields">
         <label class="field"><span>Kök ses</span><select id="rootSelect"></select></label>
         <label class="field"><span>Kök oktavı</span><select id="octaveSelect"></select></label>
         <label class="field"><span>Ses / aralık / akor</span><select id="typeSelect"></select></label>
@@ -288,13 +294,26 @@
           <option value="both" data-text="playbackBoth">Önce ayrı, sonra birlikte</option>
         </select></label>
       </div>
+      <div class="cx" id="drillSetup" hidden></div>
       <div class="actions">
-        <button class="btn primary" id="playBtn" type="button" data-text="btnPlay">▶ Çal &amp; Başla</button>
+        <button class="btn primary" id="playBtn" type="button" data-ponly="single" data-text="btnPlay">▶ Çal &amp; Başla</button>
+        <button class="btn primary" id="drillStartBtn" type="button" data-ponly="drill" hidden data-text="btnDrillStart">▶ Alıştırmayı başlat</button>
         <button class="btn" id="replayBtn" type="button" disabled data-text="btnReplay">↻ Tekrar Çal</button>
         <button class="btn" id="practicePauseBtn" type="button" disabled data-text="btnPause">⏸ Duraklat</button>
-        <button class="btn ghost" id="resetBtn" type="button" disabled data-text="btnReset">⟲ Sıfırla</button>
+        <button class="btn" id="drillSkipBtn" type="button" data-ponly="drill" hidden disabled data-text="btnDrillSkip">⏭ Soruyu Geç</button>
+        <button class="btn ghost" id="drillStopBtn" type="button" data-ponly="drill" hidden disabled data-text="btnDrillStop">■ Durdur</button>
+        <button class="btn ghost" id="resetBtn" type="button" data-ponly="single" disabled data-text="btnReset">⟲ Sıfırla</button>
       </div>
     </div>
+    </div>
+    <!-- Alıştırma sonucu: sorulan aralık/akorlar (durumlarıyla), sonuç ve süre -->
+    <div class="panel" id="drillResult" hidden>
+      <div class="panel-head"><h2 data-text="panelDrillResult">Alıştırma sonucu</h2><span class="stage" id="drillMeta"></span></div>
+      <ol class="answer-list drill-list" id="drillList"></ol>
+      <div class="actions">
+        <button class="btn primary" id="drillAgainBtn" type="button" data-text="btnDrillAgain">▶ Yeniden</button>
+        <button class="btn ghost" id="drillCloseBtn" type="button" data-text="btnClose">Kapat</button>
+      </div>
     </div>
     <div class="ws-slot" id="practiceSlot"></div>
   </section>
@@ -305,6 +324,11 @@
   <section class="panel" id="historyPanel" aria-labelledby="historyTitle">
     <div class="panel-head">
       <h2 id="historyTitle" data-text="panelHistory">Önceki testlerim</h2>
+      <div class="seg-ctl" id="historyFilter" role="group" aria-label="Süzgeç">
+        <button type="button" data-hf="all" aria-pressed="true" data-text="histAll">Hepsi</button>
+        <button type="button" data-hf="exam" aria-pressed="false" data-text="histExams">Sınav</button>
+        <button type="button" data-hf="drill" aria-pressed="false" data-text="histDrills">Alıştırma</button>
+      </div>
       <button class="btn ghost small" id="historyClear" type="button" data-text="btnHistoryClear">Geçmişi temizle</button>
     </div>
     <p class="small-note" id="historyEmpty">Henüz kayıtlı test yok. Bir testi bitirdiğinizde puan ve teşhis burada saklanır (yalnızca bu tarayıcıda).</p>
@@ -394,6 +418,6 @@
     a.hidden = false;
   }
 </script>
-<script type="module" src="./js/app.js?v=202610312356"></script>
+<script type="module" src="./js/app.js?v=202611010006"></script>
 </body>
 </html>

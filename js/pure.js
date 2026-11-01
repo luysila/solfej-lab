@@ -465,6 +465,70 @@ export function normalizeCustomExams(raw, max = 30, cfg = CONFIG) {
 }
 
 // ───────────────────────────────────────────────────────────────────────
+// ALIŞTIRMA DİZİSİ — serbest çalışmada rastgele soru dizisi; sınav altyapısını (generateSession, ExamSession) kullanır
+//  count > 0 → o kadar soru · count = 0 → "Ben durdurana kadar" (sorular parça parça üretilir)
+//  reveal: 'question' → her sorudan sonra · 'end' → hepsi bitince · 'never' → gösterme
+// ───────────────────────────────────────────────────────────────────────
+export const DRILL_REVEAL_MAP = { question: 'end', end: 'session', never: 'never' };   // → EXAM.REVEAL_NOTE_NAMES
+export function defaultDrill(cfg = CONFIG) {
+  return {
+    kinds: ['double'],
+    intervals: [...cfg.INTERVAL_RULES.POOL],
+    chords: ['major', 'minor'],
+    inversions: INVERSIONS.map((v) => v.key),
+    count: 7,
+    playback: cfg.AUDIO.PRACTICE_PLAYBACK,
+    reveal: 'question',
+  };
+}
+export function normalizeDrill(raw, cfg = CONFIG) {
+  const d = defaultDrill(cfg), x = isPlainObject(raw) ? raw : {};
+  const list = (v, allowed, fb) => (Array.isArray(v) ? [...new Set(v.filter((id) => allowed.includes(id)))] : fb);
+  return {
+    kinds: list(x.kinds, KINDS, d.kinds),
+    intervals: list(x.intervals, INTERVAL_TYPES.map((t) => t.id), d.intervals),
+    chords: list(x.chords, CUSTOM_CHORDS, d.chords),
+    inversions: list(x.inversions, INVERSIONS.map((v) => v.key), d.inversions),
+    count: Number.isFinite(+x.count) ? clamp(Math.round(+x.count), 0, 50) : d.count,
+    playback: PLAYBACK_MODES.includes(x.playback) ? x.playback : d.playback,
+    reveal: x.reveal in DRILL_REVEAL_MAP ? x.reveal : d.reveal,
+  };
+}
+export function validateDrill(dr, base = CONFIG) {
+  const errs = [];
+  if (!dr.kinds?.length) errs.push('En az bir soru tipi seçin');
+  if (dr.kinds?.includes('double') && !dr.intervals?.length) errs.push('İki ses seçili ama aralık seçilmemiş');
+  if (dr.kinds?.includes('triple') && !dr.chords?.length) errs.push('Üç ses seçili ama akor seçilmemiş');
+  if (dr.kinds?.includes('triple') && !dr.inversions?.length) errs.push('Üç ses seçili ama akor durumu seçilmemiş');
+  if (errs.length) return errs;
+  try { generateDrillChunk(dr, 3, base, mulberry32(1)); }
+  catch (err) { errs.push(err.message); }
+  return errs;
+}
+/** Seçili soru tiplerine rastgele dağıtılmış soru sayıları (her soru için tip eşit olasılıkla) */
+export function drillCounts(dr, n, rng = Math.random) {
+  const counts = Object.fromEntries(KINDS.map((k) => [k, 0]));
+  for (let i = 0; i < n; i++) counts[dr.kinds[Math.floor(rng() * dr.kinds.length)]]++;
+  return counts;
+}
+/** Alıştırmanın oturum ayarı: soru yapısı tanımdan; tolerans, tutma süresi, register genel ayardan; tekrar/geçme serbest, canlı geri bildirim açık */
+export function drillToConfig(dr, base = CONFIG, counts = drillCounts(dr, dr.count || 10)) {
+  const cfg = customExamToConfig({
+    ...defaultCustomExam(base), counts, intervals: dr.intervals, chords: dr.chords, alteredRule: false, inversions: dr.inversions,
+    order: 'shuffled', playback: dr.playback, timeLimit: 0, allowReplay: true, allowSkip: true, reveal: DRILL_REVEAL_MAP[dr.reveal], liveFeedback: true,
+  }, base);
+  cfg.TOLERANCE_CENTS = base.TOLERANCE_CENTS;
+  cfg.WARNING_CENTS = base.WARNING_CENTS;
+  cfg.SUSTAIN_TIME_MS = base.SUSTAIN_TIME_MS;
+  cfg.REGISTER = { ...base.REGISTER };
+  return cfg;
+}
+/** Bir soru parçası üretir (count sorulu dizide tamamı, "durdurana kadar"da sıradaki parça) */
+export function generateDrillChunk(dr, n, base = CONFIG, rng = Math.random) {
+  return generateSession(drillToConfig(dr, base, drillCounts(dr, n, rng)), rng);
+}
+
+// ───────────────────────────────────────────────────────────────────────
 // ÇALIM PLANI — hangi ses ne zaman, ne kadar çalınır; toplam süre kadar beklenip dinlemeye geçilir
 //  'harmonic' → hepsi birlikte CHORD_DURATION_S
 //  'melodic'  → kökten yukarı tek tek: her ses MELODIC_NOTE_S, aralarında MELODIC_GAP_S
@@ -907,9 +971,10 @@ export class ExamSession {
    * cfg: oturumun etkin ayarı (standart sınavda CONFIG; özel sınavda customExamToConfig() sonucu).
    * Sınav akışı (tekrar/geçme izni, süre, tolerans, nota adlarının açılması…) bu ayarı okur; genel CONFIG değişmez.
    */
-  constructor(questions, { seed = 0, startedAt = Date.now(), cfg = null, name = null, custom = null } = {}) {
+  constructor(questions, { seed = 0, startedAt = Date.now(), cfg = null, name = null, custom = null, drill = null } = {}) {
     this.questions = questions;
     this.cfg = cfg;
+    this.drill = drill;                             // alıştırma tanımı (serbest çalışma "Alıştırma"); sınavda null
     this.name = name;                               // özel sınavın adı (standartta null)
     this.custom = custom;                           // özel sınav tanımı (Yeni Test aynı sınavı başlatır)
     this.seed = seed;
@@ -925,6 +990,13 @@ export class ExamSession {
       status: 'pending',                            // pending · done · partial · skipped · timeout · unanswered
       endReason: null,
     }));
+  }
+  /** "Ben durdurana kadar" alıştırması: yeni soru parçasını sona ekler (sıra numaraları sürer) */
+  appendQuestions(qs) {
+    const base = new ExamSession(qs, { cfg: this.cfg });
+    qs.forEach((q, i) => { q.index = this.questions.length + i; });
+    this.questions.push(...qs);
+    this.results.push(...base.results);
   }
   get current() { return this.questions[this.index] ?? null; }
   get result()  { return this.results[this.index] ?? null; }
@@ -1126,10 +1198,11 @@ export function makeHistoryEntry(session, diag, cfg = CONFIG) {
     durationMs: Math.max(0, (session.finishedAt ?? session.startedAt) - session.startedAt),
     seed: session.seed,
     name: session.name ?? null,                     // özel sınavın adı (eski kayıtlarda yok)
+    mode: session.drill ? 'drill' : 'exam',         // "Alıştırma" etiketi ve geçmiş süzgeci (eski kayıtlar: sınav)
     score: diag.score,
-    complete: !session.aborted,
+    complete: !session.aborted || (!!session.drill && !session.drill.count),   // "durdurana kadar" alıştırması durdurulunca tamamdır
     answered: diag.totals.questions,
-    total: session.questions.length,
+    total: session.drill && !session.drill.count ? diag.totals.questions : session.questions.length,
     tendency: diag.overall.tendency,
     biasCents: round1(diag.overall.biasCents),
     hardest: diag.hardest,
@@ -1204,6 +1277,7 @@ export function validateConfig(cfg) {
   for (const v of INVERSIONS) num(cfg.CHORD_RULES?.INVERSIONS?.[v.key], 0, 10, `CHORD_RULES.INVERSIONS.${v.key}`);
   if (!INVERSIONS.some((v) => cfg.CHORD_RULES?.INVERSIONS?.[v.key] > 0)) errs.push('CHORD_RULES.INVERSIONS: en az bir akor durumunun ağırlığı 0\'dan büyük olmalı');
   oneOf(cfg.SING_ORDER, ['bass', 'root'], 'SING_ORDER');
+  num(cfg.PRACTICE?.DRILL_CHUNK, 3, 50, 'PRACTICE.DRILL_CHUNK');
   for (const id of Object.keys(cfg.CHORD_RULES?.MAIN_WEIGHTS || {})) {
     if (TYPE_BY_ID[id]?.kind !== 'chord') errs.push(`CHORD_RULES.MAIN_WEIGHTS: bilinmeyen akor "${id}"`);
   }

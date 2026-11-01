@@ -55,6 +55,7 @@ düzeni olarak anla (PURE = `js/pure.js`); "Yer:" satırlarındaki fonksiyon ve 
 | `js/summary.js` | Teşhis ekranı (`renderSummary`) ve "Önceki testlerim" (`renderHistory`, localStorage) |
 | `js/settings.js` | Arayüz adları (`T`, `applyTexts`, sayfada düzenleme), ayarlar paneli (`SETTINGS_SCHEMA`, `buildField`), kalıcılık (`savePrefs`, `applyOverrides`, `onConfigChanged`) |
 | `js/custom.js` | "Kendi sınavını hazırla" (Sınav bölümünün ikinci alt sekmesi, `#kendi-sinavim`): kompakt pencere (`buildCustomUI`, `renderCustom`), "Sınavlarım" (`solfejlab.exams.v1`, en fazla 30), alt sekme (`setExamTab`, `renderExamPanel`) |
+| `js/drill.js` | Serbest çalışma "Alıştırma" alt sekmesi: kurulum çipleri (`buildDrillUI`, `renderDrill`), sekme (`setPracticeTab`, `renderPracticePanel`), sonuç listesi (`showDrillResult`); başlatma `app.js` → `onStartDrill` |
 | `js/nav.js` | Bölümler ve menü: `showSection`, `goSection`, adres çubuğu (`SECTIONS`), geri tuşu, son bölüm (`solfejlab.ui.v1`), menü aç/kapa; bölüm değişince `pauseFlow` |
 | `js/app.js` | Giriş noktası: **6)** `onStateChange` · **7)** ana döngü `frame` · **8)** `bindEvents`, `init`, `window.solfejLab`, `?debug` → `window.__dbg` |
 
@@ -139,6 +140,14 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
   `REVEAL_NOTE_NAMES: 'session'` (sınav sonunda): soru sırasında gizli, teşhis ekranındaki "Sorular ve cevaplar" listesinde açık.
   Teşhis ekranındaki "Yeni Test" biten sınavın aynısını başlatır; standart sekmedeki başlat düğmesi hep standart sınavı.
   Geçmiş kaydına sınavın adı (`name`) eklenir; eski kayıtlar olduğu gibi okunur.
+- **Alıştırma dizileri** (Aşama 5): Serbest çalışmada "Tek soru" (kök, oktav, tip, durum) · "Alıştırma" (rastgele dizi).
+  Alıştırma sınav altyapısını kullanır: `ExamSession` + `session.drill` (tanım); `isExam()` / `isDrill()` / `drillActive()`
+  sınavla alıştırmayı ayırır (`examActive()` artık yalnız sınav). Soru sayısı ya da "Ben durdurana kadar" (sorular
+  `PRACTICE.DRILL_CHUNK` kadarlık parçalarla üretilir, `appendQuestions`). Cevap: her sorudan sonra (`REVEAL 'end'`) ·
+  hepsi bitince (`'session'`) · gösterme (`'never'`); soru sonunda "Bu soru: C Majör · 1. çevrim (6) ✓". Tolerans, tutma
+  süresi, register genel ayardan; canlı geri bildirim açık, tekrar/geçme serbest. Nota kutusuna tıklamak alıştırmada ipucu.
+  Bitince ya da "Durdur"da sonuç listesi (`PRACTICE.SHOW_RESULTS`); geçmişe `mode: 'drill'` ve "Alıştırma" etiketiyle kayıt
+  (`PRACTICE.SAVE_HISTORY`); "Önceki testlerim"de Hepsi · Sınav · Alıştırma süzgeci. Son kurulum `solfejlab.ui.v1` → `drill`.
 
 ## Doğrulanmamış / bilinen sınırlar
 - Tone.js (14.8.49) ve VexFlow (4.2.5) gerçek kütüphaneleriyle henüz denenmedi (önceki geliştirme ortamında CDN'ler

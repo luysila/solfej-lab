@@ -488,6 +488,50 @@ test('Kendi sınavın: varsayılanlar, doğrulama, oturuma özel CONFIG (genel C
   assert.deepEqual(M.normalizeHistory([{ score: 50, at: 1 }]).length, 1, 'eski (adsız) kayıtlar bozulmaz');
 });
 
+test('Alıştırma: "7 tane iki ses", "durdurana kadar şu aralık ve akorlar", "yalnız çevrimler"; parça ekleme', () => {
+  const C = M.CONFIG, before = JSON.stringify(C);
+  const d = M.defaultDrill(C);
+  assert.deepEqual(M.validateDrill(d, C), []);
+  // Rastgele 7 tane iki ses (aralık)
+  const seven = M.generateDrillChunk({ ...d, kinds: ['double'], count: 7 }, 7, C, M.mulberry32(4));
+  assert.equal(seven.length, 7);
+  assert.ok(seven.every((q) => q.kind === 'double'));
+  // Durdurana kadar yalnız şu aralık ve akorlar: parça parça üretilir, hep seçilenlerden
+  const pick = { ...d, kinds: ['double', 'triple'], intervals: ['M3', 'P5'], chords: ['minor', 'diminished'], count: 0 };
+  const cfg = M.drillToConfig(pick, C, M.drillCounts(pick, 10, M.mulberry32(1)));
+  assert.equal(cfg.EXAM.LIVE_FEEDBACK, true); assert.equal(cfg.EXAM.ALLOW_REPLAY, true); assert.equal(cfg.EXAM.QUESTION_TIME_LIMIT_S, 0);
+  assert.equal(cfg.TOLERANCE_CENTS, C.TOLERANCE_CENTS, 'tolerans genel ayardan');
+  const sess = new M.ExamSession(M.generateDrillChunk(pick, 10, C, M.mulberry32(2)), { cfg, drill: pick });
+  for (let k = 0; k < 3; k++) sess.appendQuestions(M.generateDrillChunk(pick, 10, C, M.mulberry32(10 + k)));
+  assert.equal(sess.questions.length, 40);
+  assert.equal(sess.results.length, 40);
+  assert.deepEqual(sess.questions.map((q) => q.index), Array.from({ length: 40 }, (_, i) => i), 'sıra numaraları sürer');
+  for (const q of sess.questions) {
+    if (q.kind === 'double') assert.ok(['M3', 'P5'].includes(q.type.id));
+    else assert.ok(['minor', 'diminished'].includes(q.type.id));
+  }
+  assert.ok(new Set(sess.questions.map((q) => q.kind)).size === 2, 'iki tip karışık');
+  // Yalnız çevrim akorları
+  const inv = { ...d, kinds: ['triple'], chords: ['major', 'minor'], inversions: ['first', 'second'] };
+  const qs = M.generateDrillChunk(inv, 30, C, M.mulberry32(9));
+  assert.ok(qs.every((q) => q.kind === 'triple' && q.inversion > 0 && /çevrim/.test(q.title)));
+  // Cevabın gösterilmesi → nota adları seçeneği
+  assert.equal(M.drillToConfig({ ...d, reveal: 'question' }, C).EXAM.REVEAL_NOTE_NAMES, 'end');
+  assert.equal(M.drillToConfig({ ...d, reveal: 'end' }, C).EXAM.REVEAL_NOTE_NAMES, 'session');
+  assert.equal(M.drillToConfig({ ...d, reveal: 'never' }, C).EXAM.REVEAL_NOTE_NAMES, 'never');
+  // Doğrulama ve ayıklama
+  assert.match(M.validateDrill({ ...d, kinds: [] }, C).join(), /soru tipi/);
+  assert.match(M.validateDrill({ ...d, kinds: ['double'], intervals: [] }, C).join(), /aralık/);
+  assert.match(M.validateDrill({ ...d, kinds: ['triple'], inversions: [] }, C).join(), /akor durumu/);
+  assert.deepEqual(M.normalizeDrill({ kinds: ['double', 'x'], count: 999, reveal: 'z' }, C).count, 50);
+  assert.deepEqual(M.normalizeDrill({ kinds: ['double', 'x'] }, C).kinds, ['double']);
+  // Geçmiş: "Alıştırma" kaydı
+  sess.finishQuestion('done'); sess.abort();
+  const entry = M.makeHistoryEntry(sess, M.computeDiagnostics(sess.attempted, cfg), cfg);
+  assert.equal(entry.mode, 'drill');
+  assert.equal(JSON.stringify(C), before, 'genel CONFIG değişmemeli');
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {

@@ -4,7 +4,8 @@
 import { CONFIG } from './config.js';
 import { KINDS, KIND_DETAIL, KIND_LABEL, MINUS, TENDENCY_LABEL, clamp, fmtSigned, normalizeHistory, tendencyOf } from './pure.js';
 import { biasRange, dateFmt, el, fmtDuration, lastDiag, nf0, nf1, nf2, nfMax1, prefersReducedMotion, session, setText, shortDay, showNotice, ui } from './ui.js';
-import { storageGet, storageRemove, storageSet } from './settings.js';
+import { T, storageGet, storageRemove, storageSet } from './settings.js';
+import { loadUiState, saveUiState } from './nav.js';
 
 // ── Teşhis ekranı ──
 export function renderSummary(d, sess) {
@@ -117,6 +118,7 @@ export function addHistory(entry) {
   if (!storageSet(CONFIG.HISTORY.STORAGE_KEY, list.slice(-CONFIG.HISTORY.MAX_ENTRIES))) {
     showNotice('Sonuç kaydedilemedi (tarayıcı depolaması kapalı ya da dolu).');
   }
+  renderHistory();                                  // "Önceki testlerim" hemen güncel (alıştırmada teşhis ekranı açılmaz)
 }
 export function clearHistory() { storageRemove(CONFIG.HISTORY.STORAGE_KEY); renderHistory(); }
 
@@ -127,8 +129,18 @@ export function svgEl(tag, attrs = {}, text) {
   if (text != null) n.textContent = text;
   return n;
 }
+// Süzgeç: Hepsi · Sınav · Alıştırma (solfejlab.ui.v1 → historyFilter); eski kayıtlarda mode yok → sınav
+export let historyFilter = 'all';
+export function bindHistoryFilter() {
+  historyFilter = ['all', 'exam', 'drill'].includes(loadUiState().historyFilter) ? loadUiState().historyFilter : 'all';
+  for (const b of ui.historyFilter.querySelectorAll('[data-hf]')) {
+    b.addEventListener('click', () => { historyFilter = b.dataset.hf; saveUiState({ historyFilter }); renderHistory(); });
+  }
+}
 export function renderHistory() {
-  const list = CONFIG.HISTORY.ENABLED ? loadHistory() : [];
+  for (const b of ui.historyFilter.querySelectorAll('[data-hf]')) b.setAttribute('aria-pressed', String(b.dataset.hf === historyFilter));
+  const all = CONFIG.HISTORY.ENABLED ? loadHistory() : [];
+  const list = historyFilter === 'all' ? all : all.filter((e) => (e.mode ?? 'exam') === historyFilter);
   ui.historyEmpty.hidden = list.length > 0;
   ui.historyClear.disabled = !list.length;
   drawHistoryChart(list.slice(-CONFIG.HISTORY.CHART_LAST_N));
@@ -183,6 +195,7 @@ export function historyItem(e) {
     e.complete ? `${e.answered} soru` : `yarım · ${e.answered}/${e.total}`,
   ].filter(Boolean);
   if (e.name) tags.unshift(`“${e.name}”`);       // özel sınavın adı (eski kayıtlarda yok)
+  if (e.mode === 'drill') tags.unshift(T('tagDrill'));
   meta.append(...tags.map((t) => el('span', null, t)));
   const score = el('div', 'h-score');
   score.append(el('b', null, nfMax1.format(e.score)), el('span', 'muted', ' puan'));

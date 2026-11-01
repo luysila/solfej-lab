@@ -35,15 +35,16 @@
 // ═════════════════════════════════════════════════════════════════════════
 
 import { CONFIG, DEFAULT_CONFIG } from './config.js';
-import { customExamToConfig } from './pure.js';
+import { customExamToConfig, drillToConfig, generateDrillChunk } from './pure.js';
 import { ExamSession, Exercise, PLAYBACK_MODES, ROOTS, S, TYPE_BY_ID, clamp, coachMessage, compareToTarget, computeDiagnostics, dbToLin, deepClone, deepMerge, freqToMidi, generateSession, isPlainObject, makeHistoryEntry, midiToFreq, mulberry32, nearestNoteName, octaveModeFor, recordPitchFrame, rootMeanSquare, zoneOf } from './pure.js';
 import { audioCtx, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound } from './audio.js';
 import { analyser, assignRmsLinear, detector, ensureMic, explainError, medianFilter, micStream, refreshDevices, rmsLinear, settings, setupDetector, startMic, timeBuf } from './mic.js';
-import { activeCfg, applyCoachFont, canPauseNow, paused, setPausedState } from './ui.js';
+import { activeCfg, applyCoachFont, canPauseNow, drillActive, paused, setPausedState } from './ui.js';
 import { buildCustomUI, examTab } from './custom.js';
+import { applyPracticeExercise, bindDrill, buildDrillUI, hideDrillResult, showDrillResult } from './drill.js';
 import { after, assignExercise, assignLastDiag, assignLastReadoutTs, assignMode, assignNeedleTarget, assignSession, assignStarting, assignUiReady, buildNoteBoxes, buildTicks, cancelFlow, clearReadouts, coachState, coachWin, easeNeedle, examActive, exercise, fillSelects, fmtCents, fsm, gaugeHalf, gaugeRange, hideAlert, lastDiag, lastReadoutTs, mode, needleTarget, nf1, nf2, observeGauge, paintGaugeBackground, paintLevel, paintSustain, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, renderTimer, resetCoach, selectionChanged, session, setCoach, setText, setZone, showAlert, showNotice, starting, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
 import { contour, drawContour, examStaffOn, markContour, pushContour, scheduleStaffDraw, setExamStaff, setViewMode, setupContour, staffView, viewMode, viewModeFor } from './staff.js';
-import { addHistory, clearHistory, hideSummary, loadHistory, renderHistory, showSummary } from './summary.js';
+import { addHistory, bindHistoryFilter, clearHistory, hideSummary, loadHistory, renderHistory, showSummary } from './summary.js';
 import { bindNav, goSection, initNav, loadUiState, saveUiState } from './nav.js';
 import { CONFIG_KEY, PREFS_KEY, applyOverrides, bindSettingsTabs, applyTexts, buildSettingsForm, configOverrides, fillPresetSelect, fillSettingsForm, onApplySettings, onCopyAll, onCopyNames, onEditClick, onJsonApply, onJsonExport, onJsonImportFile, onPresetChange, positionEditor, refreshJsonArea, reportApply, savePrefs, setEditNames, setTextKey, storageGet } from './settings.js';
 
@@ -118,7 +119,8 @@ export function onStateChange(next, prev, payload) {
     case S.SUMMARY:
       clearReadouts();
       stopAllSound();
-      showSummary();
+      if (session?.drill) showDrillResult(session);  // alıştırma: soru listesi · sınav: teşhis ekranı
+      else showSummary();
       break;
   }
   renderAll();
@@ -132,6 +134,10 @@ export function advanceVerified() {
 /** Sınavda soru bitince: sıradaki soru ya da teşhis ekranı */
 export function nextQuestion() {
   if (!session) return;
+  // "Ben durdurana kadar" alıştırması: sona yaklaşınca sıradaki soru parçası üretilir
+  if (session.drill && !session.drill.count && session.index >= session.questions.length - 2) {
+    session.appendQuestions(generateDrillChunk(session.drill, CONFIG.PRACTICE.DRILL_CHUNK, CONFIG, session.drillRng));
+  }
   if (session.isLast) { finishSession(); return; }
   session.index++;
   loadQuestion(session.current);
@@ -178,7 +184,8 @@ export function finishSession() {
   const attempted = session.attempted;
   const cfg = activeCfg();                          // özel sınavda oturumun kendi ayarı
   assignLastDiag(attempted.length ? computeDiagnostics(attempted, cfg) : null);
-  if (lastDiag && CONFIG.HISTORY.ENABLED && (!session.aborted || CONFIG.HISTORY.SAVE_UNFINISHED)) {
+  const save = session.drill ? CONFIG.PRACTICE.SAVE_HISTORY : true;   // alıştırma kaydı ayarla kapatılabilir
+  if (lastDiag && save && CONFIG.HISTORY.ENABLED && (!session.aborted || CONFIG.HISTORY.SAVE_UNFINISHED || (session.drill && !session.drill.count))) {
     addHistory(makeHistoryEntry(session, lastDiag, cfg));
   }
   cancelFlow();
@@ -187,6 +194,7 @@ export function finishSession() {
 
 export function hardReset() {
   cancelFlow();
+  hideDrillResult();
   setPausedState(false);
   stopAllSound();
   assignSession(null);
@@ -258,6 +266,28 @@ export async function onStartExam(opts) {
   fsm.go(S.PLAYING, { fresh: true });
 }
 
+/** Serbest çalışma "Alıştırma": rastgele soru dizisi (sınav altyapısıyla; ayar yalnız bu oturuma) */
+export async function onStartDrill(def) {
+  if (starting || drillActive() || examActive()) return;
+  assignStarting(true);
+  hideAlert();
+  renderAll();
+  const ok = await prepareInput();
+  if (!ok) { assignStarting(false); renderAll(); return; }
+  const seed = nextSeed(), rng = mulberry32(seed);
+  let questions;
+  try { questions = generateDrillChunk(def, def.count || CONFIG.PRACTICE.DRILL_CHUNK, CONFIG, rng); }
+  catch (err) { assignStarting(false); showAlert(`Alıştırma oluşturulamadı: ${err.message}`); renderAll(); return; }
+  assignStarting(false);
+  hardReset();
+  assignLastDiag(null);
+  assignSession(new ExamSession(questions, { seed, startedAt: Date.now(), cfg: drillToConfig(def, CONFIG), drill: def }));
+  session.drillRng = rng;                           // "durdurana kadar": sonraki parçalar aynı rastgele diziden
+  applySessionCfg();
+  loadQuestion(session.current);
+  fsm.go(S.PLAYING, { fresh: true });
+}
+
 export function onExamReplay() {
   if (session && fsm.state === S.LISTENING && activeCfg().EXAM.ALLOW_REPLAY) fsm.go(S.PLAYING, { replay: true });
 }
@@ -265,8 +295,8 @@ export function onSkip() {
   if (!session || fsm.state !== S.LISTENING || !activeCfg().EXAM.ALLOW_SKIP) return;
   fsm.go(S.COMPLETE, { reason: 'skipped' });
 }
-export function onEndExam() {
-  if (!examActive()) return;
+export function onEndExam() {                      // sınavda "Testi Bitir", alıştırmada "Durdur"
+  if (!examActive() && !drillActive()) return;
   cancelFlow();
   stopAllSound();
   const r = session.result;
@@ -286,7 +316,9 @@ export async function onPlayClick() {                      // serbest çalışma
   fsm.go(S.PLAYING, { fresh: true, playback: practicePlayback() });
 }
 export function onReplayClick() {
-  if (!session && fsm.state === S.LISTENING) fsm.go(S.PLAYING, { fresh: false, playback: practicePlayback() });   // ilerleme korunur
+  if (fsm.state !== S.LISTENING) return;
+  if (!session) fsm.go(S.PLAYING, { fresh: false, playback: practicePlayback() });   // tek soru: ilerleme korunur
+  else if (session.drill) fsm.go(S.PLAYING, { replay: true });                         // alıştırma: tekrar sayılır
 }
 /** Serbest çalışmadaki "Çalım biçimi" seçimi */
 export function practicePlayback() {
@@ -303,10 +335,11 @@ export async function onDeviceChange() {
 
 export function setMode(next, { persist = true } = {}) {
   if (examActive()) return;
+  if (drillActive() && next !== mode) onEndExam();   // başka bölüme geçerken alıştırma biter (sonuç kaydedilir)
   assignMode(next);
   (next === 'exam' ? ui.examSlot : ui.practiceSlot).append(ui.workspace);   // çalışma alanı bölüme taşınır
   hideSummary();
-  if (next === 'practice') selectionChanged();      // egzersizi kurar + sıfırlar
+  if (next === 'practice') applyPracticeExercise(); // tek soru: seçili soru kurulur · alıştırma: boş kutular
   else { assignExercise(new Exercise([])); buildNoteBoxes(); hardReset(); }
   setViewMode(viewModeFor(next), { persist: false });   // görünüm Sınav ve Serbest çalışma için ayrı hatırlanır
   setExamStaff(examStaffOn(), { persist: false });
@@ -422,6 +455,10 @@ export let historyClearArmed = 0;
 export function bindEvents() {
   ui.startBtn.addEventListener('click', () => onStartExam({ repeat: examTab === 'custom' }));   // özel sekmedeki teşhis ekranında aynı özel sınav
   ui.examPause.addEventListener('click', togglePause);
+  ui.drillSkip.addEventListener('click', onSkip);
+  ui.drillStop.addEventListener('click', onEndExam);
+  bindDrill();
+  bindHistoryFilter();
   ui.practicePause.addEventListener('click', togglePause);
   ui.examReplay.addEventListener('click', onExamReplay);
   ui.skipBtn.addEventListener('click', onSkip);
@@ -522,6 +559,7 @@ export function init() {
   updateThresholdUi();
   bindEvents();
   buildCustomUI();
+  buildDrillUI();
 
   assignUiReady(true);
   applyTexts();

@@ -63,7 +63,7 @@ function row(labelKey, ...content) {
   r.append(lab, ...content);
   return r;
 }
-function chip(text, title, onClick) {
+export function chip(text, title, onClick) {
   const b = el('button', 'cx-chip', text);
   b.type = 'button';
   if (title) b.title = title;

@@ -186,6 +186,10 @@ export const SETTINGS_SCHEMA = [
     { path: 'PITCH.MIN_CLARITY', label: 'En düşük netlik', type: 'number', min: 0.3, max: 0.99, step: 0.01 },
     { path: 'PITCH.MEDIAN_FRAMES', label: 'Medyan filtre (kare)', type: 'number', min: 1, max: 9, step: 1 },
   ] },
+  { title: 'Serbest çalışma · alıştırma', tab: 'view', fields: [
+    { path: 'PRACTICE.SHOW_RESULTS', label: 'Alıştırma bitince soru listesi', type: 'bool' },
+    { path: 'PRACTICE.SAVE_HISTORY', label: 'Alıştırmaları "Önceki testlerim"e kaydet', type: 'bool' },
+  ] },
   { title: 'Görünüm', tab: 'view', fields: [
     { path: 'UI.VIEW_MODE', label: 'Görünüm varsayılanı', type: 'select', options: [['staff', 'Porte'], ['staff+graph', 'Porte + grafik'], ['graph', 'Grafik (sent)']] },
     { path: 'UI.COACH_FONT_PX', label: 'Yönlendirme yazı boyutu (px)', type: 'number', min: 12, max: 40, step: 1 },

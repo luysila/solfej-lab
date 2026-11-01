@@ -7,10 +7,11 @@ import { INVERSION_LABEL, orderForSinging } from './pure.js';
 import { ALLOWED, CHORD_TYPES, CoachWindow, Exercise, KINDS, KIND_LABEL, MINUS, ROOTS, S, SustainTracker, TYPE_BY_ID, buildNotes, clamp, createMachine, getPath, midiName, semitoneNeighbors, solfege, spell } from './pure.js';
 import { audioCtx, ensureAudio, piano, playMelodic, stopAllSound } from './audio.js';
 import { detector, explainError, micStream, settings } from './mic.js';
-import { scheduleStaffDraw } from './staff.js';
+import { drawContour, scheduleStaffDraw } from './staff.js';
 import { T, btnName, configOverrides, editNames, savePrefs, setTextKey, unlockForEditing } from './settings.js';
-import { hardReset, onStateChange } from './app.js';
+import { hardReset, onStateChange, rafId } from './app.js';
 import { renderExamPanel } from './custom.js';
+import { practiceTab, renderPracticePanel } from './drill.js';
 
 // ───────────────────────────────────────────────────────────────────────
 // 5) ARAYÜZ
@@ -20,6 +21,9 @@ export const ui = {
   sub: $('subLine'), micChip: $('micChip'), micChipText: $('micChipText'), engineChip: $('engineChip'), engineChipText: $('engineChipText'),
   detChip: $('detChip'), latChip: $('latChip'), cfgChip: $('cfgChip'), alert: $('alert'), notice: $('notice'),
   examControls: $('examControls'), practiceControls: $('practiceControls'), practiceBusy: $('practiceBusy'),
+  singleFields: $('singleFields'), drillSetup: $('drillSetup'), drillStart: $('drillStartBtn'), drillSkip: $('drillSkipBtn'), drillStop: $('drillStopBtn'),
+  drillResult: $('drillResult'), drillMeta: $('drillMeta'), drillList: $('drillList'), drillAgain: $('drillAgainBtn'), drillClose: $('drillCloseBtn'),
+  historyFilter: $('historyFilter'),
   customExam: $('customExam'), sumAnswersWrap: $('sumAnswersWrap'), sumAnswers: $('sumAnswers'),
   menuBtn: $('menuBtn'), menuList: $('menuList'), workspace: $('workspace'), examSlot: $('examSlot'), practiceSlot: $('practiceSlot'),
   examPause: $('examPauseBtn'), practicePause: $('practicePauseBtn'), settingsActions: $('settingsActions'),
@@ -112,11 +116,15 @@ export function after(ms, fn) {
 }
 export function cancelFlow() { flowToken++; clearTimeout(flowTimer); }
 
-export const examActive = () => !!session && fsm.state !== S.IDLE && fsm.state !== S.SUMMARY;
+// Sınav ile alıştırma (serbest çalışma "Alıştırma") aynı oturum altyapısını kullanır; session.drill alıştırmayı ayırt eder
+export const isExam  = () => !!session && !session.drill;
+export const isDrill = () => !!session?.drill;
+export const examActive  = () => isExam() && fsm.state !== S.IDLE && fsm.state !== S.SUMMARY;
+export const drillActive = () => isDrill() && fsm.state !== S.IDLE && fsm.state !== S.SUMMARY;
 /** Sınav akışının etkin ayarı: oturum varsa oturumun (özel sınavda kendi ayarı), yoksa genel CONFIG */
 export const activeCfg = () => session?.cfg ?? CONFIG;
 /** Şu an duraklatılabilir mi? Sınav sürerken ya da serbest çalışmada çalım / dinleme / doğrulama sırasında */
-export const canPauseNow = () => !paused && (examActive() || (mode === 'practice' && !session && [S.PLAYING, S.LISTENING, S.VERIFIED].includes(fsm.state)));
+export const canPauseNow = () => !paused && (examActive() || drillActive() || (mode === 'practice' && !session && [S.PLAYING, S.LISTENING, S.VERIFIED].includes(fsm.state)));
 export const gaugeRange = () => Math.max(CONFIG.UI.GAUGE_RANGE_CENTS, activeCfg().WARNING_CENTS + 5);
 export const biasRange  = () => Math.max(30, Math.round(activeCfg().TOLERANCE_CENTS * 1.5));
 
@@ -190,12 +198,12 @@ export function updateFoldUi() {
 export function buildNoteBoxes() {
   ui.notes.replaceChildren();
   if (!exercise.notes.length) {
-    const msg = el('p', 'empty-notes', mode === 'exam' ? 'Soru başlayınca okunacak sesler burada görünür.' : 'Bir ses, aralık ya da akor seçin.');
+    const msg = el('p', 'empty-notes', mode === 'exam' || practiceTab === 'drill' ? 'Soru başlayınca okunacak sesler burada görünür.' : 'Bir ses, aralık ya da akor seçin.');
     ui.notes.append(msg);
     noteEls = [];
     return;
   }
-  const playable = mode === 'practice' && !session;   // sınavda nota kutuları hiçbir şey çalmaz
+  const playable = mode === 'practice' && !isExam();  // sınavda nota kutuları hiçbir şey çalmaz; alıştırmada ipucu
   noteEls = exercise.notes.map((n, i) => {
     const box = el('div', 'note');
     box.setAttribute('role', playable ? 'button' : 'listitem');
@@ -221,10 +229,11 @@ export function buildNoteBoxes() {
  *  Hazır / bitmiş → yalnızca ses çalar, dinleme başlamaz. Çalarken ve doğrulama anında yok sayılır.
  */
 export async function onNoteBoxPlay(i) {
-  if (session || mode !== 'practice' || starting || !exercise.notes[i]) return;
+  if (isExam() || mode !== 'practice' || starting || paused || !exercise.notes[i]) return;
   const st = fsm.state;
   if (st === S.LISTENING) { fsm.go(S.PLAYING, { single: i }); return; }
   if (st !== S.IDLE && st !== S.COMPLETE) return;
+  if (isDrill() && st === S.COMPLETE) return;       // alıştırmada sıradaki soru çalınmak üzere
   try { await ensureAudio(); } catch (err) { showAlert(explainError(err)); return; }
   stopAllSound();
   playMelodic([exercise.notes[i]], 'melodic');
@@ -257,8 +266,9 @@ export function renderNotes() {
 export function renderExTitle() {
   if (session && session.current) {
     const q = session.current;
-    setText(ui.exTitle, `Soru ${session.index + 1}/${session.questions.length} · ${KIND_LABEL[q.kind]}${answerVisible() ? ` · ${q.title}` : ''}`);
-  } else setText(ui.exTitle, mode === 'practice' ? practiceTitle : '');
+    const head = session.drill ? `Alıştırma · soru ${session.index + 1}${session.drill.count ? `/${session.questions.length}` : ''}` : `Soru ${session.index + 1}/${session.questions.length}`;
+    setText(ui.exTitle, `${head} · ${KIND_LABEL[q.kind]}${answerVisible() ? ` · ${q.title}` : ''}`);
+  } else setText(ui.exTitle, mode === 'practice' && practiceTab === 'single' ? practiceTitle : '');
 }
 
 export function renderStatus() {
@@ -267,9 +277,11 @@ export function renderStatus() {
   let msg = '';
   if (session && session.current) {
     const q = session.current, N = session.questions.length, n = session.index + 1, res = session.result;
+    const drill = !!session.drill;
+    const head = drill ? `Alıştırma · soru ${n}${session.drill.count ? `/${N}` : ''}` : `Soru ${n}/${N}`;
     switch (st) {
       case S.PLAYING:
-        msg = `Soru ${n}/${N} · ${KIND_LABEL[q.kind]}: ${q.notes.length > 1 ? 'sesler aynı anda çalınıyor' : 'ses çalınıyor'} — dikkatle dinleyin…`;
+        msg = `${head} · ${KIND_LABEL[q.kind]}: ${q.notes.length > 1 ? 'sesler aynı anda çalınıyor' : 'ses çalınıyor'} — dikkatle dinleyin…`;
         break;
       case S.LISTENING: {
         const rev = isNoteRevealed(exercise.index);
@@ -286,6 +298,12 @@ export function renderStatus() {
         break;
       case S.COMPLETE: {
         const answer = answerVisible() ? q.title : '';
+        if (drill) {                                // alıştırma: "Bu soru: C Majör · 1. çevrim (6) ✓"
+          const what = res.status === 'done' ? '✓' : res.status === 'partial' ? '· kısmen' : '· geçildi';
+          msg = answer ? `${T('drThisQuestion')}: ${answer} ${what}` : res.status === 'done' ? 'Soru tamamlandı ✓' : `Soru ${what.replace('· ', '')}`;
+          if (!session.isLast) msg += ' — sıradaki soruya geçiliyor…';
+          break;
+        }
         if (res.status === 'done') msg = `Soru tamamlandı ✓${answer ? ` · ${answer}` : ''}`;
         else {
           const what = res.endReason === 'timeout' ? 'Süre doldu' : res.status === 'partial' ? 'Soru kısmen tamamlandı' : 'Soru geçildi';
@@ -294,7 +312,7 @@ export function renderStatus() {
         if (!session.isLast) msg += ' — sıradaki soruya geçiliyor…';
         break;
       }
-      case S.SUMMARY: msg = 'Test bitti — teşhis ekranı yukarıda.'; break;
+      case S.SUMMARY: msg = drill ? 'Alıştırma bitti.' : 'Test bitti — teşhis ekranı yukarıda.'; break;
       default: msg = '';
     }
   } else if (mode === 'exam') {
@@ -302,7 +320,9 @@ export function renderStatus() {
       : `“${btnName('btnStart')}” düğmesine basın. Her soruda sesler aynı anda çalınır; ardından ${singFrom()} “na” hecesiyle sırayla söylersiniz.`;
   } else {
     switch (st) {
-      case S.IDLE:      msg = `Bir ses, aralık ya da akor seçip “${btnName('btnPlay')}” düğmesine basın. İlk kullanımda mikrofon izni istenir.`; break;
+      case S.IDLE:      msg = practiceTab === 'drill'
+        ? `Soru tiplerini ve seçenekleri belirleyip “${btnName('btnDrillStart')}” düğmesine basın. Sorular rastgele gelir; cevap seçtiğiniz zamanda açılır.`
+        : `Bir ses, aralık ya da akor seçip “${btnName('btnPlay')}” düğmesine basın. İlk kullanımda mikrofon izni istenir.`; break;
       case S.PLAYING:   msg = `Çalıyor — ${singFrom()} sesleri ayırt etmeye çalışın…`; break;
       case S.LISTENING: msg = `${cur.role}: ${cur.name} (${cur.solfege}) sesini “na” ile söyleyin ve yeşil bölgede ${sec} sn sabit tutun.`; break;
       case S.VERIFIED:  msg = 'Doğrulandı ✓ — sıradaki sese geçiliyor…'; break;
@@ -318,8 +338,8 @@ export function renderStatus() {
 // ── Sınav ilerleme şeridi ──
 export let segEls = [], segSession = null;
 export function renderProgress() {
-  ui.progress.hidden = !session;
-  if (!session) { segSession = null; return; }
+  ui.progress.hidden = !session || (!!session.drill && !session.drill.count);   // "durdurana kadar" alıştırmasında şerit yok
+  if (ui.progress.hidden) { segSession = null; return; }
   if (segSession !== session) {
     segSession = session;
     ui.segments.replaceChildren();
@@ -360,8 +380,8 @@ export function renderTimer() {
 }
 
 export function renderAll() {
-  const st = fsm.state, active = examActive();
-  ui.device.disabled = !micStream || !ui.device.options.length || active || starting;
+  const st = fsm.state, active = examActive(), dActive = drillActive();
+  ui.device.disabled = !micStream || !ui.device.options.length || active || dActive || starting;
   // Duraklat / Devam (sınav ve serbest çalışma kontrollerinde)
   const pausable = paused || canPauseNow();
   for (const b of [ui.examPause, ui.practicePause]) { b.disabled = !pausable; setTextKey(b, paused ? 'btnResume' : 'btnPause'); }
@@ -373,7 +393,9 @@ export function renderAll() {
   ui.endBtn.disabled = !active;
   // Serbest çalışma düğmeleri
   ui.play.disabled = starting || !!session || !(st === S.IDLE || st === S.COMPLETE) || !exercise.notes.length;
-  ui.replay.disabled = paused || !!session || st !== S.LISTENING;
+  ui.replay.disabled = paused || st !== S.LISTENING || isExam();
+  ui.drillSkip.disabled = paused || !(dActive && st === S.LISTENING);
+  ui.drillStop.disabled = !dActive;
   ui.reset.disabled = !!session || st === S.IDLE;
   setTextKey(ui.play, st === S.COMPLETE ? 'btnRestart' : 'btnPlay');
   // Hedef göstergesi
@@ -389,7 +411,9 @@ export function renderAll() {
   renderStatus();
   renderProgress();
   renderExamPanel();
+  renderPracticePanel();
   scheduleStaffDraw();
+  if (!rafId) drawContour(performance.now());      // mikrofon kapalıyken ana döngü çizmez: porte durum değişiminde güncellenir
   if (editNames) unlockForEditing();                // ad düzenleme modunda devre dışı düğmelere de tıklanabilsin
 }
 

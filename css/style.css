@@ -434,6 +434,10 @@ input[type="number"]:focus-visible, input[type="text"]:focus-visible, textarea:f
 .cx-info { display: grid; gap: 1px; min-width: 0; }
 .cx-info small { color: var(--muted); font-size: 12px; }
 .cx-item-acts { display: flex; flex-wrap: wrap; gap: 6px; }
+/* Alıştırma sonucu listesi ve geçmiş süzgeci */
+.drill-list { margin-top: 0; }
+#historyFilter { margin-left: auto; }
+.ans-done small { color: var(--green); } .ans-partial small { color: var(--yellow); } .ans-skipped small, .ans-timeout small { color: var(--red); }
 /* Sorular ve cevaplar (teşhis ekranı) */
 .answers { margin-top: 12px; border: 1px solid var(--line); border-radius: 10px; padding: 8px 12px; }
 .answers > summary { cursor: pointer; font-size: 13px; color: var(--text-2); font-weight: 600; }
