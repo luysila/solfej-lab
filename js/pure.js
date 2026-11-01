@@ -529,6 +529,50 @@ export function generateDrillChunk(dr, n, base = CONFIG, rng = Math.random) {
 }
 
 // ───────────────────────────────────────────────────────────────────────
+// KLAVYE KISAYOLLARI — tuş olayı → işlev. Tuş, fiziksel konumuyla değil ürettiği karakterle eşlenir (e.key):
+// Türkçe Q ve F klavyede etikette ne yazıyorsa o çalışır. Harfler Türkçe büyük harfe çevrilir (r → R, i → İ, ı → I).
+// ───────────────────────────────────────────────────────────────────────
+export const SHORTCUT_ACTIONS = ['start', 'pause', 'replay', 'skip', 'end', 'playNext', 'view', 'staff', 'octave', 'menu',
+  'section1', 'section2', 'section3', 'section4', 'section5', 'section6', 'help'];
+/** Klavye olayının adı: 'Enter', 'Space', 'Escape', 'R', '1', '?' … ('' → yalnız değiştirici tuş) */
+export function keyName(e) {
+  const k = e?.key;
+  if (!k || ['Shift', 'Control', 'Alt', 'Meta', 'AltGraph', 'CapsLock', 'Dead', 'Unidentified'].includes(k)) return '';
+  if (k === ' ' || k === 'Spacebar') return 'Space';
+  if (k.length === 1) return k.toLocaleUpperCase('tr-TR');
+  return k;                                         // Enter, Escape, ArrowUp, F1 …
+}
+/** Görüntü için: Space → Boşluk, ArrowUp → ↑ … */
+export function keyLabel(name) {
+  return { Space: 'Boşluk', Enter: 'Enter', Escape: 'Esc', ArrowUp: '↑', ArrowDown: '↓', ArrowLeft: '←', ArrowRight: '→', '': '—' }[name] ?? name;
+}
+const TYPING_TYPES = new Set(['text', 'search', 'email', 'number', 'password', 'tel', 'url', 'date', 'time', 'datetime-local', 'month', 'week', 'color', 'range', 'file']);
+/**
+ * Tuş olayını kısayol işlevine çevirir; çalışmaması gereken yerde null döner.
+ * ev: { key, ctrlKey, metaKey, altKey, shiftKey, repeat, tag, type, editable, role }  (tag/type/editable/role: odaktaki öğe)
+ * ctx: { editingNames, capturing } — ad düzenleme modunda ve tuş atarken kısayol yok.
+ * Odak bir düğmedeyken Enter/Boşluk düğmenin kendisini çalıştırır (kısayol çift işlem yapmasın).
+ */
+export function matchShortcut(ev, map, ctx = {}) {
+  if (ctx.editingNames || ctx.capturing) return null;
+  if (ev.ctrlKey || ev.metaKey || ev.altKey) return null;          // tarayıcı kısayollarına dokunma
+  const tag = (ev.tag || '').toUpperCase();
+  if (ev.editable || tag === 'TEXTAREA' || tag === 'SELECT' || (tag === 'INPUT' && TYPING_TYPES.has((ev.type || 'text').toLowerCase()))) return null;
+  const name = keyName(ev);
+  if (!name) return null;
+  const onControl = tag === 'BUTTON' || tag === 'A' || tag === 'SUMMARY' || ev.role === 'button' || ev.role === 'tab' || (tag === 'INPUT' && ['checkbox', 'radio', 'button', 'submit'].includes((ev.type || '').toLowerCase()));
+  if (onControl && (name === 'Enter' || name === 'Space')) return null;
+  for (const id of SHORTCUT_ACTIONS) if (map?.[id] && map[id] === name) return id;
+  return null;
+}
+/** Aynı tuşa atanmış işlevler: { 'R': ['replay', 'skip'] } */
+export function shortcutConflicts(map) {
+  const by = {};
+  for (const id of SHORTCUT_ACTIONS) { const k = map?.[id]; if (k) (by[k] ||= []).push(id); }
+  return Object.fromEntries(Object.entries(by).filter(([, ids]) => ids.length > 1));
+}
+
+// ───────────────────────────────────────────────────────────────────────
 // ÇALIM PLANI — hangi ses ne zaman, ne kadar çalınır; toplam süre kadar beklenip dinlemeye geçilir
 //  'harmonic' → hepsi birlikte CHORD_DURATION_S
 //  'melodic'  → kökten yukarı tek tek: her ses MELODIC_NOTE_S, aralarında MELODIC_GAP_S
@@ -1278,6 +1322,11 @@ export function validateConfig(cfg) {
   if (!INVERSIONS.some((v) => cfg.CHORD_RULES?.INVERSIONS?.[v.key] > 0)) errs.push('CHORD_RULES.INVERSIONS: en az bir akor durumunun ağırlığı 0\'dan büyük olmalı');
   oneOf(cfg.SING_ORDER, ['bass', 'root'], 'SING_ORDER');
   num(cfg.PRACTICE?.DRILL_CHUNK, 3, 50, 'PRACTICE.DRILL_CHUNK');
+  for (const id of SHORTCUT_ACTIONS) {
+    const k = cfg.SHORTCUTS?.[id];
+    if (typeof k !== 'string' || k.length > 20) errs.push(`SHORTCUTS.${id}: tuş adı (en fazla 20 karakter) olmalı; boş = kısayol yok`);
+  }
+  num(cfg.SHORTCUT_END_CONFIRM_MS, 500, 5000, 'SHORTCUT_END_CONFIRM_MS');
   for (const id of Object.keys(cfg.CHORD_RULES?.MAIN_WEIGHTS || {})) {
     if (TYPE_BY_ID[id]?.kind !== 'chord') errs.push(`CHORD_RULES.MAIN_WEIGHTS: bilinmeyen akor "${id}"`);
   }

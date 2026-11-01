@@ -63,6 +63,24 @@ export const CONFIG = {
     DRILL_CHUNK: 10,              // "Ben durdurana kadar" dizisinde bir seferde üretilen soru sayısı
   },
 
+  // ══ 2c. KLAVYE KISAYOLLARI (Ayarlar → Kısayollar; geçici varsayılanlar) ═════════
+  // Tuş adı, tuşun ürettiği karakterdir (Türkçe Q/F klavyede etiket): 'R', '1', '?'; özel: 'Enter', 'Space', 'Escape'. Boş = kısayol yok.
+  SHORTCUTS: {
+    start: 'Enter',               // Başlat (Teste Başla / Çal & Başla / Alıştırmayı başlat)
+    pause: 'Space',               // Duraklat / Devam
+    replay: 'R',                  // Tekrar çal
+    skip: 'N',                    // Soruyu geç
+    end: 'B',                     // Testi bitir / Durdur (yanlışlıkla bitmesin: SHORTCUT_END_CONFIRM_MS içinde iki kez)
+    playNext: 'S',                // Sıradaki sesi çal (serbest çalışmada ipucu)
+    view: 'V',                    // Görünüm değiştir (Porte · Porte + grafik · Grafik)
+    staff: 'P',                   // Porte aç/kapa (sınav)
+    octave: 'O',                  // Oktav toleransı aç/kapa
+    menu: 'M',                    // Menü
+    section1: '1', section2: '2', section3: '3', section4: '4', section5: '5', section6: '6',   // bölümlere git (menü sırası)
+    help: '?',                    // Kısayol listesi
+  },
+  SHORTCUT_END_CONFIRM_MS: 2000,  // "Testi bitir" kısayolu için iki basış arasındaki en uzun süre
+
   // ══ 3. PUANLAMA ═════════════════════════════════════════════════════
   SCORING: {
     PARTIAL_CREDIT: true,         // 3 sesin 2'si doğrulandıysa sorunun 2/3'ü; false → hepsi ya da hiç
@@ -324,6 +342,31 @@ export const CONFIG = {
     histExams: 'Sınav',
     histDrills: 'Alıştırma',
     tagDrill: 'Alıştırma',
+    // Klavye kısayolları (Aşama 6)
+    setTabKeys: 'Kısayollar',
+    scStart: 'Başlat',
+    scPause: 'Duraklat / Devam',
+    scReplay: 'Tekrar çal',
+    scSkip: 'Soruyu geç',
+    scEnd: 'Testi bitir / Durdur (iki kez)',
+    scPlayNext: 'Sıradaki sesi çal',
+    scView: 'Görünüm değiştir',
+    scStaff: 'Porte aç/kapa (sınav)',
+    scOctave: 'Oktav toleransı',
+    scMenu: 'Menü',
+    scSection: 'Bölüme git',
+    scHelp: 'Kısayol listesi',
+    scHelpTitle: 'Klavye kısayolları',
+    scIntro: 'Tuş, klavyenizdeki karakterdir (Türkçe Q ve F klavyede de).',
+    scHint: 'Kısayol',
+    scPressKey: 'Bir tuşa basın… (Esc: vazgeç)',
+    scConflict: 'Aynı tuş birden çok işleve atanmış',
+    scEndConfirm: 'Bitirmek için 2 saniye içinde tekrar basın',
+    btnScChange: 'Değiştir',
+    btnScRemove: 'Kaldır',
+    btnScDefault: 'Varsayılana dön',
+    btnScCopy: 'Kısayolları kopyala',
+    btnScResetAll: 'Tümünü varsayılana döndür',
     // Görünüm seçici ve sınavdaki porte anahtarı (Aşama 2)
     labelView: 'Görünüm',
     viewStaff: 'Porte',

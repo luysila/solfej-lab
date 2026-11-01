@@ -46,6 +46,7 @@ import { after, assignExercise, assignLastDiag, assignLastReadoutTs, assignMode,
 import { contour, drawContour, examStaffOn, markContour, pushContour, scheduleStaffDraw, setExamStaff, setViewMode, setupContour, staffView, viewMode, viewModeFor } from './staff.js';
 import { addHistory, bindHistoryFilter, clearHistory, hideSummary, loadHistory, renderHistory, showSummary } from './summary.js';
 import { bindNav, goSection, initNav, loadUiState, saveUiState } from './nav.js';
+import { applyShortcutHints, bindKeys, renderShortcuts } from './keys.js';
 import { CONFIG_KEY, PREFS_KEY, applyOverrides, bindSettingsTabs, applyTexts, buildSettingsForm, configOverrides, fillPresetSelect, fillSettingsForm, onApplySettings, onCopyAll, onCopyNames, onEditClick, onJsonApply, onJsonExport, onJsonImportFile, onPresetChange, positionEditor, refreshJsonArea, reportApply, savePrefs, setEditNames, setTextKey, storageGet } from './settings.js';
 
 // ───────────────────────────────────────────────────────────────────────
@@ -458,6 +459,7 @@ export function bindEvents() {
   ui.drillSkip.addEventListener('click', onSkip);
   ui.drillStop.addEventListener('click', onEndExam);
   bindDrill();
+  bindKeys();
   bindHistoryFilter();
   ui.practicePause.addEventListener('click', togglePause);
   ui.examReplay.addEventListener('click', onExamReplay);
@@ -577,6 +579,8 @@ export function init() {
     saveUiState({ viewMode: { exam: v, practice: v } });
   }
   applyCoachFont();
+  applyShortcutHints();
+  renderShortcuts();
   setMode(prefs.mode === 'practice' ? 'practice' : 'exam', { persist: false });   // serbest çalışma porteyi açar
   initNav();                                        // adres çubuğundaki bölüm ya da son kullanılan bölüm (ilk açılışta Ana sayfa)
   if (cfgProblem) showNotice(`Kayıtlı özel ayarlar geçersiz olduğu için varsayılanlar kullanılıyor (${cfgProblem}).`);

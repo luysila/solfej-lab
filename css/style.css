@@ -517,6 +517,28 @@ details.settings > summary:focus-visible { outline: 2px solid var(--accent); out
 .set-intro { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 24px; margin-bottom: 12px; }
 .set-intro .switch { margin-top: 0; }
 
+/* ── Klavye kısayolları ── (Ayarlar → Kısayollar, "?" listesi, düğme ipucu) */
+.sc-rows { display: grid; gap: 4px; }
+.sc-row { display: grid; grid-template-columns: minmax(0, 1fr) auto auto; align-items: center; gap: 6px 10px; padding: 6px 8px; border-radius: 8px; background: var(--panel-2); border: 1px solid var(--line); font-size: 13.5px; }
+.sc-row.conflict { border-color: rgba(var(--yellow-rgb), .7); }
+.sc-row .sc-btns { display: flex; flex-wrap: wrap; gap: 4px; }
+kbd { display: inline-block; min-width: 26px; padding: 2px 7px; border-radius: 6px; border: 1px solid var(--line); border-bottom-width: 2px; background: var(--field); font: 600 12px var(--mono); color: var(--text); text-align: center; }
+kbd.capturing { border-color: var(--accent); color: var(--accent); }
+.sc-msg { margin: 6px 0 0; font-size: 12.5px; color: var(--yellow); min-height: 1em; }
+.sc-dialog { max-width: min(460px, calc(100vw - 24px)); width: 100%; padding: 14px 16px; border-radius: var(--radius); border: 1px solid var(--line); background: var(--panel); color: var(--text); }
+.sc-dialog::backdrop { background: rgba(var(--shadow-rgb), .6); }
+.sc-list { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; margin: 0; font-size: 13.5px; align-items: center; }
+.sc-list dt { text-align: right; }
+.sc-list dd { margin: 0; color: var(--text-2); }
+[data-sc] { position: relative; }
+@media (hover: hover) {
+  [data-sc]:hover::after {
+    content: attr(data-sc); position: absolute; left: 50%; bottom: calc(100% + 6px); transform: translateX(-50%); z-index: 30;
+    padding: 2px 7px; border-radius: 6px; background: var(--panel-2); border: 1px solid var(--line); color: var(--text-2);
+    font: 600 11px var(--mono); white-space: nowrap; pointer-events: none;
+  }
+}
+
 /* ── Adları sayfada düzenle ── */
 .edit-names [data-text] { outline: 1px dashed rgba(var(--accent-rgb), .8); outline-offset: 2px; cursor: text; }
 .edit-names #editBar [data-text] { outline: none; }

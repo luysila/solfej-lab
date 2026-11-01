@@ -149,6 +149,14 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
   Bitince ya da "Durdur"da sonuç listesi (`PRACTICE.SHOW_RESULTS`); geçmişe `mode: 'drill'` ve "Alıştırma" etiketiyle kayıt
   (`PRACTICE.SAVE_HISTORY`); "Önceki testlerim"de Hepsi · Sınav · Alıştırma süzgeci. Son kurulum `solfejlab.ui.v1` → `drill`.
 
+- **Klavye kısayolları** (Aşama 6, `js/keys.js`; eşleme `matchShortcut` `js/pure.js`'te): tuş, ürettiği karakterle eşlenir
+  (`e.key`; Türkçe Q/F klavyede etiket). `CONFIG.SHORTCUTS` geçici varsayılanlar: Enter başlat · Boşluk duraklat/devam · R tekrar ·
+  N geç · B bitir (`SHORTCUT_END_CONFIRM_MS` içinde iki kez) · S sıradaki ses · V görünüm · P porte · O oktav · M menü · 1–6 bölümler · ? liste.
+  Yazı kutularında, ad düzenlerken ve tuş atarken çalışmaz; odak düğmedeyken Enter/Boşluk düğmenin kendisi. Kısayol işlevi
+  ilgili düğmeye tıklar (aynı kurallar). Ayarlar → Kısayollar: Değiştir / Kaldır / Varsayılana dön, çakışma uyarısı, kopyala
+  (özel ayar olarak `solfejlab.config.v1`).
+- **Aşama 7 (telefon/tablet) henüz yapılmadı** — `docs/istek-2.md`'deki AŞAMA 7 bölümüne bakın.
+
 ## Doğrulanmamış / bilinen sınırlar
 - Tone.js (14.8.49) ve VexFlow (4.2.5) gerçek kütüphaneleriyle henüz denenmedi (önceki geliştirme ortamında CDN'ler
   kapalıydı; aynı arayüzü taklit eden sürümlerle test edildi). İlk iş: gerçek tarayıcıda piyano sesini ve porteyi kontrol et.

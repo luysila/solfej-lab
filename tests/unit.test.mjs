@@ -532,6 +532,60 @@ test('Alıştırma: "7 tane iki ses", "durdurana kadar şu aralık ve akorlar", 
   assert.equal(JSON.stringify(C), before, 'genel CONFIG değişmemeli');
 });
 
+test('Kısayollar: tuş adı (Türkçe Q/F), engellenen yerler, düğmede Enter/Boşluk, çakışma', () => {
+  const map = M.CONFIG.SHORTCUTS;
+  const ev = (key, extra = {}) => ({ key, tag: 'BODY', ...extra });
+  const hit = (e, ctx) => M.matchShortcut(e, map, ctx);
+  // Tuş adları: karakterle eşleşir; harfler Türkçe büyük harfe çevrilir
+  assert.equal(M.keyName({ key: 'r' }), 'R');
+  assert.equal(M.keyName({ key: 'R' }), 'R');
+  assert.equal(M.keyName({ key: 'i' }), 'İ');
+  assert.equal(M.keyName({ key: 'ı' }), 'I');
+  assert.equal(M.keyName({ key: ' ' }), 'Space');
+  assert.equal(M.keyName({ key: 'Shift' }), '');
+  assert.equal(M.keyLabel('Space'), 'Boşluk');
+  // Varsayılanlar
+  assert.equal(hit(ev('Enter')), 'start');
+  assert.equal(hit(ev(' ')), 'pause');
+  assert.equal(hit(ev('r')), 'replay');
+  assert.equal(hit(ev('n')), 'skip');
+  assert.equal(hit(ev('b')), 'end');
+  assert.equal(hit(ev('s')), 'playNext');
+  assert.equal(hit(ev('v')), 'view');
+  assert.equal(hit(ev('p')), 'staff');
+  assert.equal(hit(ev('o')), 'octave');
+  assert.equal(hit(ev('m')), 'menu');
+  for (let i = 1; i <= 6; i++) assert.equal(hit(ev(String(i))), `section${i}`);
+  assert.equal(hit(ev('?', { shiftKey: true })), 'help', '? Türkçe Q ve F klavyede Shift ile gelir');
+  // Türkçe F klavye: R tuşunun yeri farklı ama karakteri "r" → çalışır; "ğ" gibi atanmamış harf → yok
+  assert.equal(hit(ev('ğ')), null);
+  // Engeller: değiştirici tuşlar, yazı kutuları, ad düzenleme, tuş atama
+  assert.equal(hit(ev('r', { ctrlKey: true })), null);
+  assert.equal(hit(ev('r', { metaKey: true })), null);
+  assert.equal(hit(ev('r', { tag: 'INPUT', type: 'text' })), null);
+  assert.equal(hit(ev('r', { tag: 'TEXTAREA' })), null);
+  assert.equal(hit(ev('r', { tag: 'SELECT' })), null);
+  assert.equal(hit(ev('r', { tag: 'DIV', editable: true })), null);
+  assert.equal(hit(ev('r', { tag: 'INPUT', type: 'range' })), null, 'kaydırıcıda da yazı/ok tuşları onundur');
+  assert.equal(hit(ev('r'), { editingNames: true }), null);
+  assert.equal(hit(ev('r'), { capturing: true }), null);
+  // Odak düğmedeyken Enter/Boşluk düğmenin kendisi (çift işlem yok); harf kısayolları çalışır
+  assert.equal(hit(ev('Enter', { tag: 'BUTTON' })), null);
+  assert.equal(hit(ev(' ', { tag: 'BUTTON' })), null);
+  assert.equal(hit(ev(' ', { tag: 'DIV', role: 'button' })), null);
+  assert.equal(hit(ev(' ', { tag: 'INPUT', type: 'checkbox' })), null);
+  assert.equal(hit(ev('r', { tag: 'BUTTON' })), 'replay');
+  // Çakışma ve kaldırma
+  assert.deepEqual(M.shortcutConflicts(map), {});
+  assert.deepEqual(M.shortcutConflicts({ ...map, replay: 'N' }), { N: ['replay', 'skip'] });
+  assert.equal(M.matchShortcut(ev('r'), { ...map, replay: '' }), null, 'kaldırılan kısayol çalışmaz');
+  assert.equal(M.matchShortcut(ev('t'), { ...map, replay: 'T' }), 'replay');
+  // Doğrulama
+  assert.deepEqual(M.validateConfig(M.DEFAULT_CONFIG), []);
+  assert.match(M.validateConfig(M.deepMerge(M.DEFAULT_CONFIG, { SHORTCUTS: { replay: 5 } })).join(), /SHORTCUTS\.replay/);
+  assert.deepEqual(M.validateConfig(M.deepMerge(M.DEFAULT_CONFIG, { SHORTCUTS: { replay: '' } })), []);
+});
+
 test('pickVoicing: register ve çift değiştirici kuralı, en az değiştiricili yazım', () => {
   const cfg = M.CONFIG, rng = M.mulberry32(7);
   for (const t of M.CHORD_TYPES) {

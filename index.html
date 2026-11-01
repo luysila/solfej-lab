@@ -6,24 +6,25 @@
 <meta name="color-scheme" content="dark">
 <title>Solfej Lab · İşitme Eğitimi</title>
 
-<link rel="stylesheet" href="./css/style.css?v=202611010006">
+<link rel="stylesheet" href="./css/style.css?v=202611010014">
 <!-- Sürüm etiketi (?v=…): yayından sonra tarayıcı önbelleğinde eski ve yeni dosyalar karışmasın.
      Elle değiştirmeyin; dosyaları değiştirdikten sonra: npm run stamp (scripts/stamp.mjs import map'i de yeniden üretir) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=202611010006",
-    "./js/audio.js": "./js/audio.js?v=202611010006",
-    "./js/config.js": "./js/config.js?v=202611010006",
-    "./js/custom.js": "./js/custom.js?v=202611010006",
-    "./js/drill.js": "./js/drill.js?v=202611010006",
-    "./js/mic.js": "./js/mic.js?v=202611010006",
-    "./js/nav.js": "./js/nav.js?v=202611010006",
-    "./js/pure.js": "./js/pure.js?v=202611010006",
-    "./js/settings.js": "./js/settings.js?v=202611010006",
-    "./js/staff.js": "./js/staff.js?v=202611010006",
-    "./js/summary.js": "./js/summary.js?v=202611010006",
-    "./js/ui.js": "./js/ui.js?v=202611010006"
+    "./js/app.js": "./js/app.js?v=202611010014",
+    "./js/audio.js": "./js/audio.js?v=202611010014",
+    "./js/config.js": "./js/config.js?v=202611010014",
+    "./js/custom.js": "./js/custom.js?v=202611010014",
+    "./js/drill.js": "./js/drill.js?v=202611010014",
+    "./js/keys.js": "./js/keys.js?v=202611010014",
+    "./js/mic.js": "./js/mic.js?v=202611010014",
+    "./js/nav.js": "./js/nav.js?v=202611010014",
+    "./js/pure.js": "./js/pure.js?v=202611010014",
+    "./js/settings.js": "./js/settings.js?v=202611010014",
+    "./js/staff.js": "./js/staff.js?v=202611010014",
+    "./js/summary.js": "./js/summary.js?v=202611010014",
+    "./js/ui.js": "./js/ui.js?v=202611010014"
   }
 }
 </script>
@@ -347,6 +348,7 @@
       <button class="tab" type="button" role="tab" data-tab="audio" aria-selected="false" data-text="setTabAudio">Ses ve algılama</button>
       <button class="tab" type="button" role="tab" data-tab="view" aria-selected="false" data-text="setTabView">Görünüm</button>
       <button class="tab" type="button" role="tab" data-tab="names" aria-selected="false" data-text="setTabNames">Arayüz adları</button>
+      <button class="tab" type="button" role="tab" data-tab="keys" aria-selected="false" data-text="setTabKeys">Kısayollar</button>
       <button class="tab" type="button" role="tab" data-tab="adv" aria-selected="false" data-text="setTabAdv">Gelişmiş (JSON)</button>
     </div>
     <div class="settings-body">
@@ -361,6 +363,8 @@
       </div>
       <p class="settings-msg" id="settingsMsg" role="status" aria-live="polite"></p>
 
+      <!-- Kısayollar: her işlevin tuşu, Değiştir / Kaldır / Varsayılana dön (js/keys.js üretir) -->
+      <div class="set-keys" data-tab="keys" id="shortcutsPanel"></div>
       <div class="set-adv" data-tab="adv">
       <h3 class="set-h3">Gelişmiş · JSON</h3>
       <p class="small-note">Yalnızca varsayılandan farklı ayarlar listelenir. Bir kurumun standardını dosya olarak paylaşmak için dışa aktarın; öğrenciler içe aktararak aynı ayarlarla çalışır.</p>
@@ -405,6 +409,12 @@
     <button class="btn small primary" id="editDoneBtn" type="button">Bitir</button>
   </div>
 
+  <!-- Kısayol listesi ("?" ile açılır, Esc ile kapanır) -->
+  <dialog class="sc-dialog" id="shortcutHelp" aria-labelledby="scHelpTitle">
+    <div class="panel-head"><h2 id="scHelpTitle" data-text="scHelpTitle">Klavye kısayolları</h2><button class="btn small ghost" id="scHelpClose" type="button" data-text="btnClose">Kapat</button></div>
+    <dl class="sc-list" id="scHelpList"></dl>
+  </dialog>
+
   <!-- Lisans gereği her bölümün altında görünür kalır -->
   <footer class="attrib">Piyano örnekleri: Salamander Grand Piano (Alexander Holm, CC BY 3.0) · Tone.js · VexFlow ·
     YIN algoritması: de Cheveigné &amp; Kawahara (2002) · MPM: pitchy (isteğe bağlı)</footer>
@@ -418,6 +428,6 @@
     a.hidden = false;
   }
 </script>
-<script type="module" src="./js/app.js?v=202611010006"></script>
+<script type="module" src="./js/app.js?v=202611010014"></script>
 </body>
 </html>

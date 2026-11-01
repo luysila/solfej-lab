@@ -8,6 +8,7 @@ import { analyser, assignMedianFilter, medianFilter, settings, setupDetector } f
 import { applyCoachFont, buildTicks, el, examActive, fsm, mode, paintGaugeBackground, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, selectionChanged, session, setText, showNotice, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
 import { drawContour, staffView, updateVexPanel } from './staff.js';
 import { renderHistory } from './summary.js';
+import { applyShortcutHints, renderShortcuts } from './keys.js';
 import { practicePlayback } from './app.js';
 
 // ── Ayarlar paneli (şema ile üretilir: yeni ayar eklemek için SETTINGS_SCHEMA'ya bir satır yeter) ──
@@ -308,14 +309,14 @@ export function readSettingsForm(draft) {
   }
   return bad;
 }
-// ── Ayarlar sekmeleri: Standart sınav · Ses ve algılama · Görünüm · Arayüz adları · Gelişmiş (JSON) ──
+// ── Ayarlar sekmeleri: Standart sınav · Ses ve algılama · Görünüm · Arayüz adları · Kısayollar · Gelişmiş (JSON) ──
 // Form tek parça kalır ("Kaydet ve uygula" bütün sekmelerdeki alanları okur); sekme yalnızca görünürlüğü değiştirir.
 export let settingsTab = 'std';
 export function showSettingsTab(tab) {
   settingsTab = tab;
   for (const b of ui.settingsPanel.querySelectorAll('.set-tabs [data-tab]')) b.setAttribute('aria-selected', String(b.dataset.tab === tab));
   for (const n of ui.settingsPanel.querySelectorAll('[data-tab]:not(.tab)')) n.hidden = n.dataset.tab !== tab;
-  ui.settingsActions.hidden = tab === 'adv';
+  ui.settingsActions.hidden = tab === 'adv' || tab === 'keys';   // bu iki sekmenin kendi düğmeleri var
 }
 export function bindSettingsTabs() {
   for (const b of ui.settingsPanel.querySelectorAll('.set-tabs [data-tab]')) b.addEventListener('click', () => showSettingsTab(b.dataset.tab));
@@ -469,6 +470,8 @@ export function onConfigChanged(prev) {
   }
   updateVexPanel();
   applyCoachFont();
+  applyShortcutHints();
+  renderShortcuts();
   applyTexts();
   fillSettingsForm(CONFIG);
   refreshJsonArea();

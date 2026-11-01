@@ -1,7 +1,7 @@
 // Solfej Lab — gerçek Chromium (headless) uçtan uca testi
 //  Çalıştırma: bir kez `npm install` ve `npx playwright install chromium`, sonra `npm run e2e`
 //  Tek senaryo: `ONLY=A npm run e2e` (A tam sınav · B Tone/VexFlow taklidi · C sınav provası · D telefon · E zorlanan şarkıcı
-//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici · J kendi sınavın · K alıştırma)
+//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici · J kendi sınavın · K alıştırma · L kısayollar)
 //  • Sayfa localhost'tan sunulur (güvenli bağlam → getUserMedia).
 //  • Mikrofon = "sanal şarkıcı": o anki hedef sesi (+9 sent tiz) söyleyen osilatör → MediaStream.
 //  • CDN'ler: senaryo 'offline' → hepsi engellenir (yedek yollar); 'stub' → Tone.js / VexFlow taklitleri.
@@ -926,6 +926,118 @@ if (run('K')) {
   assert.equal(await page.evaluate(() => window.__dbg.session), null);
   assert.equal(await page.isHidden('#drillResult'), true);
   assert.equal(await page.isDisabled('#playBtn'), false);
+  assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
+  await context.close();
+}
+
+// ═══ SENARYO L: klavye kısayolları ═══
+if (run('L')) {
+  log('L) klavye kısayolları');
+  const { context, page, consoleMsgs } = await openPage('offline', FAST);
+  const st = () => page.evaluate(() => ({ state: window.__dbg.state, q: window.__dbg.session?.index ?? -1, paused: window.__dbg.paused, replays: window.__dbg.session?.result?.replays ?? 0 }));
+  await page.evaluate(() => { window.__singer.enabled = false; document.activeElement?.blur(); });
+  // İpucu: düğmelerin üzerinde kısayol
+  assert.equal(await page.getAttribute('#startBtn', 'data-sc'), 'Kısayol: Enter');
+  assert.equal(await page.getAttribute('#examPauseBtn', 'data-sc'), 'Kısayol: Boşluk');
+  // Enter → başlat; Boşluk → duraklat / devam (sayfa kaymaz); R → tekrar çal; N → geç
+  await page.keyboard.press('Enter');
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+  const y0 = await page.evaluate(() => window.scrollY);
+  await page.keyboard.press(' ');
+  assert.equal((await st()).paused, true);
+  assert.equal(await page.evaluate(() => window.scrollY), y0, 'Boşluk sayfayı kaydırmamalı');
+  await page.keyboard.press(' ');
+  assert.equal((await st()).paused, false);
+  await page.keyboard.press('r');
+  await waitFor(page, () => window.__dbg.state === 'PLAYING', null, 3000);
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 5000);
+  assert.equal((await st()).replays, 1);
+  await page.keyboard.press('n');
+  await waitFor(page, () => (window.__dbg.session?.index ?? 0) >= 1 && window.__dbg.state === 'LISTENING', null, 8000);
+  log('kısayollarla:', JSON.stringify(await st()));
+  // Odak bir düğmedeyken Enter düğmenin kendisini bir kez çalıştırır (kısayol ikinci kez çalışmaz)
+  await page.focus('#examReplayBtn');
+  await page.keyboard.press('Enter');
+  await waitFor(page, () => window.__dbg.state === 'PLAYING', null, 3000);
+  await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 5000);
+  assert.equal((await st()).replays, 1, 'düğmede Enter tek işlem');
+  await page.evaluate(() => document.activeElement.blur());
+  // B: bir kez → uyarı; iki kez (2 sn içinde) → test biter
+  await page.keyboard.press('b');
+  assert.match(await page.textContent('#notice'), /tekrar basın/);
+  assert.notEqual((await st()).state, 'SUMMARY');
+  await page.keyboard.press('b');
+  await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 5000);
+  // V → görünüm değişir; O → oktav toleransı; P → sınav portesi
+  const vm0 = await page.evaluate(() => window.__dbg.viewMode);
+  await page.keyboard.press('v');
+  assert.notEqual(await page.evaluate(() => window.__dbg.viewMode), vm0);
+  const fold0 = await page.isChecked('#foldToggle');
+  await page.keyboard.press('o');
+  assert.equal(await page.isChecked('#foldToggle'), !fold0);
+  await page.keyboard.press('o');
+  await page.keyboard.press('p');
+  assert.equal(await page.isChecked('#examStaffToggle'), false);
+  await page.keyboard.press('p');
+  // M → menü; Esc kapatır; 1–6 → bölümler (Türkçe Q/F'de rakamlar aynı)
+  await page.keyboard.press('m');
+  assert.equal(await page.isVisible('#menuList'), true);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.isHidden('#menuList'), true);
+  await page.keyboard.press('4');
+  await page.waitForFunction(() => location.hash === '#gecmis');
+  await page.keyboard.press('3');
+  await page.waitForFunction(() => location.hash === '#serbest');
+  // ? → kısayol listesi (Esc kapatır)
+  await page.keyboard.press('Shift+Slash');
+  if (!(await page.evaluate(() => document.getElementById('shortcutHelp').open))) await page.keyboard.type('?');
+  assert.equal(await page.evaluate(() => document.getElementById('shortcutHelp').open), true);
+  const helpRows = await page.locator('#scHelpList dt').count();
+  await page.screenshot({ path: `${OUT}/e2e-19-shortcut-help.png` });
+  await page.keyboard.press('Escape');
+  assert.equal(await page.evaluate(() => document.getElementById('shortcutHelp').open), false);
+  assert.equal(helpRows, 17);
+  // Yazı kutusunda kısayol çalışmaz
+  await page.keyboard.press('2');
+  await page.waitForFunction(() => location.hash === '#sinav');
+  await page.click('#examTabs [data-etab="custom"]');
+  await page.waitForFunction(() => !document.getElementById('customExam').hidden);
+  await page.fill('#cxName', '');
+  await page.type('#cxName', 'B1m');
+  assert.equal(await page.inputValue('#cxName'), 'B1m');
+  assert.equal(await page.evaluate(() => location.hash), '#kendi-sinavim', '"1" bölüm değiştirmemeli');
+  // Ayarlar → Kısayollar: Tekrar çal'ı T yap (Değiştir → tuşa bas); N'ye atayınca çakışma uyarısı; varsayılana dön; kopyala
+  await page.evaluate(() => document.activeElement.blur());
+  await page.keyboard.press('5');
+  await page.waitForFunction(() => location.hash === '#ayarlar');
+  await page.click('#settingsPanel [data-tab="keys"].tab');
+  assert.equal(await page.isHidden('#settingsActions'), true);
+  const row = (id) => `#shortcutsPanel .sc-row[data-sc="${id}"]`;
+  await page.click(`${row('replay')} button:text-is("Değiştir")`);
+  assert.match(await page.textContent(`${row('replay')} kbd`), /Bir tuşa basın/);
+  await page.keyboard.press('t');
+  assert.equal(await page.textContent(`${row('replay')} kbd`), 'T');
+  assert.equal(await page.evaluate(() => window.solfejLab.CONFIG.SHORTCUTS.replay), 'T');
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('solfejlab.config.v1')).SHORTCUTS.replay), 'T');
+  await page.click(`${row('replay')} button:text-is("Değiştir")`);
+  await page.keyboard.press('n');
+  assert.match(await page.textContent('#scConflictMsg'), /Aynı tuş/);
+  assert.equal(await page.evaluate((s) => document.querySelector(s).classList.contains('conflict'), row('skip')), true);
+  await page.screenshot({ path: `${OUT}/e2e-20-shortcuts-settings.png`, fullPage: true });
+  await page.click(`${row('replay')} button:text-is("Değiştir")`);
+  await page.keyboard.press('Escape');
+  assert.equal(await page.textContent(`${row('replay')} kbd`), 'N', 'Esc vazgeçer');
+  await page.click('#scCopy');
+  await page.waitForFunction(() => /kısayol/.test(document.getElementById('notice').textContent));
+  await page.click(`${row('replay')} button:text-is("Varsayılana dön")`);
+  assert.equal(await page.textContent(`${row('replay')} kbd`), 'R');
+  assert.equal(await page.textContent('#scConflictMsg'), '');
+  // Ad düzenleme modunda kısayol çalışmaz
+  await page.click('#settingsPanel [data-tab="names"].tab');
+  await page.check('#editNamesToggle', { force: true });
+  await page.keyboard.press('2');
+  assert.equal(await page.evaluate(() => location.hash), '#ayarlar', 'ad düzenlerken bölüm değişmemeli');
+  await page.click('#editDoneBtn');
   assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
   await context.close();
 }

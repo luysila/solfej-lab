@@ -23,7 +23,7 @@ export const ui = {
   examControls: $('examControls'), practiceControls: $('practiceControls'), practiceBusy: $('practiceBusy'),
   singleFields: $('singleFields'), drillSetup: $('drillSetup'), drillStart: $('drillStartBtn'), drillSkip: $('drillSkipBtn'), drillStop: $('drillStopBtn'),
   drillResult: $('drillResult'), drillMeta: $('drillMeta'), drillList: $('drillList'), drillAgain: $('drillAgainBtn'), drillClose: $('drillCloseBtn'),
-  historyFilter: $('historyFilter'),
+  historyFilter: $('historyFilter'), shortcutsPanel: $('shortcutsPanel'), shortcutHelp: $('shortcutHelp'), scHelpList: $('scHelpList'), scHelpClose: $('scHelpClose'),
   customExam: $('customExam'), sumAnswersWrap: $('sumAnswersWrap'), sumAnswers: $('sumAnswers'),
   menuBtn: $('menuBtn'), menuList: $('menuList'), workspace: $('workspace'), examSlot: $('examSlot'), practiceSlot: $('practiceSlot'),
   examPause: $('examPauseBtn'), practicePause: $('practicePauseBtn'), settingsActions: $('settingsActions'),
