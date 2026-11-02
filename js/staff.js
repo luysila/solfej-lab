@@ -56,6 +56,7 @@ export function markContour(t, label) {
 export function drawContour(now) {
   const { ctx, w: W, h: H, dpr, colors: C } = contour;
   if (!ctx || !C) return;
+  if (document.hidden || !ui.contour.offsetParent) return;   // görünmeyen bölüm / kapalı porte çizilmez (telefonda pil ve işlemci)
   if (contour.staffMode) { drawStaffContour(now); return; }
   ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
   ctx.clearRect(0, 0, W, H);

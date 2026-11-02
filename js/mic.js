@@ -3,7 +3,7 @@
 
 import { CONFIG } from './config.js';
 import { MedianFilter, YinDetector, dbToLin } from './pure.js';
-import { audioCtx, loadPitchy } from './audio.js';
+import { audioCtx, loadPitchy, setAudioSession } from './audio.js';
 import { examActive, renderDetectorChip, setMicChip, showAlert, showNotice, ui, updateLatencyChip } from './ui.js';
 import { assignRafId, frame, hardReset, rafId } from './app.js';
 
@@ -116,6 +116,7 @@ export async function startMic(deviceId) {
   const track = stream.getAudioTracks()[0];
   track?.addEventListener('ended', onMicLost);
   micStream = stream;
+  setAudioSession('play-and-record');               // iOS: mikrofon + çalım aynı oturumda (destek varsa)
   micSource = audioCtx.createMediaStreamSource(stream);
   analyser = audioCtx.createAnalyser();
   analyser.fftSize = analysisSize(audioCtx.sampleRate);

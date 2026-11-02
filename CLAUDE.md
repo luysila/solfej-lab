@@ -155,7 +155,14 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
   Yazı kutularında, ad düzenlerken ve tuş atarken çalışmaz; odak düğmedeyken Enter/Boşluk düğmenin kendisi. Kısayol işlevi
   ilgili düğmeye tıklar (aynı kurallar). Ayarlar → Kısayollar: Değiştir / Kaldır / Varsayılana dön, çakışma uyarısı, kopyala
   (özel ayar olarak `solfejlab.config.v1`).
-- **Aşama 7 (telefon/tablet) henüz yapılmadı** — `docs/istek-2.md`'deki AŞAMA 7 bölümüne bakın.
+- **Telefon ve tablet** (Aşama 7): telefonda (≤600 px) tek sütun; ana düğmeler (`.mainbar`) altta sabit çubukta, sığmazsa
+  iki satır. Dokunmatik geniş ekranda (`pointer: coarse`, ≥740 px) iki sütun: solda kontroller ve okunacak sesler, sağda
+  akort paneli (masaüstü düzeni değişmez). Güvenli alan payları (`env(safe-area-inset-*)`), dokunmatikte en az 44 px dokunma
+  alanı, giriş kutularında 16 px yazı, `touch-action: manipulation`, fareye özgü etkiler yalnız `(hover: hover)`.
+  Ses: ilk dokunuşta `unlockAudio` (AudioContext + sessiz örnek + Tone.start); mikrofon açılınca `navigator.audioSession`
+  'play-and-record' (destek varsa); telefonda bir kez kulaklık uyarısı. Çalışma sırasında Screen Wake Lock (`keepAwake`);
+  arka plana geçince (`visibilitychange`, `pagehide`) kendiliğinden duraklar. Görünmeyen porte çizilmez; piksel oranı en fazla 2.
+  Testler: e2e M (iPhone 13, Pixel 7, iPad; ayrıca WebKit yerleşim testi; ekran görüntüleri `tests/.screenshots/m-*.png`).
 
 ## Doğrulanmamış / bilinen sınırlar
 - Tone.js (14.8.49) ve VexFlow (4.2.5) gerçek kütüphaneleriyle henüz denenmedi (önceki geliştirme ortamında CDN'ler

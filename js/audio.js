@@ -108,6 +108,32 @@ export function createAudioContext() {
 export async function ensureAudio() {
   createAudioContext();
   if (audioCtx.state !== 'running') await audioCtx.resume();   // kullanıcı jesti içinde çağrılır
+  unlockAudio();
+}
+
+/**
+ * iPhone/iPad: ses ancak dokunuşla başlar. İlk dokunuşta (ve her başlatmada) AudioContext sürdürülür,
+ * kısa sessiz bir örnek çalınır (iOS sesi "açar") ve Tone.js yüklüyse başlatılır. Tekrar çağrılması zararsız.
+ */
+export let audioUnlocked = false;
+export function unlockAudio() {
+  try {
+    createAudioContext();
+    if (audioCtx.state !== 'running') audioCtx.resume().catch(() => {});
+    if (!audioUnlocked) {
+      const buf = audioCtx.createBuffer(1, 1, audioCtx.sampleRate);
+      const src = audioCtx.createBufferSource();
+      src.buffer = buf;
+      src.connect(audioCtx.destination);
+      src.start(0);
+      audioUnlocked = true;
+    }
+    window.Tone?.start?.().catch?.(() => {});
+  } catch { /* desteklenmiyorsa sessizce geç */ }
+}
+/** Tarayıcı destekliyorsa (Safari 16.4+) ses oturumu: mikrofon açıkken 'play-and-record' */
+export function setAudioSession(type) {
+  try { if (navigator.audioSession && navigator.audioSession.type !== type) navigator.audioSession.type = type; } catch { /* yoksay */ }
 }
 
 /** Tone.js + Salamander piyano örneklerini hazırlar. Başarısızlıkta false döner (yedek sentez kullanılır). */

@@ -1,7 +1,7 @@
 // Solfej Lab — gerçek Chromium (headless) uçtan uca testi
 //  Çalıştırma: bir kez `npm install` ve `npx playwright install chromium`, sonra `npm run e2e`
 //  Tek senaryo: `ONLY=A npm run e2e` (A tam sınav · B Tone/VexFlow taklidi · C sınav provası · D telefon · E zorlanan şarkıcı
-//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici · J kendi sınavın · K alıştırma · L kısayollar)
+//               · F 6 sn −60 sent pes, sonra düzeltme · G arayüz adlarını sayfada düzenleme · H bölümler, menü, duraklatma · I görünüm seçici · J kendi sınavın · K alıştırma · L kısayollar · M telefon/tablet)
 //  • Sayfa localhost'tan sunulur (güvenli bağlam → getUserMedia).
 //  • Mikrofon = "sanal şarkıcı": o anki hedef sesi (+9 sent tiz) söyleyen osilatör → MediaStream.
 //  • CDN'ler: senaryo 'offline' → hepsi engellenir (yedek yollar); 'stub' → Tone.js / VexFlow taklitleri.
@@ -111,8 +111,8 @@ const browser = await chromium.launch({
   args: ['--autoplay-policy=no-user-gesture-required', '--use-fake-ui-for-media-stream', '--use-fake-device-for-media-stream'],
 });
 
-async function openPage(scenario, overrides, { width = 980, height = 1400, hash = 'sinav' } = {}) {
-  const context = await browser.newContext({ viewport: { width, height }, permissions: ['microphone'] });
+async function openPage(scenario, overrides, { width = 980, height = 1400, hash = 'sinav', device = null } = {}) {
+  const context = await browser.newContext(device ? { ...device, permissions: ['microphone'] } : { viewport: { width, height }, permissions: ['microphone'] });
   await context.addInitScript(SINGER);
   await context.addInitScript(`(() => { try { if (!sessionStorage.getItem('__init')) { sessionStorage.setItem('__init', '1'); localStorage.clear(); ${overrides ? `localStorage.setItem('solfejlab.config.v1', ${JSON.stringify(JSON.stringify(overrides))});` : ''} } } catch (e) {} })();`);
   const requests = [];
@@ -1040,6 +1040,86 @@ if (run('L')) {
   await page.click('#editDoneBtn');
   assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0);
   await context.close();
+}
+
+// ═══ SENARYO M: telefon ve tablet — iPhone 13, Pixel 7, iPad (Chromium) + WebKit (Safari motoru) yerleşim ═══
+if (run('M')) {
+  log('M) telefon ve tablet');
+  const { devices, webkit } = await import('playwright');
+  const SECS = ['ana-sayfa', 'sinav', 'kendi-sinavim', 'serbest', 'gecmis', 'ayarlar', 'yardim'];
+  /** Bir cihazda: her bölümün ekran görüntüsü, yatay taşma, dokunma alanı, giriş yazısı */
+  async function layoutCheck(page, name, isPhone, isTablet) {
+    for (const sec of SECS) {
+      await go(page, sec);
+      await page.waitForTimeout(150);
+      const m = await page.evaluate(() => ({
+        overflow: document.documentElement.scrollWidth - window.innerWidth,
+        bar: (() => { const b = [...document.querySelectorAll('.mainbar')].find((x) => x.offsetParent || getComputedStyle(x).position === 'fixed' && x.getClientRects().length); if (!b || !b.getClientRects().length) return null; const r = b.getBoundingClientRect(); return { pos: getComputedStyle(b).position, bottom: Math.round(innerHeight - r.bottom), minBtn: Math.min(...[...b.querySelectorAll('.btn')].filter((x) => x.offsetParent).map((x) => x.getBoundingClientRect().height)) }; })(),
+        inputFont: Math.min(...[...document.querySelectorAll('input, select, textarea')].filter((x) => x.offsetParent && x.type !== 'checkbox' && x.type !== 'range' && x.type !== 'file').map((x) => parseFloat(getComputedStyle(x).fontSize)), 99),
+        smallTargets: [...document.querySelectorAll('main .btn, main .tab, main .cx-chip, main .seg-ctl button')].filter((x) => x.offsetParent && x.getBoundingClientRect().height < 40).length,
+      }));
+      if (m.overflow > 0) throw new Error(`${name} ${sec}: yatay taşma ${m.overflow}px`);
+      assert.ok(m.inputFont >= 16, `${name} ${sec}: giriş yazısı ${m.inputFont}px (iPhone büyütmesin diye ≥16)`);
+      assert.equal(m.smallTargets, 0, `${name} ${sec}: 40 px'ten küçük dokunma alanı`);
+      if (isPhone && (sec === 'sinav' || sec === 'serbest')) {
+        assert.ok(m.bar && m.bar.pos === 'fixed' && m.bar.bottom === 0, `${name} ${sec}: ana düğmeler altta sabit çubukta ${JSON.stringify(m.bar)}`);
+        assert.ok(m.bar.minBtn >= 44, `${name} ${sec}: çubuk düğmesi ${m.bar.minBtn}px`);
+        const off = await page.evaluate(() => [...document.querySelectorAll('.mainbar .btn')].filter((b) => b.offsetParent && (b.getBoundingClientRect().right > innerWidth + 1 || b.getBoundingClientRect().left < -1)).length);
+        assert.equal(off, 0, `${name} ${sec}: alt çubuktaki düğmelerin hepsi ekranda`);
+      }
+      await page.screenshot({ path: `${OUT}/m-${name}-${sec}.png` });
+    }
+    if (isTablet) {                                 // iki sütun: solda kontroller, sağda porte ve gösterge
+      await go(page, 'sinav');
+      const two = await page.evaluate(() => { const a = document.getElementById('examPanel').getBoundingClientRect(), t = document.getElementById('tuner').getBoundingClientRect(); return { left: Math.round(a.left), tunerLeft: Math.round(t.left), aRight: Math.round(a.right) }; });
+      log(`${name} iki sütun:`, JSON.stringify(two));
+      assert.ok(two.tunerLeft >= two.aRight, 'tablette porte ve gösterge sağ sütunda');
+    }
+  }
+  for (const [name, dev, phone, tablet] of [['iphone13', devices['iPhone 13'], true, false], ['pixel7', devices['Pixel 7'], true, false], ['ipad', devices['iPad (gen 7)'], false, true]]) {
+    const { context, page, consoleMsgs } = await openPage('offline', { ...FAST, QUESTION_COUNTS: { single: 1, double: 1, triple: 1 } }, { device: dev });
+    await layoutCheck(page, name, phone, tablet);
+    if (name === 'iphone13') {
+      // Sanal şarkıcı telefonda: alttaki çubuktan dokunarak başlat → kısa sınav biter
+      await go(page, 'sinav');
+      await page.tap('#startBtn');
+      await waitFor(page, () => window.__dbg.state === 'LISTENING', null, 15000);
+      assert.match(await page.textContent('#notice'), /Kulaklık/, 'telefonda kulaklık uyarısı');
+      // Arka plana geçince kendiliğinden duraklar; dönünce "Devam"
+      await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => true }); document.dispatchEvent(new Event('visibilitychange')); });
+      assert.equal(await page.evaluate(() => window.__dbg.paused), true, 'arka planda duraklamalı');
+      await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
+      assert.equal(await page.evaluate(() => window.__dbg.paused), true, 'dönünce kendiliğinden sürmemeli');
+      await page.tap('#examPauseBtn');
+      await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 40000);
+      const sc = await page.evaluate(() => ({ score: window.__dbg.diag.score, statuses: window.__dbg.session.results.map((r) => r.status).join(',') }));
+      log('iPhone 13 sınav:', JSON.stringify(sc));
+      assert.equal(sc.statuses, 'done,done,done');
+      await page.screenshot({ path: `${OUT}/m-iphone13-summary.png`, fullPage: true });
+    }
+    assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0, `${name}: sayfa hatası`);
+    await context.close();
+  }
+  // WebKit (Safari motoru): yerleşim ve sayfa hataları
+  let wk = null;
+  try { wk = await webkit.launch(); } catch (e) { log('WebKit kurulu değil, atlandı:', e.message.split('\n')[0]); }
+  if (wk) {
+    for (const [name, dev, phone, tablet] of [['webkit-iphone13', devices['iPhone 13'], true, false], ['webkit-ipad', devices['iPad (gen 7)'], false, true]]) {
+      const context = await wk.newContext({ ...dev });
+      await context.addInitScript(`try { localStorage.clear(); } catch (e) {}`);
+      await context.route(/cdn\.jsdelivr\.net|unpkg\.com|esm\.sh|tonejs\.github\.io/, (r) => r.abort());
+      const page = await context.newPage();
+      const errs = [];
+      page.on('pageerror', (e) => errs.push(e.message));
+      await page.goto(`${BASE}?debug#ana-sayfa`);
+      await page.waitForFunction(() => window.__dbg && window.solfejLab);
+      await layoutCheck(page, name, phone, tablet);
+      assert.deepEqual(errs, [], `${name}: sayfa hatası`);
+      log(`${name}: yerleşim tamam`);
+      await context.close();
+    }
+    await wk.close();
+  }
 }
 
 await browser.close();

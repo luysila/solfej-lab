@@ -342,6 +342,7 @@ export const CONFIG = {
     histExams: 'Sınav',
     histDrills: 'Alıştırma',
     tagDrill: 'Alıştırma',
+    phoneHeadphones: 'Kulaklık takın: hoparlör sesi mikrofona karışır; sessiz modda ses kesilebilir.',
     // Klavye kısayolları (Aşama 6)
     setTabKeys: 'Kısayollar',
     scStart: 'Başlat',

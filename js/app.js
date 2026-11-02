@@ -37,7 +37,7 @@
 import { CONFIG, DEFAULT_CONFIG } from './config.js';
 import { customExamToConfig, drillToConfig, generateDrillChunk } from './pure.js';
 import { ExamSession, Exercise, PLAYBACK_MODES, ROOTS, S, TYPE_BY_ID, clamp, coachMessage, compareToTarget, computeDiagnostics, dbToLin, deepClone, deepMerge, freqToMidi, generateSession, isPlainObject, makeHistoryEntry, midiToFreq, mulberry32, nearestNoteName, octaveModeFor, recordPitchFrame, rootMeanSquare, zoneOf } from './pure.js';
-import { audioCtx, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound } from './audio.js';
+import { audioCtx, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound, unlockAudio } from './audio.js';
 import { analyser, assignRmsLinear, detector, ensureMic, explainError, medianFilter, micStream, refreshDevices, rmsLinear, settings, setupDetector, startMic, timeBuf } from './mic.js';
 import { activeCfg, applyCoachFont, canPauseNow, drillActive, paused, setPausedState } from './ui.js';
 import { buildCustomUI, examTab } from './custom.js';
@@ -47,7 +47,7 @@ import { contour, drawContour, examStaffOn, markContour, pushContour, scheduleSt
 import { addHistory, bindHistoryFilter, clearHistory, hideSummary, loadHistory, renderHistory, showSummary } from './summary.js';
 import { bindNav, goSection, initNav, loadUiState, saveUiState } from './nav.js';
 import { applyShortcutHints, bindKeys, renderShortcuts } from './keys.js';
-import { CONFIG_KEY, PREFS_KEY, applyOverrides, bindSettingsTabs, applyTexts, buildSettingsForm, configOverrides, fillPresetSelect, fillSettingsForm, onApplySettings, onCopyAll, onCopyNames, onEditClick, onJsonApply, onJsonExport, onJsonImportFile, onPresetChange, positionEditor, refreshJsonArea, reportApply, savePrefs, setEditNames, setTextKey, storageGet } from './settings.js';
+import { CONFIG_KEY, PREFS_KEY, T, applyOverrides, bindSettingsTabs, applyTexts, buildSettingsForm, configOverrides, fillPresetSelect, fillSettingsForm, onApplySettings, onCopyAll, onCopyNames, onEditClick, onJsonApply, onJsonExport, onJsonImportFile, onPresetChange, positionEditor, refreshJsonArea, reportApply, savePrefs, setEditNames, setTextKey, storageGet } from './settings.js';
 
 // ───────────────────────────────────────────────────────────────────────
 // 6) DURUM MAKİNESİ GEÇİŞ EYLEMLERİ
@@ -58,6 +58,7 @@ export const octaveVotes = new Map();          // ilk sesin tolerans içi karele
 export function onStateChange(next, prev, payload) {
   switch (next) {
     case S.IDLE:
+      keepAwake(false);
       exercise.restart();
       tracker.reset();
       medianFilter.reset();
@@ -66,6 +67,7 @@ export function onStateChange(next, prev, payload) {
       break;
 
     case S.PLAYING: {                               // sesler çalınır; bu sırada mikrofon yok sayılır
+      keepAwake(true);                              // sınav / alıştırma sırasında ekran kararmasın
       if (payload?.fresh) exercise.restart();
       if (payload?.replay && session?.result) session.result.replays++;
       tracker.reset();
@@ -118,6 +120,7 @@ export function onStateChange(next, prev, payload) {
       break;
 
     case S.SUMMARY:
+      keepAwake(false);
       clearReadouts();
       stopAllSound();
       if (session?.drill) showDrillResult(session);  // alıştırma: soru listesi · sınav: teşhis ekranı
@@ -205,7 +208,38 @@ export function hardReset() {
 }
 
 /** Ses + mikrofon + algılayıcıyı hazırlar (kullanıcı jesti içinde çağrılır). Hata olursa false. */
+// ── Telefon ve tablet: ekranın kararmaması, arka planda duraklama, kulaklık uyarısı ──
+let wakeLock = null, wantAwake = false;
+/** Screen Wake Lock: destek yoksa sessizce geçer; sekme gizlenince tarayıcı bırakır, dönünce yeniden istenir */
+export async function keepAwake(on) {
+  wantAwake = on;
+  try {
+    if (on && !wakeLock && navigator.wakeLock && !document.hidden) {
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener?.('release', () => { wakeLock = null; });
+    } else if (!on && wakeLock) { const w = wakeLock; wakeLock = null; await w.release(); }
+  } catch { wakeLock = null; }
+}
+export const isPhone = () => window.matchMedia?.('(pointer: coarse)').matches && Math.min(screen.width, screen.height) < 600;
+/** Telefonda ilk başlatmada bir kez kulaklık uyarısı (bu sekmede) */
+export function headphoneHint() {
+  try {
+    if (!isPhone() || sessionStorage.getItem('solfejlab.hp')) return;
+    sessionStorage.setItem('solfejlab.hp', '1');
+  } catch { if (!isPhone()) return; }
+  showNotice(T('phoneHeadphones'), 9000);
+}
+/** Uygulama arka plana geçince (arama, başka uygulama) duraklar; dönünce "Devam" ile sürer */
+export function onVisibility() {
+  if (document.hidden) {
+    pauseFlow();
+    tracker.reset();
+    medianFilter.reset();
+  } else if (wantAwake) keepAwake(true);
+}
+
 export async function prepareInput() {
+  headphoneHint();
   try {
     await ensureAudio();                            // AudioContext kullanıcı jestiyle başlatılır
     await ensureMic();
@@ -519,7 +553,10 @@ export function bindEvents() {
   window.addEventListener('scroll', positionEditor, { passive: true });   // düzenleme kutusu yazının üstünde kalır
   window.addEventListener('resize', positionEditor);
 
-  document.addEventListener('visibilitychange', () => { if (document.hidden) { tracker.reset(); medianFilter.reset(); } });
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', () => pauseFlow());
+  document.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });   // iOS: ses ilk dokunuşta açılır
+  window.addEventListener('orientationchange', () => setTimeout(() => drawContour(performance.now()), 300));
   navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (micStream) refreshDevices(); });
   if ('ResizeObserver' in window) {
     let raf = 0;
