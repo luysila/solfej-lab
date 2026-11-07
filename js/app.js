@@ -37,9 +37,9 @@
 import { CONFIG, DEFAULT_CONFIG } from './config.js';
 import { customExamToConfig, drillToConfig, generateDrillChunk } from './pure.js';
 import { ExamSession, Exercise, PLAYBACK_MODES, ROOTS, S, TYPE_BY_ID, clamp, coachMessage, compareToTarget, computeDiagnostics, dbToLin, deepClone, deepMerge, freqToMidi, generateSession, isPlainObject, makeHistoryEntry, midiToFreq, mulberry32, nearestNoteName, octaveModeFor, recordPitchFrame, rootMeanSquare, zoneOf } from './pure.js';
-import { audioCtx, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound, unlockAudio } from './audio.js';
+import { audioCtx, audioSuspended, createAudioContext, ensureAudio, loadPitchy, piano, playMelodic, playReward, preparePiano, sleep, stopAllSound, unlockAudio } from './audio.js';
 import { analyser, assignRmsLinear, detector, ensureMic, explainError, medianFilter, micStream, refreshDevices, rmsLinear, settings, setupDetector, startMic, timeBuf } from './mic.js';
-import { activeCfg, applyCoachFont, canPauseNow, drillActive, paused, setPausedState } from './ui.js';
+import { activeCfg, applyCoachFont, assignBgPaused, bgPaused, canPauseNow, drillActive, hideResumeBanner, paused, setPausedState, showResumeBanner } from './ui.js';
 import { buildCustomUI, examTab } from './custom.js';
 import { applyPracticeExercise, bindDrill, buildDrillUI, hideDrillResult, showDrillResult } from './drill.js';
 import { after, assignExercise, assignLastDiag, assignLastReadoutTs, assignMode, assignNeedleTarget, assignSession, assignStarting, assignUiReady, buildNoteBoxes, buildTicks, cancelFlow, clearReadouts, coachState, coachWin, easeNeedle, examActive, exercise, fillSelects, fmtCents, fsm, gaugeHalf, gaugeRange, hideAlert, lastDiag, lastReadoutTs, mode, needleTarget, nf1, nf2, observeGauge, paintGaugeBackground, paintLevel, paintSustain, renderAll, renderConfigChip, renderDetectorChip, renderEngineChip, renderTimer, resetCoach, selectionChanged, session, setCoach, setText, setZone, showAlert, showNotice, starting, tracker, ui, uiReady, updateFoldUi, updateHeaderText, updateThresholdUi } from './ui.js';
@@ -56,6 +56,7 @@ export let invalidMs = 0, lastOctave = 0;
 export const octaveVotes = new Map();          // ilk sesin tolerans içi karelerinde oktav kayması oyları → sağlam çapa
 
 export function onStateChange(next, prev, payload) {
+  queueMicrotask(refreshResumeBanner);             // "Sesi aç" mesajı yalnız çalışma sürerken (durum değişince güncellenir)
   switch (next) {
     case S.IDLE:
       keepAwake(false);
@@ -171,8 +172,13 @@ export function resumeFlow() {
   else if (st === S.VERIFIED) advanceVerified();
   else if (st === S.COMPLETE && session) nextQuestion();
   renderAll();
+  refreshResumeBanner();
 }
-export function togglePause() { if (paused) resumeFlow(); else pauseFlow(); }
+export function togglePause() {
+  if (paused && bgPaused) onResumeBanner();          // arka plandan dönüş: ses ve mikrofon yeniden açılarak sürer
+  else if (paused) resumeFlow();
+  else pauseFlow();
+}
 
 export function loadQuestion(q) {
   assignExercise(new Exercise(q.notes));
@@ -205,6 +211,7 @@ export function hardReset() {
   applySessionCfg();                                // sayaç ve gösterge bantları genel ayara döner
   if (fsm.state !== S.IDLE) fsm.go(S.IDLE);
   else { exercise.restart(); tracker.reset(); clearReadouts(); renderAll(); }
+  refreshResumeBanner();
 }
 
 /** Ses + mikrofon + algılayıcıyı hazırlar (kullanıcı jesti içinde çağrılır). Hata olursa false. */
@@ -229,13 +236,35 @@ export function headphoneHint() {
   } catch { if (!isPhone()) return; }
   showNotice(T('phoneHeadphones'), 9000);
 }
-/** Uygulama arka plana geçince (arama, başka uygulama) duraklar; dönünce "Devam" ile sürer */
+/** Uygulama arka plana geçince (arama, başka uygulama) duraklar; dönünce açık bir mesaj ve "Devam et" düğmesi */
 export function onVisibility() {
   if (document.hidden) {
-    pauseFlow();
+    if (pauseFlow() || paused) assignBgPaused(true);   // elle duraklatılmışsa da: dönüşte mikrofon yeniden açılmalı
     tracker.reset();
     medianFilter.reset();
-  } else if (wantAwake) keepAwake(true);
+  } else {
+    if (wantAwake) keepAwake(true);
+    refreshResumeBanner();
+  }
+}
+/** Durum mesajı: arka planda durakladıysa "Devam et"; çalışma sürerken ses bağlamı askıdaysa "Sesi aç" */
+export function refreshResumeBanner() {
+  if (document.hidden) return;
+  if (paused && bgPaused) showResumeBanner('resumeBackground', 'btnResumeGo');
+  else if (audioSuspended() && fsm.state !== S.IDLE && fsm.state !== S.SUMMARY) showResumeBanner('resumeAudio', 'btnAudioOn');
+  else hideResumeBanner();
+}
+/** Mesajdaki düğme (bir dokunuş = kullanıcı jesti): ses yeniden açılır, gerekiyorsa mikrofon yeniden istenir, akış sürer */
+export async function onResumeBanner() {
+  unlockAudio();
+  if (paused && bgPaused) {
+    hideResumeBanner();
+    if (!(await prepareInput())) { refreshResumeBanner(); return; }
+    resumeFlow();
+  } else {
+    try { await ensureAudio(); } catch (err) { showAlert(explainError(err)); }
+  }
+  refreshResumeBanner();
 }
 
 export async function prepareInput() {
@@ -244,6 +273,7 @@ export async function prepareInput() {
     await ensureAudio();                            // AudioContext kullanıcı jestiyle başlatılır
     await ensureMic();
     await setupDetector();
+    refreshResumeBanner();                          // iOS: resume() sonuçlanmadıysa "Sesi aç" mesajı
     return true;
   } catch (err) {
     console.error(err);
@@ -554,7 +584,9 @@ export function bindEvents() {
   window.addEventListener('resize', positionEditor);
 
   document.addEventListener('visibilitychange', onVisibility);
-  window.addEventListener('pagehide', () => pauseFlow());
+  window.addEventListener('pagehide', () => { if (pauseFlow() || paused) assignBgPaused(true); });
+  ui.resumeBtn.addEventListener('click', onResumeBanner);
+  window.addEventListener('solfej:audiostate', () => refreshResumeBanner());   // ses bağlamı askıya alındı / sürdü
   document.addEventListener('pointerdown', unlockAudio, { capture: true, passive: true });   // iOS: ses ilk dokunuşta açılır
   window.addEventListener('orientationchange', () => setTimeout(() => drawContour(performance.now()), 300));
   navigator.mediaDevices?.addEventListener?.('devicechange', () => { if (micStream) refreshDevices(); });

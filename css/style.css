@@ -392,11 +392,11 @@ input[type="number"]:focus-visible, input[type="text"]:focus-visible, textarea:f
 .key-band { display: inline-block; width: 12px; height: 10px; border-radius: 2px; vertical-align: -1px; margin-right: 6px; background: rgba(var(--green-rgb), .22); }
 .contour canvas { display: block; width: 100%; height: var(--view-h, 230px); border-radius: 12px; background: var(--field); border: 1px solid var(--line); }
 
-.meter-row { display: grid; grid-template-columns: minmax(110px, 1fr) 1.8fr auto; gap: 14px; align-items: center; margin-top: 22px; font-size: 12.5px; color: var(--muted); }
+.meter-row { display: grid; grid-template-columns: minmax(110px, 1fr) minmax(0, 1.8fr) auto; gap: 14px; align-items: center; margin-top: 22px; font-size: 12.5px; color: var(--muted); }
 .meter { position: relative; height: 8px; border-radius: 999px; background: var(--field); border: 1px solid var(--line); overflow: hidden; }
 .meter-fill { height: 100%; transform-origin: left center; transform: scaleX(0); background: linear-gradient(90deg, var(--meter-a), var(--meter-b)); }
 .meter-thr { position: absolute; top: 0; bottom: 0; width: 2px; background: var(--gate); }
-.thr { display: flex; align-items: center; gap: 10px; }
+.thr { display: flex; align-items: center; gap: 10px; min-width: 0; }
 .thr input { flex: 1; min-width: 80px; accent-color: var(--accent); }
 @media (max-width: 620px) { .meter-row { grid-template-columns: 1fr; } }
 
@@ -558,9 +558,24 @@ kbd.capturing { border-color: var(--accent); color: var(--accent); }
 /* ── Telefon ve tablet ── (Aşama 7) */
 html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
 body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }   /* çift dokunuşta yakınlaşma yok */
+/* Kırılma noktaları: telefon ≤ 600 px · tablet 601–1024 px · masaüstü > 1024 px (masaüstü düzeni değişmez).
+   --gutter: sayfanın yan kenar boşluğu (masaüstü 12 px, tablet 20 px, telefon 16 px) */
+html { --gutter: 12px; }
+@media (min-width: 601px) and (max-width: 1024px) { html { --gutter: 20px; } }
+@media (max-width: 600px) { html { --gutter: 16px; } }
 /* Çentikli ekranlar: güvenli alan payları */
-.app { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
-.top { padding-top: max(8px, env(safe-area-inset-top)); padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); margin-left: calc(-1 * max(12px, env(safe-area-inset-left))); margin-right: calc(-1 * max(12px, env(safe-area-inset-right))); }
+.app { padding-left: max(var(--gutter), env(safe-area-inset-left)); padding-right: max(var(--gutter), env(safe-area-inset-right)); padding-bottom: calc(40px + env(safe-area-inset-bottom)); }
+.top { padding-top: max(8px, env(safe-area-inset-top)); padding-left: max(var(--gutter), env(safe-area-inset-left)); padding-right: max(var(--gutter), env(safe-area-inset-right)); margin-left: calc(-1 * max(var(--gutter), env(safe-area-inset-left))); margin-right: calc(-1 * max(var(--gutter), env(safe-area-inset-right))); }
+/* Telefon/tablet durum mesajı (arka planda durakladı · ses askıda): üst çubuğun altında, kaydırınca da görünür */
+.resume-banner {
+  position: sticky; top: calc(56px + env(safe-area-inset-top)); z-index: 40; display: flex; flex-wrap: wrap; align-items: center;
+  justify-content: space-between; gap: 8px 12px; padding: 10px 12px; border-radius: 10px; font-size: 15px; font-weight: 600;
+  color: var(--notice-text); background: var(--panel-2); border: 1px solid rgba(var(--accent-rgb), .55); box-shadow: 0 6px 20px rgba(0, 0, 0, .35);
+}
+.resume-banner[hidden] { display: none; }
+.resume-banner span { flex: 1 1 200px; min-width: 0; }
+.resume-banner .btn { min-height: 44px; }
+.sc-touch { margin: 0 0 10px; }
 /* Dokunmatik: en az 44 px dokunma alanı; iPhone'da kutuya odaklanınca sayfa büyümesin (en az 16 px yazı) */
 @media (pointer: coarse) {
   .btn, .tab, .menu-btn, .menu a, .seg-ctl button, .cx-chip, a.btn { min-height: 44px; }
@@ -589,6 +604,13 @@ body { touch-action: manipulation; -webkit-tap-highlight-color: transparent; }  
   .cx-bar { top: calc(50px + env(safe-area-inset-top)); }
   .tiles { grid-template-columns: 1fr; }
   .common { gap: 8px 14px; }
+  /* Yatay kaydırma olmasın: uzun sözcükler ve geniş öğeler ekrana sığar */
+  .app > * { min-width: 0; }
+  .panel, .section { overflow-wrap: anywhere; }
+  /* Yönlendirme (koç) satırı: akışta kalır (altta sabit değil), alttaki düğme çubuğunun altında kalmaz,
+     uzun metin üst üste binmez; çok uzarsa kendi içinde kaydırılır */
+  .coach { position: static; max-height: 7.5em; overflow-y: auto; overscroll-behavior: contain; overflow-wrap: anywhere; scroll-margin-bottom: calc(140px + env(safe-area-inset-bottom)); }
+  .resume-banner { top: calc(52px + env(safe-area-inset-top)); }
 }
 /* Yatay telefon: kısa ekranda porte/gösterge alçalır */
 @media (max-height: 500px) and (orientation: landscape) { .tuner { --view-h: 170px; } }

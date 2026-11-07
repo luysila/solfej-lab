@@ -147,6 +147,7 @@ export const CONFIG = {
   UI: {
     VIEW_MODE: 'staff+graph',     // görünüm varsayılanı: 'staff' (yalnız porte: hedef ve canlı nota başı) · 'staff+graph' (porte + akan çizgi) · 'graph' (sent grafiği)
                                   // Sınav ve Serbest çalışma için seçim ayrı ayrı hatırlanır (solfejlab.ui.v1)
+    VIEW_MODE_MOBILE: 'staff',    // telefonda (kısa kenarı ≤ 600 px dokunmatik ekran) görünüm varsayılanı; masaüstü ve tablet VIEW_MODE'u kullanır
     VEXFLOW_PANEL: false,         // ayrı VexFlow porte paneli (yalnızca "Portede göster" açıkken; kütüphane CDN'den yüklenir)
     STAFF_WARN_YELLOW: false,     // portede canlı nota başı ve çizgi: true → sınırdayken (WARNING_CENTS içinde) sarı; false → yalnızca yeşil/kırmızı
     GAUGE_RANGE_CENTS: 100,       // dikey göstergenin yarı ölçeği (± sent); 100 → uçlar tam bir yarım ses aşağı/yukarı
@@ -342,6 +343,11 @@ export const CONFIG = {
     histExams: 'Sınav',
     histDrills: 'Alıştırma',
     tagDrill: 'Alıştırma',
+    resumeBackground: 'Uygulama arka plana geçtiği için durakladı; mikrofon ve ses durdu.',
+    resumeAudio: 'Ses kapalı (askıda). Sesi açmak için dokun.',
+    btnResumeGo: 'Devam et',
+    btnAudioOn: 'Sesi aç',
+    scTouchNote: 'Dokunmatik ekranda kısayollar yalnızca bağlı bir klavyeyle çalışır.',
     phoneHeadphones: 'Kulaklık takın: hoparlör sesi mikrofona karışır; sessiz modda ses kesilebilir.',
     // Klavye kısayolları (Aşama 6)
     setTabKeys: 'Kısayollar',

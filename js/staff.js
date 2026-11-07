@@ -29,18 +29,31 @@ export function setupContour() {
     head: v('--staff-head', 'rgba(203,213,225,.78)'), guide: v('--staff-guide', 'rgba(138,164,255,.55)'),
   };
   contour.mono = v('--mono', 'monospace');
+  // CSS boyutu (genişlik %100, yükseklik --view-h) ekrandan okunur; iç çözünürlük = CSS boyutu × devicePixelRatio (en fazla 2)
   const measure = () => {
     const r = cv.getBoundingClientRect();
-    contour.w = Math.max(1, Math.round(r.width));
-    contour.h = Math.max(1, Math.round(r.height));
-    contour.dpr = Math.min(2, window.devicePixelRatio || 1);
-    cv.width = Math.round(contour.w * contour.dpr);
-    cv.height = Math.round(contour.h * contour.dpr);
+    const w = Math.max(1, Math.round(r.width)), h = Math.max(1, Math.round(r.height));
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    if (w === contour.w && h === contour.h && dpr === contour.dpr && cv.width === Math.round(w * dpr)) return;   // değişmediyse tuval silinmez
+    contour.w = w; contour.h = h; contour.dpr = dpr;
+    cv.width = Math.round(w * dpr);
+    cv.height = Math.round(h * dpr);
     drawContour(performance.now());
   };
+  let raf = 0;
+  const schedule = () => { if (!raf) raf = requestAnimationFrame(() => { raf = 0; measure(); }); };
+  contour.w = 0;
   measure();
-  if ('ResizeObserver' in window) new ResizeObserver(measure).observe(cv);
-  else window.addEventListener('resize', measure);
+  if ('ResizeObserver' in window) new ResizeObserver(schedule).observe(cv);
+  window.addEventListener('resize', schedule);
+  // Telefon/tablet döndürülünce: tarayıcı yeni boyutu biraz gecikmeyle verir
+  window.addEventListener('orientationchange', () => { schedule(); setTimeout(schedule, 300); });
+  // Piksel oranı değişince (yakınlaştırma, başka ekrana taşıma) boyut aynı kalsa da iç çözünürlük yenilenir
+  const watchDpr = () => {
+    const mq = window.matchMedia?.(`(resolution: ${window.devicePixelRatio || 1}dppx)`);
+    mq?.addEventListener?.('change', () => { schedule(); watchDpr(); }, { once: true });
+  };
+  watchDpr();
 }
 /** midi: puanlamadaki gibi katlanmış perde (hedef.midi + sent/100) → porte basamağı burada, yazım bağlamıyla hesaplanır */
 export function pushContour(t, cents, held, midi = NaN, zone = 'none') {
@@ -454,13 +467,17 @@ export let staffRaf = 0;
 // ── Görünüm: 'staff' (yalnız porte) · 'staff+graph' (porte + akan çizgi) · 'graph' (sent grafiği) ──
 // Sınav ve Serbest çalışma için ayrı ayrı hatırlanır (solfejlab.ui.v1 → viewMode.exam / viewMode.practice).
 export let viewMode = 'staff+graph';
-/** Bir çalışma modunun hatırlanan görünümü (yoksa CONFIG.UI.VIEW_MODE) */
+/** Telefon: dokunmatik ve ekranın kısa kenarı ≤ 600 px (dikey ve yatay aynı sonuç) */
+export const phoneScreen = () => !!window.matchMedia?.('(pointer: coarse)').matches && Math.min(screen.width, screen.height) <= 600;
+/** Görünüm varsayılanı: telefonda CONFIG.UI.VIEW_MODE_MOBILE ('Porte'), masaüstü ve tablette CONFIG.UI.VIEW_MODE */
+export const defaultViewMode = () => (phoneScreen() && VIEW_MODES.includes(CONFIG.UI.VIEW_MODE_MOBILE) ? CONFIG.UI.VIEW_MODE_MOBILE : CONFIG.UI.VIEW_MODE);
+/** Bir çalışma modunun hatırlanan görünümü (yoksa cihaza göre varsayılan) */
 export function viewModeFor(m) {
   const v = loadUiState().viewMode?.[m];
-  return VIEW_MODES.includes(v) ? v : CONFIG.UI.VIEW_MODE;
+  return VIEW_MODES.includes(v) ? v : defaultViewMode();
 }
 export function setViewMode(vm, { persist = true } = {}) {
-  if (!VIEW_MODES.includes(vm)) vm = CONFIG.UI.VIEW_MODE;
+  if (!VIEW_MODES.includes(vm)) vm = defaultViewMode();
   viewMode = vm;
   const staffOn = vm !== 'graph';
   staffView.on = staffOn;

@@ -112,6 +112,9 @@ export function renderShortcuts() {
   const bad = new Set(Object.values(conflicts).flat());
   const intro = el('p', 'small-note', T('scIntro'));
   intro.dataset.text = 'scIntro';
+  // Dokunmatik cihaz (telefon / tablet): liste kalır ama başta kısa uyarı (bağlı klavyeyle yine çalışır)
+  const touchNote = window.matchMedia?.('(pointer: coarse)').matches ? el('p', 'notice sc-touch', T('scTouchNote')) : null;
+  if (touchNote) touchNote.dataset.text = 'scTouchNote';
   const rows = el('div', 'sc-rows');
   for (const id of SHORTCUT_ACTIONS) {
     const row = el('div', `sc-row${bad.has(id) ? ' conflict' : ''}`);
@@ -134,7 +137,7 @@ export function renderShortcuts() {
   const reset = el('button', 'btn ghost', T('btnScResetAll')); reset.type = 'button'; reset.dataset.text = 'btnScResetAll';
   reset.addEventListener('click', () => { const o = deepMerge(configOverrides, {}); delete o.SHORTCUTS; applyOverrides(o); renderShortcuts(); });
   acts.append(copy, reset);
-  box.replaceChildren(intro, rows, msg, acts);
+  box.replaceChildren(...(touchNote ? [touchNote] : []), intro, rows, msg, acts);
 }
 /** Değişen kısayolları JSON olarak panoya kopyalar (varsayılan yapmak için geliştiriciye verilir) */
 export async function copyShortcuts() {

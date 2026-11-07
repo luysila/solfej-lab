@@ -193,6 +193,7 @@ export const SETTINGS_SCHEMA = [
   ] },
   { title: 'Görünüm', tab: 'view', fields: [
     { path: 'UI.VIEW_MODE', label: 'Görünüm varsayılanı', type: 'select', options: [['staff', 'Porte'], ['staff+graph', 'Porte + grafik'], ['graph', 'Grafik (sent)']] },
+    { path: 'UI.VIEW_MODE_MOBILE', label: 'Görünüm varsayılanı (telefon)', type: 'select', options: [['staff', 'Porte'], ['staff+graph', 'Porte + grafik'], ['graph', 'Grafik (sent)']] },
     { path: 'UI.COACH_FONT_PX', label: 'Yönlendirme yazı boyutu (px)', type: 'number', min: 12, max: 40, step: 1 },
     { path: 'UI.VEXFLOW_PANEL', label: 'Ayrı VexFlow porte paneli', type: 'bool' },
     { path: 'UI.STAFF_WARN_YELLOW', label: 'Portede sınırdayken sarı', type: 'bool' },

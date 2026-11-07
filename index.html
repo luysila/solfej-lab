@@ -6,25 +6,25 @@
 <meta name="color-scheme" content="dark">
 <title>Solfej Lab · İşitme Eğitimi</title>
 
-<link rel="stylesheet" href="./css/style.css?v=202611021251">
+<link rel="stylesheet" href="./css/style.css?v=202611071335">
 <!-- Sürüm etiketi (?v=…): yayından sonra tarayıcı önbelleğinde eski ve yeni dosyalar karışmasın.
      Elle değiştirmeyin; dosyaları değiştirdikten sonra: npm run stamp (scripts/stamp.mjs import map'i de yeniden üretir) -->
 <script type="importmap">
 {
   "imports": {
-    "./js/app.js": "./js/app.js?v=202611021251",
-    "./js/audio.js": "./js/audio.js?v=202611021251",
-    "./js/config.js": "./js/config.js?v=202611021251",
-    "./js/custom.js": "./js/custom.js?v=202611021251",
-    "./js/drill.js": "./js/drill.js?v=202611021251",
-    "./js/keys.js": "./js/keys.js?v=202611021251",
-    "./js/mic.js": "./js/mic.js?v=202611021251",
-    "./js/nav.js": "./js/nav.js?v=202611021251",
-    "./js/pure.js": "./js/pure.js?v=202611021251",
-    "./js/settings.js": "./js/settings.js?v=202611021251",
-    "./js/staff.js": "./js/staff.js?v=202611021251",
-    "./js/summary.js": "./js/summary.js?v=202611021251",
-    "./js/ui.js": "./js/ui.js?v=202611021251"
+    "./js/app.js": "./js/app.js?v=202611071335",
+    "./js/audio.js": "./js/audio.js?v=202611071335",
+    "./js/config.js": "./js/config.js?v=202611071335",
+    "./js/custom.js": "./js/custom.js?v=202611071335",
+    "./js/drill.js": "./js/drill.js?v=202611071335",
+    "./js/keys.js": "./js/keys.js?v=202611071335",
+    "./js/mic.js": "./js/mic.js?v=202611071335",
+    "./js/nav.js": "./js/nav.js?v=202611071335",
+    "./js/pure.js": "./js/pure.js?v=202611071335",
+    "./js/settings.js": "./js/settings.js?v=202611071335",
+    "./js/staff.js": "./js/staff.js?v=202611071335",
+    "./js/summary.js": "./js/summary.js?v=202611071335",
+    "./js/ui.js": "./js/ui.js?v=202611071335"
   }
 }
 </script>
@@ -58,6 +58,8 @@
 
   <div class="alert" id="alert" role="alert" hidden></div>
   <div class="notice" id="notice" role="status" hidden></div>
+  <!-- Telefon/tablet: arka planda durakladı ya da ses askıda → açık mesaj ve tek düğme (js/app.js → refreshResumeBanner) -->
+  <div class="resume-banner" id="resumeBanner" role="status" hidden><span id="resumeText"></span><button class="btn primary" id="resumeBtn" type="button"></button></div>
 
   <!-- ══ Ana sayfa ══ -->
   <section class="section" id="sec-home" data-sec="ana-sayfa" hidden>
@@ -428,6 +430,6 @@
     a.hidden = false;
   }
 </script>
-<script type="module" src="./js/app.js?v=202611021251"></script>
+<script type="module" src="./js/app.js?v=202611071335"></script>
 </body>
 </html>

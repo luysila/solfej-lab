@@ -1069,6 +1069,11 @@ if (run('M')) {
       }
       await page.screenshot({ path: `${OUT}/m-${name}-${sec}.png` });
     }
+    if (isPhone) {                                  // telefonda görünüm varsayılanı "Porte" (CONFIG.UI.VIEW_MODE_MOBILE)
+      await go(page, 'sinav');
+      const vm = await page.evaluate(() => document.querySelector('#viewSeg [aria-pressed="true"]')?.dataset.view);
+      assert.equal(vm, 'staff', `${name}: telefonda görünüm varsayılanı Porte`);
+    }
     if (isTablet) {                                 // iki sütun: solda kontroller, sağda porte ve gösterge
       await go(page, 'sinav');
       const two = await page.evaluate(() => { const a = document.getElementById('examPanel').getBoundingClientRect(), t = document.getElementById('tuner').getBoundingClientRect(); return { left: Math.round(a.left), tunerLeft: Math.round(t.left), aRight: Math.round(a.right) }; });
@@ -1090,7 +1095,11 @@ if (run('M')) {
       assert.equal(await page.evaluate(() => window.__dbg.paused), true, 'arka planda duraklamalı');
       await page.evaluate(() => { Object.defineProperty(document, 'hidden', { configurable: true, get: () => false }); document.dispatchEvent(new Event('visibilitychange')); });
       assert.equal(await page.evaluate(() => window.__dbg.paused), true, 'dönünce kendiliğinden sürmemeli');
-      await page.tap('#examPauseBtn');
+      const banner = await page.evaluate(() => { const b = document.getElementById('resumeBanner'); return { shown: !b.hidden, kind: b.dataset.kind, btn: document.getElementById('resumeBtn').textContent }; });
+      assert.ok(banner.shown && banner.kind === 'resumeBackground' && /Devam et/.test(banner.btn), `arka plandan dönüşte durum mesajı ve "Devam et" ${JSON.stringify(banner)}`);
+      await page.screenshot({ path: `${OUT}/m-iphone13-background.png` });
+      await page.tap('#resumeBtn');
+      await waitFor(page, () => !window.__dbg.paused && document.getElementById('resumeBanner').hidden, null, 5000);
       await waitFor(page, () => window.__dbg.state === 'SUMMARY', null, 40000);
       const sc = await page.evaluate(() => ({ score: window.__dbg.diag.score, statuses: window.__dbg.session.results.map((r) => r.status).join(',') }));
       log('iPhone 13 sınav:', JSON.stringify(sc));
@@ -1099,6 +1108,46 @@ if (run('M')) {
     }
     assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0, `${name}: sayfa hatası`);
     await context.close();
+  }
+  // Dikey ve yatay: iPhone 13 (390×844) ve iPad (820×1180). Ekran görüntüsü, ekrandan taşan öğe, tuval iç çözünürlüğü
+  {
+    const ipad = { ...devices['iPad (gen 7)'], viewport: { width: 820, height: 1180 }, screen: { width: 820, height: 1180 } };
+    const ipadL = { ...ipad, viewport: { width: 1180, height: 820 }, screen: { width: 1180, height: 820 } };
+    for (const [name, dev] of [['iphone13-dikey', devices['iPhone 13']], ['iphone13-yatay', devices['iPhone 13 landscape']], ['ipad820-dikey', ipad], ['ipad820-yatay', ipadL]]) {
+      const { context, page, consoleMsgs } = await openPage('offline', FAST, { device: dev });
+      const measure = () => page.evaluate(() => {
+        const W = document.documentElement.clientWidth;
+        const out = [...document.querySelectorAll('main *, header *')].filter((x) => {
+          if (!x.getClientRects().length || x.closest('[hidden], dialog:not([open])')) return false;
+          const b = x.getBoundingClientRect();
+          if (b.width === 0 || b.right <= W + 1) return false;
+          for (let q = x.parentElement; q && q !== document.body; q = q.parentElement) { const o = getComputedStyle(q).overflowX; if (o !== 'visible') return false; }   // kendi içinde kayan / kırpılan kutu
+          return true;
+        }).slice(0, 3).map((x) => `${x.tagName.toLowerCase()}#${x.id}.${[...x.classList].join('.')} → ${Math.round(x.getBoundingClientRect().right)}/${W}`);
+        const cv = document.getElementById('contour'), cr = cv.getBoundingClientRect(), dpr = Math.min(2, devicePixelRatio || 1);
+        return { scroll: document.documentElement.scrollWidth - innerWidth, out, canvas: cv.offsetParent ? { w: cv.width, h: cv.height, expect: Math.round(Math.round(cr.width) * dpr), expectH: Math.round(Math.round(cr.height) * dpr) } : null };
+      });
+      for (const sec of ['ana-sayfa', 'sinav', 'serbest', 'ayarlar']) {
+        await go(page, sec);
+        await page.waitForTimeout(200);
+        const r = await measure();
+        assert.ok(r.scroll <= 0 && r.out.length === 0, `${name} ${sec}: yatay taşma ${r.scroll}px · ${r.out.join(' | ')}`);
+        if (r.canvas) assert.ok(r.canvas.w === r.canvas.expect && r.canvas.h === r.canvas.expectH, `${name} ${sec}: tuval iç çözünürlüğü = CSS boyutu × devicePixelRatio ${JSON.stringify(r.canvas)}`);
+        await page.screenshot({ path: `${OUT}/m-${name}-${sec}.png` });
+      }
+      // Döndürme: aynı sayfada boyut değişince tuval yeniden ölçülür, taşma olmaz
+      const vp = dev.viewport;
+      await go(page, 'sinav');
+      await page.setViewportSize({ width: vp.height, height: vp.width });
+      await page.waitForTimeout(400);
+      const rot = await measure();
+      assert.ok(rot.scroll <= 0 && rot.out.length === 0, `${name}: döndürünce yatay taşma ${rot.scroll}px · ${rot.out.join(' | ')}`);
+      if (rot.canvas) assert.ok(rot.canvas.w === rot.canvas.expect && rot.canvas.h === rot.canvas.expectH, `${name}: döndürünce tuval yeniden boyutlanmalı ${JSON.stringify(rot.canvas)}`);
+      await page.screenshot({ path: `${OUT}/m-${name}-dondurulmus.png` });
+      log(`${name}: yerleşim ve döndürme tamam`, JSON.stringify(rot.canvas));
+      assert.equal(consoleMsgs.filter((m) => /PAGEERROR/.test(m)).length, 0, `${name}: sayfa hatası`);
+      await context.close();
+    }
   }
   // WebKit (Safari motoru): yerleşim ve sayfa hataları
   let wk = null;

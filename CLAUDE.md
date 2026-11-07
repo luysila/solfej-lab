@@ -163,6 +163,13 @@ Yalnızca `ALLOWED` tablosundaki geçişler serbesttir.
   'play-and-record' (destek varsa); telefonda bir kez kulaklık uyarısı. Çalışma sırasında Screen Wake Lock (`keepAwake`);
   arka plana geçince (`visibilitychange`, `pagehide`) kendiliğinden duraklar. Görünmeyen porte çizilmez; piksel oranı en fazla 2.
   Testler: e2e M (iPhone 13, Pixel 7, iPad; ayrıca WebKit yerleşim testi; ekran görüntüleri `tests/.screenshots/m-*.png`).
+  Mobil düzeltmeler: kırılma noktaları telefon ≤600 · tablet 601–1024 · masaüstü >1024 (`--gutter` kenar boşluğu 16 / 20 / 12 px);
+  viewport'ta yakınlaştırma serbest. Arka plana geçince (`bgPaused`) dönüşte durum mesajı + "Devam et" (`#resumeBanner`,
+  `refreshResumeBanner`): ses ve mikrofon yeniden açılarak sürer; arka planda kopan mikrofon oturumu silmez. Çalışma sürerken
+  ses bağlamı askıdaysa "Sesi açmak için dokun" + "Sesi aç". Telefonda (dokunmatik, kısa kenar ≤600 px) görünüm varsayılanı
+  `UI.VIEW_MODE_MOBILE` ('staff'). Mikrofon izni reddinde iOS / Android'e göre yol tarifi (`explainError`). Kısayollar
+  sekmesinde dokunmatikte kısa uyarı. Tuval: CSS boyutu × devicePixelRatio; resize, döndürme ve piksel oranı değişince yeniden ölçülür.
+  e2e M ayrıca iPhone 13 ve iPad 820×1180 dikey/yatay + döndürme (öğe düzeyinde taşma, tuval çözünürlüğü) denetler.
 
 ## Doğrulanmamış / bilinen sınırlar
 - Tone.js (14.8.49) ve VexFlow (4.2.5) gerçek kütüphaneleriyle henüz denenmedi (önceki geliştirme ortamında CDN'ler

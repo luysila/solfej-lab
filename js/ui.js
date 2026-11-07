@@ -20,6 +20,7 @@ export const $ = (id) => document.getElementById(id);
 export const ui = {
   sub: $('subLine'), micChip: $('micChip'), micChipText: $('micChipText'), engineChip: $('engineChip'), engineChipText: $('engineChipText'),
   detChip: $('detChip'), latChip: $('latChip'), cfgChip: $('cfgChip'), alert: $('alert'), notice: $('notice'),
+  resumeBanner: $('resumeBanner'), resumeText: $('resumeText'), resumeBtn: $('resumeBtn'),
   examControls: $('examControls'), practiceControls: $('practiceControls'), practiceBusy: $('practiceBusy'),
   singleFields: $('singleFields'), drillSetup: $('drillSetup'), drillStart: $('drillStartBtn'), drillSkip: $('drillSkipBtn'), drillStop: $('drillStopBtn'),
   drillResult: $('drillResult'), drillMeta: $('drillMeta'), drillList: $('drillList'), drillAgain: $('drillAgainBtn'), drillClose: $('drillCloseBtn'),
@@ -98,9 +99,12 @@ export let starting = false;                   // başlat'a basıldı, mikrofon 
 export let uiReady = false;
 export let paused = false;                     // "Duraklat": dinleme ve soru süresi durur (durum makinesi olduğu yerde bekler)
 export let pausedSince = 0;                    // duraklatmanın başladığı an (Date.now) → sınav saatinden düşülür
+export let bgPaused = false;                   // duraklatmanın sebebi: sekme / uygulama arka plana geçti (telefon)
+export function assignBgPaused(v) { bgPaused = v; }
 
 /** Duraklatma durumunu değiştirir; sınav oturumunda duraklı geçen süreyi biriktirir (renderTimer bunu düşer) */
 export function setPausedState(on) {
+  if (!on) bgPaused = false;
   if (on === paused) return;
   if (!on && session && pausedSince) session.pausedMs = (session.pausedMs || 0) + (Date.now() - pausedSince);
   paused = on;
@@ -426,6 +430,15 @@ export function showNotice(msg, ms = 12000) {
   clearTimeout(noticeTimer);
   if (ms) noticeTimer = setTimeout(() => { ui.notice.hidden = true; }, ms);
 }
+/** Telefon/tablet durum mesajı + tek düğme (arka planda durakladı → "Devam et"; ses askıda → "Sesi aç"). Mantık app.js → refreshResumeBanner */
+export function showResumeBanner(textKey, btnKey) {
+  if (!ui.resumeBanner) return;
+  setTextKey(ui.resumeText, textKey);
+  setTextKey(ui.resumeBtn, btnKey);
+  ui.resumeBanner.dataset.kind = textKey;
+  ui.resumeBanner.hidden = false;
+}
+export function hideResumeBanner() { if (ui.resumeBanner) { ui.resumeBanner.hidden = true; delete ui.resumeBanner.dataset.kind; } }
 
 export function setMicChip(on, label) {
   ui.micChip.classList.toggle('on', on);
@@ -524,7 +537,8 @@ export function observeGauge() {
   const measure = () => { gaugeHalf = ui.gauge.clientHeight / 2; };
   measure();
   if ('ResizeObserver' in window) new ResizeObserver(measure).observe(ui.gauge);
-  else window.addEventListener('resize', measure);
+  window.addEventListener('resize', measure);                 // gösterge DOM tabanlı (CSS ölçekli); yalnız yarı yükseklik gerekir
+  window.addEventListener('orientationchange', () => setTimeout(measure, 300));
 }
 export function setZone(zone) {
   if (zone !== curZone) { curZone = zone; ui.tuner.dataset.zone = zone; }

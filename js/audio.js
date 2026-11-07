@@ -102,12 +102,18 @@ export function createAudioContext() {
   masterGain.gain.value = CONFIG.AUDIO.MASTER_GAIN;
   masterGain.connect(audioCtx.destination);
   voiceWave = createVoiceWave(audioCtx);
+  // Ses bağlamı askıya alınınca (iOS arka plan, arama, Android pil tasarrufu) arayüz "Sesi aç" mesajı gösterir (app.js)
+  audioCtx.addEventListener?.('statechange', () => window.dispatchEvent(new CustomEvent('solfej:audiostate', { detail: audioCtx.state })));
   return audioCtx;
 }
+/** Ses bağlamı oluşturulmuş ama çalışmıyor mu (suspended / iOS 'interrupted') */
+export const audioSuspended = () => !!audioCtx && audioCtx.state !== 'running' && audioCtx.state !== 'closed';
 
 export async function ensureAudio() {
   createAudioContext();
-  if (audioCtx.state !== 'running') await audioCtx.resume();   // kullanıcı jesti içinde çağrılır
+  // Kullanıcı jesti ("Başlat" dokunuşu) içinde çağrılır. iOS'ta bağlam 'interrupted' iken resume() hiç
+  // sonuçlanmayabilir; en fazla 1,5 sn beklenir, hâlâ askıdaysa arayüz "Sesi açmak için dokun" gösterir.
+  if (audioCtx.state !== 'running') await Promise.race([audioCtx.resume().catch(() => {}), sleep(1500)]);
   unlockAudio();
 }
 

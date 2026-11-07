@@ -4,7 +4,7 @@
 import { CONFIG } from './config.js';
 import { MedianFilter, YinDetector, dbToLin } from './pure.js';
 import { audioCtx, loadPitchy, setAudioSession } from './audio.js';
-import { examActive, renderDetectorChip, setMicChip, showAlert, showNotice, ui, updateLatencyChip } from './ui.js';
+import { bgPaused, examActive, renderDetectorChip, setMicChip, showAlert, showNotice, ui, updateLatencyChip } from './ui.js';
 import { assignRafId, frame, hardReset, rafId } from './app.js';
 
 // ───────────────────────────────────────────────────────────────────────
@@ -137,12 +137,14 @@ export function stopMic() {
 }
 
 export async function ensureMic() {
-  if (analyser && micStream?.active) return;
+  if (analyser && micStream?.active && micStream.getAudioTracks()[0]?.readyState !== 'ended') return;
   await startMic(settings.deviceId);
 }
 
 export function onMicLost() {
   stopMic();
+  // Telefon arka plana geçince tarayıcı mikrofonu kapatabilir: oturum silinmez, dönünce "Devam et" mikrofonu yeniden açar
+  if (document.hidden || bgPaused) { setMicChip(false, 'Mikrofon durdu'); return; }
   setMicChip(false, 'Giriş koptu');
   hardReset();
   showAlert('Ses girişi kesildi (cihaz çıkarılmış olabilir). Girişi kontrol edip yeniden başlayın.');
@@ -164,11 +166,26 @@ export function explainError(err) {
   if (err?.code === 'NO_WEBAUDIO') return 'Bu tarayıcı Web Audio API desteklemiyor.';
   if (err?.code === 'INSECURE' || err?.name === 'SecurityError') return 'Mikrofon için sayfa https veya http://localhost üzerinden açılmalıdır.';
   switch (err?.name) {
-    case 'NotAllowedError':  return 'Mikrofon izni verilmedi. Adres çubuğundaki izin simgesinden mikrofona izin verip tekrar deneyin.';
+    case 'NotAllowedError':  return micDeniedText();
     case 'NotFoundError':    return 'Ses girişi bulunamadı. Ses kartınızın bağlı ve işletim sisteminde etkin olduğundan emin olun.';
-    case 'NotReadableError': return 'Ses girişi açılamadı; başka bir uygulama (ör. ASIO/özel mod) kullanıyor olabilir.';
+    case 'NotReadableError': return mobileDevice()
+      ? 'Mikrofon açılamadı: başka bir uygulama (telefon görüşmesi, ses kaydı, görüntülü arama) kullanıyor olabilir. O uygulamayı kapatıp "Başlat"a yeniden dokunun.'
+      : 'Ses girişi açılamadı; başka bir uygulama (ör. ASIO/özel mod) kullanıyor olabilir.';
+    case 'AbortError':       return 'Mikrofon açılırken kesildi (ör. arama geldi ya da uygulama arka plana geçti). "Başlat"a yeniden dokunun.';
+    case 'OverconstrainedError': return 'Seçili ses girişi bu ayarlarla açılamadı. Ayarlar → Ses ve algılama bölümünden başka bir giriş seçin.';
     default:                 return `Beklenmeyen hata: ${err?.message || err}`;
   }
+}
+/** Dokunmatik ana işaretçi (telefon / tablet) */
+const mobileDevice = () => !!window.matchMedia?.('(pointer: coarse)').matches;
+/** Mikrofon izni reddedildi: cihaza göre nereden açılacağını söyler */
+function micDeniedText() {
+  const ua = navigator.userAgent || '';
+  const ios = /iPhone|iPad|iPod/.test(ua) || (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const head = 'Mikrofon izni verilmedi; uygulama sesinizi duyamıyor.';
+  if (ios) return `${head} iPhone/iPad: adres çubuğundaki "aA" (ya da ⓘ) simgesine dokunun → Web Sitesi Ayarları → Mikrofon → İzin Ver. İzin sorulmuyorsa Ayarlar → Safari → Mikrofon bölümüne bakın. Sonra "Başlat"a yeniden dokunun.`;
+  if (/Android/.test(ua)) return `${head} Android: adres çubuğundaki kilit simgesine dokunun → İzinler → Mikrofon → İzin ver. Hâlâ olmuyorsa telefonun Ayarlar → Uygulamalar → tarayıcı → İzinler bölümünde mikrofonu açın. Sonra "Başlat"a yeniden dokunun.`;
+  return `${head} Adres çubuğundaki izin simgesinden mikrofona izin verip tekrar deneyin.`;
 }
 
 // ── Başka modüllerin değiştirdiği paylaşılan değişkenler ──

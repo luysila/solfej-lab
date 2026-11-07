@@ -1363,6 +1363,7 @@ export function validateConfig(cfg) {
   num(cfg.UI?.COACH_FAR_CENTS, 30, 600, 'UI.COACH_FAR_CENTS');
   num(cfg.UI?.COACH_FONT_PX, 12, 40, 'UI.COACH_FONT_PX');
   oneOf(cfg.UI?.VIEW_MODE, VIEW_MODES, 'UI.VIEW_MODE');
+  oneOf(cfg.UI?.VIEW_MODE_MOBILE, VIEW_MODES, 'UI.VIEW_MODE_MOBILE');
   num(cfg.HISTORY?.MAX_ENTRIES, 1, 1000, 'HISTORY.MAX_ENTRIES');
   for (const [p, v] of textLeaves(cfg.TEXTS)) {                // arayüz adları: boş olamaz, uzunluk sınırı
     if (typeof v !== 'string' || !v.trim()) errs.push(`TEXTS.${p}: ad boş olamaz`);
